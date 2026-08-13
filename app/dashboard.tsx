@@ -6,7 +6,7 @@ import AdminPanel from './admin-panel';
 import {HistoryPage,ActivityPage,MissionControlPage,RankingPage} from './tracker-pages-v2';
 import {FullSettings,settingsDefaults} from './full-settings';
 import {monthlyReward} from '@/lib/reward';
-import './globals.css';import './post-library.css';import './tracker-sections.css';import './video-reference.css';import './screenshot-exact.css';
+import './globals.css';import './post-library.css';import './tracker-sections.css';import './video-reference.css';import './screenshot-exact.css';import './interactions.css';
 
 const blank={post_url:'',title:'Publicação do X',views:0,likes:0,reposts:0,comments:0,mission_profile_id:'',image_urls:'',video_url:''};
 const nav=['Painel','Classificação','Comunidade','História','Centro de Controle da Missão','Registro de atividades','Configurações'];
