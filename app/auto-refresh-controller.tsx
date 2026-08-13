@@ -7,6 +7,7 @@ type AutoConfig={active:boolean;hours:number};
 type StoredTimer={deadline:number;hours:number};
 
 const toSeconds=(hours:number)=>Math.max(1,Math.round((Number(hours)||.5)*3600));
+const toMs=(hours:number)=>toSeconds(hours)*1000;
 const formatTime=(seconds:number)=>{const v=Math.max(0,Math.floor(seconds));const h=Math.floor(v/3600);const m=Math.floor((v%3600)/60);const s=v%60;return h>0?`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`};
 const timerKey=(uid:string)=>`aoh:auto-refresh-timer:${uid}`;
 
@@ -16,7 +17,8 @@ export default function AutoRefreshController(){
  const[host,setHost]=useState<HTMLElement|null>(null);
  const[uid,setUid]=useState('');
 
- const saveDeadline=(userId:string,hours:number)=>{const deadline=Date.now()+toSeconds(hours)*1000;localStorage.setItem(timerKey(userId),JSON.stringify({deadline,hours} satisfies StoredTimer));setRemaining(Math.max(0,Math.ceil((deadline-Date.now())/1000)));return deadline};
+ const persistTimer=(userId:string,deadline:number,hours:number)=>{localStorage.setItem(timerKey(userId),JSON.stringify({deadline,hours} satisfies StoredTimer));setRemaining(Math.max(0,Math.ceil((deadline-Date.now())/1000)));return deadline};
+ const saveDeadline=(userId:string,hours:number)=>persistTimer(userId,Date.now()+toMs(hours),hours);
 
  useEffect(()=>{
   let mounted=true;
@@ -33,10 +35,22 @@ export default function AutoRefreshController(){
   if(!config.active){setRemaining(0);localStorage.removeItem(timerKey(uid));return}
   let stored:StoredTimer|null=null;
   try{stored=JSON.parse(localStorage.getItem(timerKey(uid))||'null')}catch{}
-  const sameInterval=stored&&Number(stored.hours)===Number(config.hours);
-  const stillValid=stored&&Number(stored.deadline)>Date.now();
-  if(sameInterval&&stillValid){setRemaining(Math.max(0,Math.ceil((Number(stored!.deadline)-Date.now())/1000)));return}
-  saveDeadline(uid,config.hours);
+  if(!stored){saveDeadline(uid,config.hours);return}
+
+  const oldHours=Number(stored.hours||config.hours);
+  const oldDeadline=Number(stored.deadline||0);
+  const sameInterval=oldHours===Number(config.hours);
+  if(sameInterval){
+   if(oldDeadline>Date.now())persistTimer(uid,oldDeadline,config.hours);
+   else persistTimer(uid,oldDeadline,config.hours);
+   return;
+  }
+
+  // Preserve the elapsed portion of the current cycle when the interval changes.
+  // Example: 30 min interval with 10 min elapsed -> changing to 60 min leaves 50 min.
+  const cycleStartedAt=oldDeadline-toMs(oldHours);
+  const adjustedDeadline=cycleStartedAt+toMs(config.hours);
+  persistTimer(uid,adjustedDeadline,config.hours);
  },[uid,config.active,config.hours]);
 
  useEffect(()=>{
