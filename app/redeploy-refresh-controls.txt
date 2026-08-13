@@ -1,0 +1,1 @@
+Force Vercel production rebuild after refresh controls fix.
