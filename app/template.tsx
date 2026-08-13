@@ -1,2 +1,5 @@
 import BulkReviewInjector from './bulk-review-injector';
-export default function Template({children}:{children:React.ReactNode}){return <>{children}<BulkReviewInjector/></>}
+import SiteUpgrades from './site-upgrades';
+import PostSortEnhancer from './post-sort-enhancer';
+import './site-upgrades.css';
+export default function Template({children}:{children:React.ReactNode}){return <>{children}<BulkReviewInjector/><SiteUpgrades/><PostSortEnhancer/></>}
