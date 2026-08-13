@@ -1,0 +1,2 @@
+Restauração da versão validada até a solução do vídeo em 1,2 segundo.
+Componentes restaurados em commit atômico.
