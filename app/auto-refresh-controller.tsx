@@ -4,18 +4,23 @@ import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
 
 type AutoConfig={active:boolean;hours:number};
+type StoredTimer={deadline:number;hours:number};
 
 const toSeconds=(hours:number)=>Math.max(1,Math.round((Number(hours)||.5)*3600));
 const formatTime=(seconds:number)=>{const v=Math.max(0,Math.floor(seconds));const h=Math.floor(v/3600);const m=Math.floor((v%3600)/60);const s=v%60;return h>0?`${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`};
+const timerKey=(uid:string)=>`aoh:auto-refresh-timer:${uid}`;
 
 export default function AutoRefreshController(){
  const[config,setConfig]=useState<AutoConfig>({active:false,hours:.5});
  const[remaining,setRemaining]=useState(0);
  const[host,setHost]=useState<HTMLElement|null>(null);
+ const[uid,setUid]=useState('');
+
+ const saveDeadline=(userId:string,hours:number)=>{const deadline=Date.now()+toSeconds(hours)*1000;localStorage.setItem(timerKey(userId),JSON.stringify({deadline,hours} satisfies StoredTimer));setRemaining(Math.max(0,Math.ceil((deadline-Date.now())/1000)));return deadline};
 
  useEffect(()=>{
   let mounted=true;
-  const loadConfig=async()=>{const{data:{session}}=await supabase.auth.getSession();if(!session||!mounted){if(mounted)setConfig({active:false,hours:.5});return}const{data}=await supabase.from('user_settings').select('show_refresh_timer,refresh_interval').eq('user_id',session.user.id).maybeSingle();if(mounted)setConfig({active:!!data?.show_refresh_timer,hours:Number(data?.refresh_interval||.5)})};
+  const loadConfig=async()=>{const{data:{session}}=await supabase.auth.getSession();if(!session||!mounted){if(mounted){setUid('');setConfig({active:false,hours:.5})}return}const userId=session.user.id;setUid(userId);const{data}=await supabase.from('user_settings').select('show_refresh_timer,refresh_interval').eq('user_id',userId).maybeSingle();if(mounted)setConfig({active:!!data?.show_refresh_timer,hours:Number(data?.refresh_interval||.5)})};
   loadConfig();
   const{data:auth}=supabase.auth.onAuthStateChange(()=>loadConfig());
   const changed=(event:Event)=>{const detail=(event as CustomEvent).detail||{};setConfig({active:!!detail.active,hours:Number(detail.hours||.5)})};
@@ -23,13 +28,26 @@ export default function AutoRefreshController(){
   return()=>{mounted=false;auth.subscription.unsubscribe();window.removeEventListener('aoh:auto-refresh-changed',changed)};
  },[]);
 
- useEffect(()=>{if(!config.active){setRemaining(0);return}setRemaining(toSeconds(config.hours))},[config.active,config.hours]);
+ useEffect(()=>{
+  if(!uid)return;
+  if(!config.active){setRemaining(0);localStorage.removeItem(timerKey(uid));return}
+  let stored:StoredTimer|null=null;
+  try{stored=JSON.parse(localStorage.getItem(timerKey(uid))||'null')}catch{}
+  const sameInterval=stored&&Number(stored.hours)===Number(config.hours);
+  const stillValid=stored&&Number(stored.deadline)>Date.now();
+  if(sameInterval&&stillValid){setRemaining(Math.max(0,Math.ceil((Number(stored!.deadline)-Date.now())/1000)));return}
+  saveDeadline(uid,config.hours);
+ },[uid,config.active,config.hours]);
 
- useEffect(()=>{if(!config.active)return;const timer=window.setInterval(()=>setRemaining(v=>Math.max(0,v-1)),1000);return()=>window.clearInterval(timer)},[config.active,config.hours]);
+ useEffect(()=>{
+  if(!config.active||!uid)return;
+  const tick=()=>{let stored:StoredTimer|null=null;try{stored=JSON.parse(localStorage.getItem(timerKey(uid))||'null')}catch{}const deadline=Number(stored?.deadline||0);setRemaining(Math.max(0,Math.ceil((deadline-Date.now())/1000)))};
+  tick();const timer=window.setInterval(tick,1000);return()=>window.clearInterval(timer)
+ },[config.active,config.hours,uid]);
 
- useEffect(()=>{if(!config.active||remaining!==0)return;const manual=document.querySelector<HTMLButtonElement>('.hero-actions .green-btn');if(manual&&!manual.disabled)manual.click();else window.location.reload();setRemaining(toSeconds(config.hours))},[remaining,config.active,config.hours]);
+ useEffect(()=>{if(!config.active||!uid||remaining!==0)return;const manual=document.querySelector<HTMLButtonElement>('.hero-actions .green-btn');saveDeadline(uid,config.hours);if(manual&&!manual.disabled)manual.click();else window.location.reload()},[remaining,config.active,config.hours,uid]);
 
- useEffect(()=>{const reset=(e:MouseEvent)=>{const el=e.target as HTMLElement|null;if(config.active&&el?.closest('.hero-actions .green-btn'))setRemaining(toSeconds(config.hours))};document.addEventListener('click',reset,true);return()=>document.removeEventListener('click',reset,true)},[config.active,config.hours]);
+ useEffect(()=>{const reset=(e:MouseEvent)=>{const el=e.target as HTMLElement|null;if(config.active&&uid&&el?.closest('.hero-actions .green-btn'))saveDeadline(uid,config.hours)};document.addEventListener('click',reset,true);return()=>document.removeEventListener('click',reset,true)},[config.active,config.hours,uid]);
 
  useEffect(()=>{
   if(!config.active){host?.remove();setHost(null);return}
