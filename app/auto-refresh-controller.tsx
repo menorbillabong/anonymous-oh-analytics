@@ -41,13 +41,12 @@ export default function AutoRefreshController(){
   const oldDeadline=Number(stored.deadline||0);
   const sameInterval=oldHours===Number(config.hours);
   if(sameInterval){
-   if(oldDeadline>Date.now())persistTimer(uid,oldDeadline,config.hours);
-   else persistTimer(uid,oldDeadline,config.hours);
+   persistTimer(uid,oldDeadline,config.hours);
    return;
   }
 
-  // Preserve the elapsed portion of the current cycle when the interval changes.
-  // Example: 30 min interval with 10 min elapsed -> changing to 60 min leaves 50 min.
+  // Keep the elapsed time from the current cycle when the configured interval changes.
+  // Example: after 10 minutes of a 30-minute cycle, switching to 60 minutes leaves 50 minutes.
   const cycleStartedAt=oldDeadline-toMs(oldHours);
   const adjustedDeadline=cycleStartedAt+toMs(config.hours);
   persistTimer(uid,adjustedDeadline,config.hours);
