@@ -1,0 +1,1 @@
+.publication-form{display:grid;gap:12px}.publication-form .locked-option{opacity:.4;pointer-events:none}.publication-form .special-options{display:grid;grid-template-columns:1fr 1fr;gap:10px}.publication-form .special-option{padding:12px;border:1px solid rgba(255,255,255,.08);border-radius:9px}

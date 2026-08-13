@@ -1,0 +1,1 @@
+.missions-grid{display:grid;gap:10px}.mission-card{border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:14px;background:#0a0d0a}.mission-card.disabled{opacity:.45}.mission-reward{color:#8dff59;font-weight:700}

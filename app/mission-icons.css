@@ -1,0 +1,2 @@
+/* Mission icon helpers */
+.mission-icon{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(124,255,64,.08);border:1px solid rgba(124,255,64,.15);color:#9cff65}.mission-icon svg{width:15px;height:15px}.mission-icon--muted{color:#8a8f98;background:rgba(255,255,255,.03);border-color:rgba(255,255,255,.08)}

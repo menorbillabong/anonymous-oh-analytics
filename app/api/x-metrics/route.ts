@@ -1,0 +1,2 @@
+import { NextResponse } from 'next/server';
+export async function POST(req:Request){try{const {url}=await req.json();if(!url)return NextResponse.json({error:'URL obrigatória'},{status:400});return NextResponse.json({url,views:null,likes:null,reposts:null,comments:null,message:'Coleta automática depende de credenciais/API configuradas.'})}catch{return NextResponse.json({error:'Requisição inválida'},{status:400})}}

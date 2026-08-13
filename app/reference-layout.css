@@ -1,0 +1,2 @@
+/* layout reference */
+.reference-shell{display:grid;grid-template-columns:260px 1fr;min-height:100vh}.reference-sidebar{border-right:1px solid rgba(255,255,255,.08);background:#090b09;padding:22px}.reference-content{padding:28px}.reference-topbar{height:58px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08)}

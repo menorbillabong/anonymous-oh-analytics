@@ -1,0 +1,1 @@
+.top-navigation{display:flex;gap:4px;align-items:center}.top-navigation button{border:0;background:transparent;color:#787f77;border-radius:7px;padding:8px 11px;font-size:12px}.top-navigation button:hover{color:#fff;background:rgba(255,255,255,.04)}.top-navigation button.active{color:#fff;background:rgba(255,255,255,.06)}

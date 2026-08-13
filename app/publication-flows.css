@@ -1,0 +1,1 @@
+.flow-steps{display:flex;gap:7px}.flow-step{height:5px;flex:1;border-radius:99px;background:rgba(255,255,255,.07)}.flow-step.active{background:#86ff4d}.flow-note{font-size:11px;color:#727a70}
