@@ -1,0 +1,12 @@
+/* Global hover/interactivity layer */
+:where(button,.btn,.tracker-add,.action-btn,.ghost-link,.icon-btn,.view-switch button,.tracker-top nav button,a){transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease,background-color .18s ease,color .18s ease,filter .18s ease}
+:where(button,.btn,.tracker-add,.action-btn,.ghost-link,.icon-btn,.view-switch button,.tracker-top nav button):not(:disabled):hover{transform:translateY(-2px);filter:brightness(1.06);box-shadow:0 8px 24px rgba(0,0,0,.28)}
+:where(button,.btn,.tracker-add,.action-btn,.ghost-link,.icon-btn,.view-switch button,.tracker-top nav button):not(:disabled):active{transform:translateY(0) scale(.98)}
+:where(.metric-card,.tracker-stat,.tracker-hero,.tracker-panel,.tracker-report,.panel,.post-card,.mission-create-card,.mission-existing,.settings-page article,.simple-page article,.summary-card,.formula-bar,.mission-table,.review-card,.tracker-empty,.history-grid article,.activity-list article,.rank-table>div,.tracker-stat-row>div){transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease,background-color .2s ease}
+:where(.metric-card,.tracker-stat,.tracker-hero,.tracker-panel,.tracker-report,.panel,.post-card,.mission-create-card,.mission-existing,.settings-page article,.simple-page article,.summary-card,.formula-bar,.mission-table,.review-card,.tracker-empty,.history-grid article,.activity-list article,.tracker-stat-row>div):hover{transform:translateY(-3px);border-color:rgba(246,169,74,.46)!important;box-shadow:0 12px 32px rgba(0,0,0,.34),0 0 0 1px rgba(246,169,74,.06);background-color:rgba(255,255,255,.018)}
+:where(input,select,textarea){transition:border-color .18s ease,box-shadow .18s ease,background-color .18s ease}
+:where(input,select,textarea):hover{border-color:rgba(246,169,74,.38)!important}
+:where(input,select,textarea):focus{border-color:rgba(246,169,74,.72)!important;box-shadow:0 0 0 3px rgba(246,169,74,.10)!important}
+:where(.mission-table tr,.rank-table>div,.post-card-head){transition:background-color .18s ease,transform .18s ease}
+:where(.mission-table tr,.rank-table>div,.post-card-head):hover{background:rgba(246,169,74,.045)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}.metric-card:hover,.tracker-stat:hover,.tracker-hero:hover,.tracker-panel:hover,.tracker-report:hover,.panel:hover,.post-card:hover,button:hover{transform:none!important}}
