@@ -1,7 +1,47 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
-import {createPortal} from 'react-dom';
+import {useEffect,useRef} from 'react';
 import {supabase} from '@/lib/supabase';
-function applyColors(s:any){const r=document.documentElement;r.style.setProperty('--aoh-accent',s?.accent_color||'#f6ad55');r.style.setProperty('--aoh-bg',s?.background_color||'#101010');r.style.setProperty('--aoh-surface',s?.surface_color||'#1e1e1e');r.style.setProperty('--aoh-border',s?.border_color||'#303030')}
-export default function SettingsPersistenceSync(){const uid=useRef(''),last=useRef('');const[active,setActive]=useState(false),[hours,setHours]=useState(.5),[left,setLeft]=useState(0),[ready,setReady]=useState(false);useEffect(()=>{setReady(true);let stopped=false;supabase.auth.getSession().then(async({data})=>{const id=data.session?.user.id||'';if(!id||stopped)return;uid.current=id;const{data:s}=await supabase.from('user_settings').select('*').eq('user_id',id).maybeSingle();applyColors(s||{});const h=Number(s?.refresh_interval||.5),on=!!s?.show_refresh_timer;setHours(h);setActive(on);setLeft(on?Math.round(h*3600):0);const value=String(Math.max(1,Number(s?.monthly_post_goal||60)));localStorage.setItem(`aoh:monthly-goal:${id}`,value);last.current=value});const goalTimer=setInterval(async()=>{const id=uid.current;if(!id)return;const value=String(Math.max(1,Number(localStorage.getItem(`aoh:monthly-goal:${id}`)||60)));if(value!==last.current){last.current=value;await supabase.from('user_settings').update({monthly_post_goal:Number(value),updated_at:new Date().toISOString()}).eq('user_id',id)}},1200);const onAuto=(event:Event)=>{const d=(event as CustomEvent).detail||{};const h=Number(d.hours||.5),on=!!d.active;setHours(h);setActive(on);setLeft(on?Math.round(h*3600):0)};window.addEventListener('aoh:auto-refresh-changed',onAuto as EventListener);return()=>{stopped=true;clearInterval(goalTimer);window.removeEventListener('aoh:auto-refresh-changed',onAuto as EventListener)}},[]);useEffect(()=>{if(!active){setLeft(0);return}setLeft(Math.round(hours*3600));const t=setInterval(()=>setLeft(v=>{if(v<=1){const b=[...document.querySelectorAll('button')].find(x=>(x.textContent||'').toUpperCase().includes('ATUALIZAR AGORA')) as HTMLButtonElement|null;b?.click();return Math.round(hours*3600)}return v-1}),1000);return()=>clearInterval(t)},[active,hours]);useEffect(()=>{const click=(e:MouseEvent)=>{const b=(e.target as HTMLElement).closest('button');if(active&&b&&(b.textContent||'').toUpperCase().includes('ATUALIZAR AGORA'))setLeft(Math.round(hours*3600))};document.addEventListener('click',click,true);return()=>document.removeEventListener('click',click,true)},[active,hours]);if(!ready||!active||left<=0)return null;const top=document.querySelector('.exact-topbar');if(!top)return null;return createPortal(<div className="auto-timer-pill"><span>↻</span><b>{fmt(left)}</b></div>,top)}
-function fmt(s:number){return `${String(Math.floor(s/3600)).padStart(2,'0')}:${String(Math.floor((s%3600)/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`}
+
+function applyColors(s:any){
+  const r=document.documentElement;
+  r.style.setProperty('--aoh-accent',s?.accent_color||'#f6ad55');
+  r.style.setProperty('--aoh-bg',s?.background_color||'#101010');
+  r.style.setProperty('--aoh-surface',s?.surface_color||'#1e1e1e');
+  r.style.setProperty('--aoh-border',s?.border_color||'#303030');
+}
+
+export default function SettingsPersistenceSync(){
+  const uid=useRef('');
+  const last=useRef('');
+
+  useEffect(()=>{
+    let stopped=false;
+    supabase.auth.getSession().then(async({data})=>{
+      const id=data.session?.user.id||'';
+      if(!id||stopped)return;
+      uid.current=id;
+      const{data:s}=await supabase.from('user_settings').select('*').eq('user_id',id).maybeSingle();
+      applyColors(s||{});
+      const value=String(Math.max(1,Number(s?.monthly_post_goal||60)));
+      localStorage.setItem(`aoh:monthly-goal:${id}`,value);
+      last.current=value;
+    });
+
+    const goalTimer=setInterval(async()=>{
+      const id=uid.current;
+      if(!id)return;
+      const value=String(Math.max(1,Number(localStorage.getItem(`aoh:monthly-goal:${id}`)||60)));
+      if(value!==last.current){
+        last.current=value;
+        await supabase.from('user_settings').update({monthly_post_goal:Number(value),updated_at:new Date().toISOString()}).eq('user_id',id);
+      }
+    },1200);
+
+    return()=>{
+      stopped=true;
+      clearInterval(goalTimer);
+    };
+  },[]);
+
+  return null;
+}
