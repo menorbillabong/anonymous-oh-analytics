@@ -5,4 +5,5 @@ import SettingsPersistenceSync from './settings-persistence-sync';
 import './site-upgrades.css';
 import './full-settings-v2.css';
 import './color-customization.css';
+// Single automatic refresh timer is mounted from app/page.tsx.
 export default function Template({children}:{children:React.ReactNode}){return <>{children}<BulkReviewInjector/><SiteUpgrades/><PostSortEnhancer/><SettingsPersistenceSync/></>}
