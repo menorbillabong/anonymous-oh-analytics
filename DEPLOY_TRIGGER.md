@@ -1,1 +1,1 @@
-Deployment trigger for unified X post preview, expanded details, and shared edit modal.
+Final production trigger for unified X post preview, expanded details, shared edit modal, and enriched X metrics.
