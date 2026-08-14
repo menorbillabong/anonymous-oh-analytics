@@ -4,7 +4,7 @@ import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
 
 type TimerState={active:boolean;hours:number;next:string|null};
-const msFor=(hours:number)=>Math.max(1,Number(hours)||.5)*3600000;
+const msFor=(hours:number)=>Math.max(.5,Number(hours)||.5)*3600000;
 const format=(seconds:number)=>{const s=Math.max(0,Math.floor(seconds));const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60;return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`};
 
 export default function DatabaseRefreshTimer(){
@@ -18,12 +18,7 @@ export default function DatabaseRefreshTimer(){
   const{data}=await supabase.from('user_settings').select('show_refresh_timer,refresh_interval,last_refresh_at,next_refresh_at').eq('user_id',userId).maybeSingle();
   if(!data)return;
   const active=!!data.show_refresh_timer,hours=Number(data.refresh_interval||.5);
-  let next=data.next_refresh_at as string|null;
-  if(active&&!next){
-   const now=new Date(),nextDate=new Date(now.getTime()+msFor(hours));
-   await supabase.from('user_settings').update({last_refresh_at:now.toISOString(),next_refresh_at:nextDate.toISOString()}).eq('user_id',userId);
-   next=nextDate.toISOString();
-  }
+  const next=data.next_refresh_at as string|null;
   setState({active,hours,next});
  };
 
@@ -41,14 +36,20 @@ export default function DatabaseRefreshTimer(){
     setState({active:false,hours:newHours,next:null});
     return;
    }
-   let start:number;
-   if(data?.last_refresh_at) start=new Date(data.last_refresh_at).getTime();
-   else if(data?.next_refresh_at) start=new Date(data.next_refresh_at).getTime()-msFor(oldHours);
-   else start=now;
-   let nextMs=start+msFor(newHours);
-   if(nextMs<=now) nextMs=now;
-   const lastIso=new Date(start).toISOString(),nextIso=new Date(nextMs).toISOString();
-   await supabase.from('user_settings').update({last_refresh_at:lastIso,next_refresh_at:nextIso}).eq('user_id',uid);
+   let nextIso=data?.next_refresh_at as string|null;
+   if(!nextIso){
+    let start:number;
+    if(data?.last_refresh_at) start=new Date(data.last_refresh_at).getTime();
+    else start=now;
+    nextIso=new Date(start+msFor(newHours)).toISOString();
+    await supabase.from('user_settings').update({last_refresh_at:new Date(start).toISOString(),next_refresh_at:nextIso}).eq('user_id',uid);
+   }else if(newHours!==oldHours){
+    let start:number;
+    if(data?.last_refresh_at) start=new Date(data.last_refresh_at).getTime();
+    else start=new Date(nextIso).getTime()-msFor(oldHours);
+    nextIso=new Date(start+msFor(newHours)).toISOString();
+    await supabase.from('user_settings').update({last_refresh_at:new Date(start).toISOString(),next_refresh_at:nextIso}).eq('user_id',uid);
+   }
    setState({active:true,hours:newHours,next:nextIso});
   };
   window.addEventListener('aoh:auto-refresh-changed',changed as EventListener);return()=>window.removeEventListener('aoh:auto-refresh-changed',changed as EventListener)
