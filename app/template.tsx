@@ -2,8 +2,9 @@ import BulkReviewInjector from './bulk-review-injector';
 import SiteUpgrades from './site-upgrades';
 import PostSortEnhancer from './post-sort-enhancer';
 import SettingsPersistenceSync from './settings-persistence-sync';
+import VideoThumbnailEnhancer from './video-thumbnail-enhancer';
 import './site-upgrades.css';
 import './full-settings-v2.css';
 import './color-customization.css';
 // Single automatic refresh timer is mounted from app/page.tsx.
-export default function Template({children}:{children:React.ReactNode}){return <>{children}<BulkReviewInjector/><SiteUpgrades/><PostSortEnhancer/><SettingsPersistenceSync/></>}
+export default function Template({children}:{children:React.ReactNode}){return <>{children}<BulkReviewInjector/><SiteUpgrades/><PostSortEnhancer/><SettingsPersistenceSync/><VideoThumbnailEnhancer/></>}
