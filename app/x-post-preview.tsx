@@ -15,18 +15,18 @@ export function VideoPreview({url,poster,postUrl}:{url:string;poster?:string|nul
  const ref=useRef<HTMLVideoElement>(null);
  const[frameReady,setFrameReady]=useState(false);
  const[resolvedPoster,setResolvedPoster]=useState(poster||'');
- useEffect(()=>{setResolvedPoster(poster||'')},[poster]);
+ useEffect(()=>{setResolvedPoster(poster||'');setFrameReady(false)},[poster,url]);
  useEffect(()=>{
   if(resolvedPoster||!postUrl||!xPostPattern.test(postUrl))return;
   let alive=true;
   fetchPost(postUrl).then(data=>{if(alive&&data?.thumbnail_url)setResolvedPoster(data.thumbnail_url)}).catch(()=>{});
   return()=>{alive=false};
  },[postUrl,resolvedPoster]);
- const seek=()=>{const v=ref.current;if(!v)return;try{const duration=Number.isFinite(v.duration)?v.duration:1.2;const max=Math.max(0,duration-.05);v.currentTime=Math.min(1.2,max);v.pause()}catch{}};
- const ready=()=>{ref.current?.pause();setFrameReady(true)};
+ const seek=()=>{const v=ref.current;if(!v)return;try{const duration=Number.isFinite(v.duration)?v.duration:1.2;const max=Math.max(0,duration-.05);const target=Math.min(1.2,max);if(Math.abs(v.currentTime-target)>.03)v.currentTime=target;else ready();v.pause()}catch{}};
+ const ready=()=>{const v=ref.current;if(!v||v.readyState<2)return;v.pause();requestAnimationFrame(()=>requestAnimationFrame(()=>setFrameReady(true)))};
  return <div className={`video-frame x-video-frame${frameReady?' is-frame-ready':''}`}>
   {!frameReady&&<div className="x-video-poster">{resolvedPoster?<img src={resolvedPoster} alt="Prévia do vídeo"/>:<span>𝕏</span>}</div>}
-  <video ref={ref} src={url} poster={resolvedPoster||undefined} controls playsInline preload="auto" muted onLoadedMetadata={seek} onLoadedData={seek} onSeeked={ready}/>
+  <video ref={ref} src={url} poster={resolvedPoster||undefined} controls playsInline preload="auto" muted onLoadedMetadata={seek} onLoadedData={seek} onCanPlay={seek} onSeeked={ready}/>
  </div>;
 }
 
