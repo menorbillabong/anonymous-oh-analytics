@@ -1,1 +1,1 @@
-Final production trigger for unified X post preview, expanded details, shared edit modal, and enriched X metrics.
+Production trigger: thumbnail-first X video preview with poster persistence until the 1.2-second frame is ready.
