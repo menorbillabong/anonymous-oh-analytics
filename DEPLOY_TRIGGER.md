@@ -1,1 +1,1 @@
-Deployment trigger for the video thumbnail preview fix.
+Deployment trigger for unified X post preview, expanded details, and shared edit modal.
