@@ -9,18 +9,19 @@ export default function PostSortEnhancer(){
  const[head,setHead]=useState<Element|null>(null);
  useEffect(()=>{
   localStorage.setItem(SORT_KEY,asc?'1':'0');
-  const timer=setInterval(()=>{
-   document.querySelectorAll('.ref-summary-tail').forEach((e:any)=>e.style.display='none');
-   setHead(document.querySelector('.exact-posts .posts-head'));
-   const container=document.querySelector('.post-view.list .ref-list')||document.querySelector('.post-view.cards .ref-card-grid');
-   if(!container)return;
-   const selector=container.classList.contains('ref-list')?'.ref-list-row':'.ref-card';
-   const nodes=[...container.querySelectorAll(selector)] as HTMLElement[];
-   nodes.sort((a,b)=>(asc?1:-1)*(dateOf(a)-dateOf(b)));
-   nodes.forEach(n=>container.appendChild(n));
-  },700);
-  return()=>clearInterval(timer)
+  window.dispatchEvent(new CustomEvent('aoh:post-sort-change',{detail:{asc}}));
  },[asc]);
+ useEffect(()=>{
+  const sync=()=>{
+   document.querySelectorAll('.ref-summary-tail').forEach((element:Element)=>(element as HTMLElement).style.display='none');
+   const next=document.querySelector('.exact-posts .posts-head');
+   setHead(current=>current===next?current:next);
+  };
+  sync();
+  const observer=new MutationObserver(sync);
+  observer.observe(document.body,{childList:true,subtree:true});
+  return()=>observer.disconnect();
+ },[]);
  if(!head)return null;
  const label=asc?'Mais antigas primeiro':'Mais recentes primeiro';
  return createPortal(<>
@@ -31,8 +32,3 @@ export default function PostSortEnhancer(){
  </>,head)
 }
 
-function dateOf(el:HTMLElement){
- const txt=[...el.querySelectorAll('small')].map(x=>x.textContent||'').find(x=>/\d{1,2}\/\d{1,2}\/\d{4}/.test(x))||'';
- const m=txt.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
- return m?new Date(Number(m[3]),Number(m[2])-1,Number(m[1])).getTime():0
-}

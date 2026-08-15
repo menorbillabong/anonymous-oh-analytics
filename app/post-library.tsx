@@ -32,12 +32,14 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
  const[edit,setEdit]=useState<any>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(new Set());
  const[deletingSelected,setDeletingSelected]=useState(false);
+ const[sortAsc,setSortAsc]=useState(false);
  const selectAllRef=useRef<HTMLInputElement>(null);
  useEscapeClose(!!edit,()=>setEdit(null));
 
  const effectiveView=view||(typeof window!=='undefined'&&localStorage.getItem('aoh:post-view')==='cards'?'cards':'list');
  const reward=monthlyReward(posts,capUnlocked);
  const missionCrystal=posts.reduce((total,post)=>total+postContribution(post),0);
+ const sortedPosts=useMemo(()=>[...posts].sort((a,b)=>(sortAsc?1:-1)*(postDateValue(a)-postDateValue(b))),[posts,sortAsc]);
  const selectableIds=useMemo(()=>posts.map(post=>String(post.id)),[posts]);
  const selectedCount=selectedIds.size;
  const allSelected=selectableIds.length>0&&selectableIds.every(id=>selectedIds.has(id));
@@ -55,6 +57,15 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
  useEffect(()=>{
   if(selectAllRef.current)selectAllRef.current.indeterminate=someSelected;
  },[someSelected]);
+
+ useEffect(()=>{
+  const sync=()=>setSortAsc(localStorage.getItem('aoh:post-sort-asc')==='1');
+  const onSort=(event:Event)=>setSortAsc(Boolean((event as CustomEvent<{asc:boolean}>).detail?.asc));
+  sync();
+  window.addEventListener('storage',sync);
+  window.addEventListener('aoh:post-sort-change',onSort);
+  return()=>{window.removeEventListener('storage',sync);window.removeEventListener('aoh:post-sort-change',onSort)};
+ },[]);
 
  function openEditor(post:any){
   setEdit({...post,edit_date:dateInputValue(post.published_at||post.created_at)});
@@ -138,7 +149,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
     <input ref={selectAllRef} className="ref-select-check" type="checkbox" checked={allSelected} onChange={toggleAll} aria-label="Selecionar todas as publicações"/>
     <b>POST⌄</b><b>ENGAJAMENTO</b><b>CURTIDAS</b><b>COMENTÁRIOS</b><b>REPOSTS</b><b>VIEWS</b><b>CRYSTGIN</b><b>AÇÕES</b>
    </div>
-   {posts.map(post=>{
+   {sortedPosts.map(post=>{
     const engagement=Number(post.likes||0)+Number(post.comments||0)+Number(post.reposts||0);
     const selected=selectedIds.has(String(post.id));
     const isExpanded=expanded===post.id;
@@ -177,7 +188,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
  return <>
   <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal}/>
   <div className="ref-card-grid">
-   {posts.map(post=><article className="ref-card" key={post.id}>
+   {sortedPosts.map(post=><article className="ref-card" key={post.id}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
     <div className="ref-card-info"><strong className="ref-mission">{post.mission_name||post.title||'PUBLICAÇÃO'}</strong><small>{formatDate(post.created_at)}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
     <div className="ref-card-foot"><span>⌁ <b>{Number(post.likes||0).toLocaleString('pt-BR')}</b></span><strong>{postContribution(post).toLocaleString('pt-BR')}</strong><small>Crystgin</small><button type="button" className="ref-pencil" onClick={()=>openEditor(post)} aria-label="Editar publicação">✎</button></div>
@@ -227,6 +238,7 @@ export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;se
 }
 
 function formatDate(value:any){if(!value)return'';try{return new Date(value).toLocaleDateString('pt-BR')}catch{return''}}
+function postDateValue(post:any){const value=new Date(post?.created_at||0).getTime();return Number.isFinite(value)?value:0}
 function formatDateTime(value:any){if(!value)return'';try{return new Date(value).toLocaleString('pt-BR')}catch{return''}}
 function dateInputValue(value:any){if(!value)return'';try{return new Date(value).toISOString().slice(0,10)}catch{return''}}
 function mergePostDate(original:any,date:string){const current=original?new Date(original):new Date();const[year,month,day]=date.split('-').map(Number);if(!year||!month||!day)return original;current.setFullYear(year,month-1,day);return current.toISOString()}
@@ -258,4 +270,5 @@ export function PostExpandedDetails({post,reward,missionProfile,capUnlocked,onDe
   <div className="post-expanded-actions"><button type="button" className="post-delete-button" onClick={onDelete}>🗑 EXCLUIR PUBLICAÇÃO</button></div>
  </section>;
 }
+
 
