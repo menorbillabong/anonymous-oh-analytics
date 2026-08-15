@@ -24,10 +24,10 @@ type PostLibraryProps={
  reload:()=>Promise<void>;
  view?:'list'|'cards';
  profiles?:MissionProfile[];
- capUnlocked?:boolean;
+ crystalginLimit?:number;
 };
 
-export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnlocked=false}:PostLibraryProps){
+export default function PostLibrary({userId,posts,reload,view,profiles=[],crystalginLimit=30000}:PostLibraryProps){
  const[expanded,setExpanded]=useState<any>(null);
  const[edit,setEdit]=useState<any>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(new Set());
@@ -37,7 +37,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
  useEscapeClose(!!edit,()=>setEdit(null));
 
  const effectiveView=view||(typeof window!=='undefined'&&localStorage.getItem('aoh:post-view')==='cards'?'cards':'list');
- const reward=monthlyReward(posts,capUnlocked);
+ const reward=monthlyReward(posts);
  const missionCrystal=posts.reduce((total,post)=>total+postContribution(post),0);
  const sortedPosts=useMemo(()=>[...posts].sort((a,b)=>(sortAsc?1:-1)*(postDateValue(a)-postDateValue(b))),[posts,sortAsc]);
  const selectableIds=useMemo(()=>posts.map(post=>String(post.id)),[posts]);
@@ -139,7 +139,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
  }
 
  if(effectiveView==='list')return <>
-  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal}/>
+  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
   <div className="ref-list">
    {selectedCount>0&&<div className="ref-selection-bar">
     <strong>{selectedCount} selecionado{selectedCount===1?'':'s'}</strong>
@@ -177,7 +177,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
       <button type="button" className="ref-more" onClick={()=>openEditor(post)} aria-label="Editar publicação pelo menu de ações">•••</button>
      </div>
      {isExpanded&&<div className="ref-expanded" onClick={event=>event.stopPropagation()} onKeyDown={event=>event.stopPropagation()}>
-      <ExpandedPost post={post} reward={reward} missionProfile={missionProfile} capUnlocked={capUnlocked} onDelete={()=>removePost(post)}/>
+      <ExpandedPost post={post} reward={reward} missionProfile={missionProfile} crystalginLimit={crystalginLimit} onDelete={()=>removePost(post)}/>
      </div>}
     </div>;
    })}
@@ -186,7 +186,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
  </>;
 
  return <>
-  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal}/>
+  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
   <div className="ref-card-grid">
    {sortedPosts.map(post=><article className="ref-card" key={post.id}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
@@ -198,8 +198,8 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],capUnl
  </>;
 }
 
-function SummaryTail({posts,reward,missionCrystal}:{posts:any[];reward:any;missionCrystal:number}){
- return <div className="ref-summary-tail"><div className="ref-summary-total"><b>TOTAL</b><strong>{posts.length}</strong><strong>{reward.views.toLocaleString('pt-BR')}</strong><strong>{reward.likes.toLocaleString('pt-BR')}</strong><strong>{missionCrystal.toLocaleString('pt-BR')}</strong></div><div className="ref-reward-line"><span>RECOMPENSA BÁSICA (MÍN. 10 POSTAGENS)</span><b>+ {reward.base.toLocaleString('pt-BR')} CG</b></div><div className="ref-reward-line"><span>BÔNUS DE VISUALIZAÇÕES (COLCHETES)</span><b>+ {reward.viewsReward.toLocaleString('pt-BR')} CG</b></div><div className="ref-official"><strong>TOTAL OFICIAL (COM CAP)</strong><b>{reward.total.toLocaleString('pt-BR')}</b></div></div>;
+function SummaryTail({posts,reward,missionCrystal,crystalginLimit}:{posts:any[];reward:any;missionCrystal:number;crystalginLimit:number}){
+ return <div className="ref-summary-tail"><div className="ref-summary-total"><b>TOTAL</b><strong>{posts.length}</strong><strong>{reward.views.toLocaleString('pt-BR')}</strong><strong>{reward.likes.toLocaleString('pt-BR')}</strong><strong>{missionCrystal.toLocaleString('pt-BR')}</strong></div><div className="ref-reward-line"><span>RECOMPENSA BÁSICA (MÍN. 10 POSTAGENS)</span><b>+ {reward.base.toLocaleString('pt-BR')} CG</b></div><div className="ref-reward-line"><span>BÔNUS DE VISUALIZAÇÕES (COLCHETES)</span><b>+ {reward.viewsReward.toLocaleString('pt-BR')} CG</b></div><div className="ref-official"><strong>PROGRESSO OFICIAL (COM LIMITE)</strong><b>{Math.min(reward.raw,crystalginLimit).toLocaleString('pt-BR')}</b></div></div>;
 }
 
 export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;setEdit:(value:any)=>void;save:()=>Promise<void>|void;profiles:MissionProfile[];onDelete:()=>Promise<void>|void}){
@@ -252,11 +252,11 @@ function Media({post}:{post:any}){
  return <div className="ref-media-empty">𝕏</div>;
 }
 
-function ExpandedPost({post,reward,missionProfile,capUnlocked,onDelete}:{post:any;reward:any;missionProfile?:MissionProfile;capUnlocked:boolean;onDelete:()=>void}){
- return <div className="post-expanded-shell"><PostExpandedDetails post={post} reward={reward} missionProfile={missionProfile} capUnlocked={capUnlocked} onDelete={onDelete}/><XPostPreview post={post}/></div>;
+function ExpandedPost({post,reward,missionProfile,crystalginLimit,onDelete}:{post:any;reward:any;missionProfile?:MissionProfile;crystalginLimit:number;onDelete:()=>void}){
+ return <div className="post-expanded-shell"><PostExpandedDetails post={post} reward={reward} missionProfile={missionProfile} crystalginLimit={crystalginLimit} onDelete={onDelete}/><XPostPreview post={post}/></div>;
 }
 
-export function PostExpandedDetails({post,reward,missionProfile,capUnlocked,onDelete}:{post:any;reward:any;missionProfile?:MissionProfile;capUnlocked:boolean;onDelete:()=>void}){
+export function PostExpandedDetails({post,reward,missionProfile,crystalginLimit,onDelete}:{post:any;reward:any;missionProfile?:MissionProfile;crystalginLimit:number;onDelete:()=>void}){
  const likes=Number(post.likes||0);
  const special=Number(post.special_reward||0);
  const contribution=postContribution(post);
@@ -267,7 +267,7 @@ export function PostExpandedDetails({post,reward,missionProfile,capUnlocked,onDe
   <div className="mission-overview"><small>PERFIL / MISSÃO</small><h3>{mission}</h3><p>{description}</p></div>
   <div className="mission-rule-grid"><div><small>MULTIPLICADOR</small><b>× 2</b></div><div><small>BÔNUS</small><b>{special.toLocaleString('pt-BR')} CG</b></div><div><small>LIMITE</small><b>{String(limit)}</b></div></div>
   <div className="calc-detail-head"><div><span className="formula-badge">FÓRMULA OFICIAL V2</span><h4>Detalhamento do Cálculo de Crystgin</h4></div><strong>◆ {contribution.toLocaleString('pt-BR')} CG</strong></div>
-  <div className="calc-detail-grid"><div><small>CONTRIBUIÇÃO INDIVIDUAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>VIEWS</small><b>{Number(post.views||0).toLocaleString('pt-BR')}</b></div><div><small>CURTIDAS × 2</small><b>{(likes*2).toLocaleString('pt-BR')} CG</b></div><div><small>RECOMPENSA BÁSICA</small><b>{reward.base.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE VIEWS</small><b>{reward.viewsReward.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE ENGAJAMENTO</small><b>{(likes*2).toLocaleString('pt-BR')} CG desta publicação</b></div><div><small>MISSÕES ESPECIAIS</small><b>{special.toLocaleString('pt-BR')} CG</b></div><div className="calc-total"><small>CRYSTGIN TOTAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>CAP MENSAL</small><b>{capUnlocked?'Desbloqueado':'30.000 CG'}</b></div><div className="calc-month-total"><small>TOTAL MENSAL OFICIAL</small><b>{reward.total.toLocaleString('pt-BR')} CG</b></div></div>
+  <div className="calc-detail-grid"><div><small>CONTRIBUIÇÃO INDIVIDUAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>VIEWS</small><b>{Number(post.views||0).toLocaleString('pt-BR')}</b></div><div><small>CURTIDAS × 2</small><b>{(likes*2).toLocaleString('pt-BR')} CG</b></div><div><small>RECOMPENSA BÁSICA</small><b>{reward.base.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE VIEWS</small><b>{reward.viewsReward.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE ENGAJAMENTO</small><b>{(likes*2).toLocaleString('pt-BR')} CG desta publicação</b></div><div><small>MISSÕES ESPECIAIS</small><b>{special.toLocaleString('pt-BR')} CG</b></div><div className="calc-total"><small>CRYSTGIN TOTAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>LIMITE DE PROGRESSO</small><b>{crystalginLimit.toLocaleString('pt-BR')} CG</b></div><div className="calc-month-total"><small>PROGRESSO OFICIAL</small><b>{Math.min(reward.raw,crystalginLimit).toLocaleString('pt-BR')} CG</b></div></div>
   <div className="post-expanded-actions"><button type="button" className="post-delete-button" onClick={onDelete}>🗑 EXCLUIR PUBLICAÇÃO</button></div>
  </section>;
 }
