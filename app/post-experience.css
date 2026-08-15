@@ -20,6 +20,54 @@
   transform: none !important;
 }
 
+/* Keep hover feedback stable: moving the hit area can repeatedly enter/leave hover. */
+:where(
+  button,
+  .btn,
+  .icon-btn,
+  .toggle,
+  .add-submit,
+  .bulk-process,
+  .mission-orange-btn
+):hover {
+  transform: none !important;
+}
+
+:where(
+  .exact-stat,
+  .metric-card,
+  .tracker-stat,
+  .tracker-hero,
+  .tracker-panel,
+  .tracker-report,
+  .panel,
+  .post-card,
+  .history-row,
+  .history-grid article,
+  .mission-create-card,
+  .mission-existing,
+  .mission-existing-card,
+  .mission-profile-grid>article,
+  .mission-table,
+  .settings-page article,
+  .settings-lower article,
+  .simple-page article,
+  .summary-card,
+  .formula-bar,
+  .reward-card,
+  .activity-list article,
+  .review-card,
+  .preview-box,
+  .disabled-bonuses,
+  .close-period,
+  .reference-list-item,
+  .tracker-section,
+  .tracker-empty,
+  .tracker-stat-row>div
+):hover {
+  transform: none !important;
+}
+
 .ref-list-row:hover,
 .ref-list-row:focus-visible,
 .ref-list-row.is-expanded {
