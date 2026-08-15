@@ -11,6 +11,8 @@
 
 /* Legibility and responsive navigation refinements. */
 .exact-stat small,.formula-caption,.formula-item small,.mission-columns,.mission-head span{color:#9ba0aa}
+.mission-summary-card .mission-columns>b{width:100%;justify-self:center;text-align:center}
 .stat-hint{display:block;margin-top:5px;color:#9297a1;font-size:8px;font-weight:700;line-height:1.25}
 @media(max-width:1280px){.exact-topbar{padding-left:2%;padding-right:2%;gap:8px}.exact-brand{left:0;font-size:15px}.exact-nav{gap:2px}.exact-nav button{padding-left:8px;padding-right:8px;font-size:10px}.user-pill{padding-left:10px;padding-right:10px}}
 @media(max-width:1000px){.exact-topbar{height:auto;min-height:82px;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;overflow:visible}.exact-brand{order:1}.db-refresh-timer-host,.refresh-pill,.wait-pill{order:2}.user-pill{order:2;margin-left:auto}.exact-nav{order:3;flex:1 0 100%;height:48px;overflow-x:auto;justify-content:flex-start}.exact-nav button{flex:0 0 auto;white-space:nowrap}.exact-main{margin-top:18px}}
+
