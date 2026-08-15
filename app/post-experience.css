@@ -1,0 +1,26 @@
+.x-media-grid.n1 img {
+  background: #050505;
+  object-fit: contain;
+}
+
+.post-expanded-info {
+  border-left: 3px solid #f4a640;
+}
+
+.calc-detail-grid .calc-month-total {
+  grid-column: 1 / -1;
+  border-color: #775024;
+  background: linear-gradient(90deg, #24180c, #17120d);
+}
+
+.calc-detail-grid .calc-month-total b {
+  color: #f4ab4a;
+  font-size: 16px;
+}
+
+@media (max-width: 560px) {
+  .calc-detail-grid .calc-month-total {
+    grid-column: auto;
+  }
+}
+
