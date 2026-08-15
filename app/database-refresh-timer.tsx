@@ -60,7 +60,8 @@ export default function DatabaseRefreshTimer(){
  useEffect(()=>{
   if(!uid||!state.active||!state.next||left!==0||firing.current)return;
   firing.current=true;
-  const run=async()=>{const now=new Date(),next=new Date(now.getTime()+msFor(state.hours));await supabase.from('user_settings').update({last_refresh_at:now.toISOString(),next_refresh_at:next.toISOString()}).eq('user_id',uid);setState(s=>({...s,next:next.toISOString()}));const button=[...document.querySelectorAll('button')].find(b=>(b.textContent||'').toUpperCase().includes('ATUALIZAR AGORA')) as HTMLButtonElement|undefined;if(button&&!button.disabled)button.click();window.setTimeout(()=>{firing.current=false},1200)};run()
+  const requestRefresh=()=>new Promise<boolean>(resolve=>{let settled=false;const finish=(success:boolean)=>{if(settled)return;settled=true;window.clearTimeout(timeout);resolve(success)};const detail:{handled:boolean;complete:(success:boolean)=>void}={handled:false,complete:finish};const timeout=window.setTimeout(()=>finish(false),180000);window.dispatchEvent(new CustomEvent('aoh:refresh-metrics',{detail}));if(!detail.handled)finish(false)});
+  const run=async()=>{const success=await requestRefresh(),now=new Date(),next=new Date(now.getTime()+msFor(state.hours));const schedule:any={next_refresh_at:next.toISOString()};if(success)schedule.last_refresh_at=now.toISOString();await supabase.from('user_settings').update(schedule).eq('user_id',uid);setState(s=>({...s,next:next.toISOString()}));window.setTimeout(()=>{firing.current=false},1200)};run()
  },[uid,state.active,state.next,state.hours,left]);
 
  useEffect(()=>{if(!state.active){document.querySelectorAll('.db-refresh-timer-host').forEach(el=>el.remove());setHost(null);return}const attach=()=>{const nav=document.querySelector('.exact-nav');if(!nav)return;const panel=[...nav.querySelectorAll('button')].find(b=>b.textContent?.trim().includes('Painel'));if(!panel)return;let target=nav.querySelector<HTMLElement>('.db-refresh-timer-host');if(!target){target=document.createElement('div');target.className='db-refresh-timer-host';panel.insertAdjacentElement('afterend',target)}setHost(target)};attach();const obs=new MutationObserver(attach);obs.observe(document.body,{childList:true,subtree:true});return()=>{obs.disconnect();document.querySelectorAll('.db-refresh-timer-host').forEach(el=>el.remove());setHost(null)}},[state.active]);
@@ -68,3 +69,4 @@ export default function DatabaseRefreshTimer(){
  if(!state.active||!host)return null;
  return createPortal(<div className="db-refresh-timer" title="Atualização automática" style={{height:38,minWidth:92,padding:'0 10px',borderRadius:8,border:'1px solid #6b4b1f',background:'#21180d',color:'#f7bb55',display:'flex',alignItems:'center',justifyContent:'center',gap:7,fontWeight:900,boxSizing:'border-box'}}><span>◷</span><b style={{fontSize:11,fontVariantNumeric:'tabular-nums'}}>{format(left)}</b></div>,host);
 }
+
