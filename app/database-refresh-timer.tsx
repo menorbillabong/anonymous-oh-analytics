@@ -13,6 +13,7 @@ export default function DatabaseRefreshTimer(){
  const[left,setLeft]=useState(0);
  const[host,setHost]=useState<HTMLElement|null>(null);
  const firing=useRef(false);
+ const remainingSeconds=useRef<number|null>(null);
 
  const sync=async(userId:string)=>{
   const{data}=await supabase.from('user_settings').select('show_refresh_timer,refresh_interval,last_refresh_at,next_refresh_at').eq('user_id',userId).maybeSingle();
@@ -55,10 +56,10 @@ export default function DatabaseRefreshTimer(){
   window.addEventListener('aoh:auto-refresh-changed',changed as EventListener);return()=>window.removeEventListener('aoh:auto-refresh-changed',changed as EventListener)
  },[uid]);
 
- useEffect(()=>{if(!state.active||!state.next){setLeft(0);return}const tick=()=>setLeft(Math.max(0,Math.ceil((new Date(state.next!).getTime()-Date.now())/1000)));tick();const id=window.setInterval(tick,1000);return()=>window.clearInterval(id)},[state.active,state.next]);
+ useEffect(()=>{if(!state.active||!state.next){remainingSeconds.current=null;setLeft(0);return}const tick=()=>{const value=Math.max(0,Math.ceil((new Date(state.next!).getTime()-Date.now())/1000));remainingSeconds.current=value;setLeft(value)};tick();const id=window.setInterval(tick,1000);return()=>window.clearInterval(id)},[state.active,state.next]);
 
  useEffect(()=>{
-  if(!uid||!state.active||!state.next||left!==0||firing.current)return;
+  if(!uid||!state.active||!state.next||left!==0||remainingSeconds.current!==0||firing.current)return;
   firing.current=true;
   const requestRefresh=()=>new Promise<boolean>(resolve=>{let settled=false;const finish=(success:boolean)=>{if(settled)return;settled=true;window.clearTimeout(timeout);resolve(success)};const detail:{handled:boolean;complete:(success:boolean)=>void}={handled:false,complete:finish};const timeout=window.setTimeout(()=>finish(false),180000);window.dispatchEvent(new CustomEvent('aoh:refresh-metrics',{detail}));if(!detail.handled)finish(false)});
   const run=async()=>{const success=await requestRefresh(),now=new Date(),next=new Date(now.getTime()+msFor(state.hours));const schedule:any={next_refresh_at:next.toISOString()};if(success)schedule.last_refresh_at=now.toISOString();await supabase.from('user_settings').update(schedule).eq('user_id',uid);setState(s=>({...s,next:next.toISOString()}));window.setTimeout(()=>{firing.current=false},1200)};run()
