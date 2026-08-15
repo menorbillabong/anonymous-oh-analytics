@@ -16,6 +16,10 @@
   transition: background .16s ease, box-shadow .16s ease;
 }
 
+.ref-card:hover {
+  transform: none !important;
+}
+
 .ref-list-row:hover,
 .ref-list-row:focus-visible,
 .ref-list-row.is-expanded {
@@ -187,5 +191,6 @@
     display: none;
   }
 }
+
 
 
