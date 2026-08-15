@@ -1,0 +1,16 @@
+.mission-create-panel .mission-orange-btn:disabled{cursor:not-allowed;opacity:.55;transform:none;box-shadow:none}
+.mission-cancel-edit{width:100%;height:42px;border:1px solid #414141;border-radius:6px;background:#242424;color:#d6d8dc;font-size:13px;font-weight:800}
+.mission-cancel-edit:hover{border-color:#686868;background:#2a2a2a}
+.mission-notice{margin:0;padding:10px 12px;border:1px solid #3c4d46;border-radius:6px;background:#15231d;color:#9eddbf;font-size:12px;line-height:1.4}
+.mission-existing-card{padding-right:112px}
+.mission-card-actions{gap:12px}
+.mission-card-actions button{display:grid;place-items:center;width:38px;height:38px;border:0;border-radius:999px;background:rgba(255,255,255,.035);color:#a5abb5;font-size:18px;text-shadow:none}
+.mission-card-actions .mission-edit-action:hover{background:rgba(34,197,94,.12);color:#4ade80;text-shadow:none;box-shadow:0 0 0 1px rgba(34,197,94,.18),0 0 16px rgba(34,197,94,.12)}
+.mission-card-actions .mission-delete-action:hover{background:rgba(239,68,68,.12);color:#f87171;text-shadow:none;box-shadow:0 0 0 1px rgba(239,68,68,.2),0 0 16px rgba(239,68,68,.12)}
+.mission-card-actions button:focus-visible{outline:2px solid #f3a640;outline-offset:2px}
+.mission-delete-backdrop{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.72);backdrop-filter:blur(3px)}
+.mission-delete-dialog{width:min(430px,calc(100vw - 32px));padding:28px;border:1px solid #4a3030;border-radius:12px;background:#1c1c1c;color:#f3f3f3;box-shadow:0 28px 90px rgba(0,0,0,.65);text-align:center}
+.mission-delete-dialog .mission-delete-icon{display:grid;place-items:center;width:48px;height:48px;margin:0 auto 14px;border-radius:50%;background:rgba(239,68,68,.12);color:#f87171;font-size:24px}
+.mission-delete-dialog h2{margin:0 0 12px;font-size:22px}.mission-delete-dialog p{margin:0;color:#c4c7cc;font-size:14px;line-height:1.55}.mission-delete-dialog p strong{color:#fff}.mission-delete-dialog small{display:block;margin-top:8px;color:#ef8b8b}
+.mission-delete-dialog>div:last-child{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:24px}.mission-delete-dialog button{height:42px;border:1px solid #3d3d3d;border-radius:7px;background:#292929;color:#eee;font-weight:900}.mission-delete-dialog .mission-delete-confirm{border-color:#9b3636;background:#d84949;color:#fff}.mission-delete-dialog .mission-delete-confirm:hover{background:#ed5555}.mission-delete-dialog button:disabled{cursor:wait;opacity:.6}
+@media(max-width:560px){.mission-existing-card{padding-right:96px}.mission-card-actions{right:10px;gap:6px}.mission-card-actions button{width:36px;height:36px}.mission-delete-dialog>div:last-child{grid-template-columns:1fr}}
