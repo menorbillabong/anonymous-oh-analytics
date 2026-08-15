@@ -44,4 +44,3 @@ export async function refreshStoredPostMetrics(posts:any[],userId:string,onProgr
  }
  return{attempted:targets.length,succeeded,failed};
 }
-

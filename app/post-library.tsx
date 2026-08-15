@@ -271,4 +271,3 @@ export function PostExpandedDetails({post,reward,missionProfile,capUnlocked,onDe
  </section>;
 }
 
-
