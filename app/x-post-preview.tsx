@@ -13,20 +13,22 @@ async function fetchPost(postUrl:string){
 
 export function VideoPreview({url,poster,postUrl}:{url:string;poster?:string|null;postUrl?:string}){
  const ref=useRef<HTMLVideoElement>(null);
+ const targetRef=useRef(1.2);
+ const revealIdRef=useRef(0);
  const[frameReady,setFrameReady]=useState(false);
  const[resolvedPoster,setResolvedPoster]=useState(poster||'');
- useEffect(()=>{setResolvedPoster(poster||'');setFrameReady(false)},[poster,url]);
+ useEffect(()=>{revealIdRef.current++;setResolvedPoster(poster||'');setFrameReady(false)},[poster,url]);
  useEffect(()=>{
   if(resolvedPoster||!postUrl||!xPostPattern.test(postUrl))return;
   let alive=true;
   fetchPost(postUrl).then(data=>{if(alive&&data?.thumbnail_url)setResolvedPoster(data.thumbnail_url)}).catch(()=>{});
   return()=>{alive=false};
  },[postUrl,resolvedPoster]);
- const seek=()=>{const v=ref.current;if(!v)return;try{const duration=Number.isFinite(v.duration)?v.duration:1.2;const max=Math.max(0,duration-.05);const target=Math.min(1.2,max);if(Math.abs(v.currentTime-target)>.03)v.currentTime=target;else ready();v.pause()}catch{}};
- const ready=()=>{const v=ref.current;if(!v||v.readyState<2)return;v.pause();requestAnimationFrame(()=>requestAnimationFrame(()=>setFrameReady(true)))};
+ const revealDecodedFrame=()=>{const video=ref.current;if(!video||video.readyState<2||video.seeking)return;const revealId=++revealIdRef.current;let revealed=false;const reveal=()=>{if(revealed||revealId!==revealIdRef.current||ref.current!==video||video.readyState<2||video.seeking||Math.abs(video.currentTime-targetRef.current)>=.35)return;revealed=true;setFrameReady(true)};const fallback=window.setTimeout(()=>requestAnimationFrame(()=>requestAnimationFrame(reveal)),250);const withFrame=video as HTMLVideoElement&{requestVideoFrameCallback?:(callback:(now:number,metadata:{mediaTime:number})=>void)=>number};if(withFrame.requestVideoFrameCallback)withFrame.requestVideoFrameCallback((_now,metadata)=>{if(Math.abs(metadata.mediaTime-targetRef.current)<.35){window.clearTimeout(fallback);requestAnimationFrame(reveal)}});else requestAnimationFrame(()=>requestAnimationFrame(reveal))};
+ const seek=()=>{const video=ref.current;if(!video||video.readyState<1)return;try{const duration=Number.isFinite(video.duration)?video.duration:1.2;targetRef.current=Math.min(1.2,Math.max(0,duration-.05));video.pause();if(Math.abs(video.currentTime-targetRef.current)>.03)video.currentTime=targetRef.current;else if(!video.seeking)revealDecodedFrame()}catch{}};
  return <div className={`video-frame x-video-frame${frameReady?' is-frame-ready':''}`}>
-  {!frameReady&&<div className="x-video-poster">{resolvedPoster?<img src={resolvedPoster} alt="Prévia do vídeo"/>:<span>𝕏</span>}</div>}
-  <video ref={ref} src={url} poster={resolvedPoster||undefined} controls playsInline preload="auto" muted onLoadedMetadata={seek} onLoadedData={seek} onCanPlay={seek} onSeeked={ready}/>
+  {!frameReady&&<div className="x-video-poster">{resolvedPoster?<img src={resolvedPoster} alt="Prévia do vídeo" onError={()=>setResolvedPoster('')}/>:<span>𝕏</span>}</div>}
+  <video ref={ref} src={url} poster={resolvedPoster||undefined} controls playsInline preload="auto" muted onLoadedMetadata={seek} onLoadedData={seek} onDurationChange={seek} onSeeked={revealDecodedFrame}/>
  </div>;
 }
 
@@ -65,3 +67,4 @@ export default function XPostPreview({post,compact=false}:PreviewProps){
   <footer className="x-preview-footer"><time>{dateTime(published)}{loading?' · atualizando…':''}</time>{postUrl&&<a href={postUrl} target="_blank" rel="noopener noreferrer">View on X ↗</a>}</footer>
  </article>;
 }
+
