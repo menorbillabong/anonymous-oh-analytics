@@ -139,7 +139,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  }
 
  if(effectiveView==='list')return <>
-  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal}/>
+  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
   <div className="ref-list">
    {selectedCount>0&&<div className="ref-selection-bar">
     <strong>{selectedCount} selecionado{selectedCount===1?'':'s'}</strong>
@@ -198,7 +198,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  </>;
 }
 
-function SummaryTail({posts,reward,missionCrystal}:{posts:any[];reward:any;missionCrystal:number}){
+function SummaryTail({posts,reward,missionCrystal,crystalginLimit}:{posts:any[];reward:any;missionCrystal:number;crystalginLimit:number}){
  return <div className="ref-summary-tail"><div className="ref-summary-total"><b>TOTAL</b><strong>{posts.length}</strong><strong>{reward.views.toLocaleString('pt-BR')}</strong><strong>{reward.likes.toLocaleString('pt-BR')}</strong><strong>{missionCrystal.toLocaleString('pt-BR')}</strong></div><div className="ref-reward-line"><span>RECOMPENSA BÁSICA (MÍN. 10 POSTAGENS)</span><b>+ {reward.base.toLocaleString('pt-BR')} CG</b></div><div className="ref-reward-line"><span>BÔNUS DE VISUALIZAÇÕES (COLCHETES)</span><b>+ {reward.viewsReward.toLocaleString('pt-BR')} CG</b></div><div className="ref-official"><strong>PROGRESSO OFICIAL (COM LIMITE)</strong><b>{Math.min(reward.raw,crystalginLimit).toLocaleString('pt-BR')}</b></div></div>;
 }
 
