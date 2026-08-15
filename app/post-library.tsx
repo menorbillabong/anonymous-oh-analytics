@@ -186,7 +186,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  </>;
 
  return <>
-  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal}/>
+  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
   <div className="ref-card-grid">
    {sortedPosts.map(post=><article className="ref-card" key={post.id}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
