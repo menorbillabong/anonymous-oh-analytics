@@ -7,6 +7,10 @@
   border-left: 3px solid #f4a640;
 }
 
+.edit-post-overlay {
+  z-index: 1300;
+}
+
 .calc-detail-grid .calc-month-total {
   grid-column: 1 / -1;
   border-color: #775024;
