@@ -2,7 +2,9 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2.57.4";
 
 const origins=new Set(["https://anonymous-oh-analytics.vercel.app","http://localhost:3000"]);
-const reply=(origin:string,body:Record<string,unknown>,status=200)=>new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":origins.has(origin)?origin:"https://anonymous-oh-analytics.vercel.app","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Vary":"Origin"}});
+const previewOrigin=/^https:\/\/anonymous-oh-analytics(?:-[a-z0-9-]+)?-jf-anonymous\.vercel\.app$/;
+const isAllowedOrigin=(origin:string)=>origins.has(origin)||previewOrigin.test(origin);
+const reply=(origin:string,body:Record<string,unknown>,status=200)=>new Response(JSON.stringify(body),{status,headers:{"Content-Type":"application/json","Access-Control-Allow-Origin":isAllowedOrigin(origin)?origin:"https://anonymous-oh-analytics.vercel.app","Access-Control-Allow-Headers":"authorization, x-client-info, apikey, content-type","Access-Control-Allow-Methods":"POST, OPTIONS","Vary":"Origin"}});
 const normalize=(value:unknown)=>String(value??"").trim().toLowerCase();
 async function sha256(value:string){const digest=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return[...new Uint8Array(digest)].map(b=>b.toString(16).padStart(2,"0")).join("")}
 
@@ -10,7 +12,7 @@ Deno.serve(async(req:Request)=>{
  const origin=req.headers.get("origin")??"";
  if(req.method==="OPTIONS")return reply(origin,{ok:true});
  if(req.method!=="POST")return reply(origin,{error:"Método não permitido."},405);
- if(origin&&!origins.has(origin))return reply(origin,{error:"Origem não permitida."},403);
+ if(origin&&!isAllowedOrigin(origin))return reply(origin,{error:"Origem não permitida."},403);
  try{
   const{action,username:rawUsername,password,email:rawEmail}=await req.json();
   const username=normalize(rawUsername);
