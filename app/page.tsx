@@ -26,6 +26,7 @@ export default function Home() {
   const [session,setSession]=useState<any>(null);
   const [username,setUsername]=useState('');
   const [password,setPassword]=useState('');
+  const [passwordConfirmation,setPasswordConfirmation]=useState('');
   const [mode,setMode]=useState<Mode>('login');
   const [message,setMessage]=useState('');
   const [busy,setBusy]=useState(false);
@@ -44,6 +45,7 @@ export default function Home() {
     if(!normalized||!password)return setMessage('Preencha o nome de usuário e a senha.');
     if(!/^[a-z0-9._-]{3,24}$/.test(normalized))return setMessage('Use de 3 a 24 caracteres: letras, números, ponto, traço ou sublinhado.');
     if(password.length<6)return setMessage('A senha precisa ter pelo menos 6 caracteres.');
+    if(mode==='signup'&&password!==passwordConfirmation)return setMessage('As senhas não são iguais.');
     setBusy(true);
     try{
       const credentials=await usernameAuth(mode==='login'?'resolve':'signup',username.trim(),mode==='signup'?password:undefined);
@@ -81,10 +83,14 @@ export default function Home() {
           <input value={username} onChange={event=>setUsername(event.target.value)} type="text" autoComplete="username" maxLength={24} placeholder="Seu nome de usuário"/>
           <label>Senha (mínimo 6 caracteres)</label>
           <input value={password} onChange={event=>setPassword(event.target.value)} type="password" autoComplete={mode==='login'?'current-password':'new-password'} placeholder="••••••••"/>
+          {mode==='signup'&&<>
+            <label>Confirmar senha</label>
+            <input value={passwordConfirmation} onChange={event=>setPasswordConfirmation(event.target.value)} type="password" autoComplete="new-password" placeholder="••••••••"/>
+          </>}
           <button type="submit" disabled={busy}>{busy?'AGUARDE...':mode==='login'?'ENTRAR':'CRIAR CONTA'}</button>
         </form>
         {message&&<div className="auth-message">{message}</div>}
-        <button className="auth-switch" disabled={busy} onClick={()=>{setMode(mode==='login'?'signup':'login');setMessage('');setPassword('')}}>
+        <button className="auth-switch" disabled={busy} onClick={()=>{setMode(mode==='login'?'signup':'login');setMessage('');setPassword('');setPasswordConfirmation('')}}>
           {mode==='login'?'Não tem uma conta? Criar conta':'Já tem uma conta? Entrar'}
         </button>
       </div>
