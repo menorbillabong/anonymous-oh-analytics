@@ -21,9 +21,13 @@ function exportCsv(posts:any[]){
   if(index)output+='\n';
   output+=`MISSÃO: ${mission}\nData,Rede,Link,Visualizações,Curtidas\n`;
   [...rows]
-   .sort((a,b)=>new Date(a.published_date||a.created_at).getTime()-new Date(b.published_date||b.created_at).getTime())
+   .sort((a,b)=>{
+    const aTime=a.published_date?new Date(a.published_date).getTime():Number.POSITIVE_INFINITY;
+    const bTime=b.published_date?new Date(b.published_date).getTime():Number.POSITIVE_INFINITY;
+    return aTime-bTime;
+   })
    .forEach(post=>{
-    const published=new Date(post.published_date||post.created_at).toLocaleDateString('pt-BR');
+    const published=post.published_date?new Date(post.published_date).toLocaleDateString('pt-BR'):'';
     const url=String(post.post_url||'').replaceAll('"','""');
     output+=`"${published}","X","${url}",${Number(post.views||0)},${Number(post.likes||0)}\n`;
    });
