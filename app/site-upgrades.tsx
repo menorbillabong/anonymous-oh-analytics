@@ -22,12 +22,12 @@ function exportCsv(posts:any[]){
   output+=`MISSÃO: ${mission}\nData,Rede,Link,Visualizações,Curtidas\n`;
   [...rows]
    .sort((a,b)=>{
-    const aTime=a.published_date?new Date(a.published_date).getTime():Number.POSITIVE_INFINITY;
-    const bTime=b.published_date?new Date(b.published_date).getTime():Number.POSITIVE_INFINITY;
+    const aTime=a.published_at?new Date(a.published_at).getTime():Number.POSITIVE_INFINITY;
+    const bTime=b.published_at?new Date(b.published_at).getTime():Number.POSITIVE_INFINITY;
     return aTime-bTime;
    })
    .forEach(post=>{
-    const published=post.published_date?new Date(post.published_date).toLocaleDateString('pt-BR'):'';
+    const published=post.published_at?new Date(post.published_at).toLocaleDateString('pt-BR'):'';
     const url=String(post.post_url||'').replaceAll('"','""');
     output+=`"${published}","X","${url}",${Number(post.views||0)},${Number(post.likes||0)}\n`;
    });
