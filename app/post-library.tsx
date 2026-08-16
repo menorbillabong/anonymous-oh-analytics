@@ -88,7 +88,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
    video_url:edit.video_url||null,
    metrics_updated_at:new Date().toISOString(),
   };
-  if(edit.edit_date)payload.created_at=mergePostDate(edit.created_at,edit.edit_date);
+  if(edit.edit_date)payload.published_at=edit.edit_date;
   if(profiles.length){
    payload.mission_profile_id=missionProfile?.id||null;
    payload.mission_name=missionProfile?.name||null;
@@ -165,7 +165,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
      <input className="ref-select-check" type="checkbox" checked={selected} onClick={event=>event.stopPropagation()} onChange={()=>toggleOne(post.id)} aria-label={`Selecionar ${post.title||'publicação'}`}/>
      <div className="ref-post-cell">
       <button type="button" className="ref-edit-square" onClick={event=>{event.stopPropagation();openEditor(post)}} aria-label="Editar publicação">✎</button>
-      <div><strong>𝕏 <span>{displayMissionName(post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatDate(post.created_at)}</small></div>
+      <div><strong>𝕏 <span>{displayMissionName(post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatDate(post.published_at||post.created_at)}</small></div>
      </div>
      <b>{engagement.toLocaleString('pt-BR')}</b>
      <span>{Number(post.likes||0).toLocaleString('pt-BR')}</span>
@@ -190,7 +190,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
   <div className="ref-card-grid">
    {sortedPosts.map(post=><article className="ref-card" key={post.id}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
-    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatDate(post.created_at)}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
+    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatDate(post.published_at||post.created_at)}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
     <div className="ref-card-foot"><span>⌁ <b>{Number(post.likes||0).toLocaleString('pt-BR')}</b></span><strong>{postContribution(post).toLocaleString('pt-BR')}</strong><small>Crystgin</small><button type="button" className="ref-pencil" onClick={()=>openEditor(post)} aria-label="Editar publicação">✎</button></div>
    </article>)}
   </div>
@@ -238,7 +238,7 @@ export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;se
 }
 
 function formatDate(value:any){if(!value)return'';try{return new Date(value).toLocaleDateString('pt-BR')}catch{return''}}
-function postDateValue(post:any){const value=new Date(post?.created_at||0).getTime();return Number.isFinite(value)?value:0}
+function postDateValue(post:any){const value=new Date(post?.published_at||post?.created_at||0).getTime();return Number.isFinite(value)?value:0}
 function formatDateTime(value:any){if(!value)return'';try{return new Date(value).toLocaleString('pt-BR')}catch{return''}}
 function dateInputValue(value:any){if(!value)return'';try{return new Date(value).toISOString().slice(0,10)}catch{return''}}
 function mergePostDate(original:any,date:string){const current=original?new Date(original):new Date();const[year,month,day]=date.split('-').map(Number);if(!year||!month||!day)return original;current.setFullYear(year,month-1,day);return current.toISOString()}
