@@ -8,10 +8,10 @@ import { supabase } from '@/lib/supabase';
 import './globals.css';
 import './auth.css';
 
-type Mode = 'login' | 'signup';
+type Mode = 'login' | 'signup' | 'migrate';
 
-async function usernameAuth(action:'resolve'|'signup',username:string,password?:string) {
-  const {data,error}=await supabase.functions.invoke('username-auth',{body:{action,username,password}});
+async function usernameAuth(action:'resolve'|'signup'|'migrate',username:string,password?:string,email?:string) {
+  const {data,error}=await supabase.functions.invoke('username-auth',{body:{action,username,password,email}});
   if(error){
     let message='Não foi possível concluir a solicitação.';
     try{const payload=await (error as any).context?.json();if(payload?.error)message=payload.error}catch{}
@@ -25,6 +25,7 @@ export default function Home() {
   const [loading,setLoading]=useState(true);
   const [session,setSession]=useState<any>(null);
   const [username,setUsername]=useState('');
+  const [email,setEmail]=useState('');
   const [password,setPassword]=useState('');
   const [passwordConfirmation,setPasswordConfirmation]=useState('');
   const [mode,setMode]=useState<Mode>('login');
@@ -43,14 +44,16 @@ export default function Home() {
     setMessage('');
     const normalized=username.trim().toLowerCase();
     if(!normalized||!password)return setMessage('Preencha o nome de usuário e a senha.');
+    if(mode==='migrate'&&!email.trim())return setMessage('Preencha o e-mail do cadastro antigo.');
     if(!/^[a-z0-9._-]{3,24}$/.test(normalized))return setMessage('Use de 3 a 24 caracteres: letras, números, ponto, traço ou sublinhado.');
     if(password.length<6)return setMessage('A senha precisa ter pelo menos 6 caracteres.');
     if(mode==='signup'&&password!==passwordConfirmation)return setMessage('As senhas não são iguais.');
     setBusy(true);
     try{
-      const credentials=await usernameAuth(mode==='login'?'resolve':'signup',username.trim(),mode==='signup'?password:undefined);
+      const action=mode==='login'?'resolve':mode==='signup'?'signup':'migrate';
+      const credentials=await usernameAuth(action,username.trim(),mode==='login'?undefined:password,mode==='migrate'?email.trim():undefined);
       const result=await supabase.auth.signInWithPassword({email:credentials.email,password});
-      if(result.error)throw new Error(mode==='login'?'Usuário ou senha incorretos.':'Conta criada, mas não foi possível entrar.');
+      if(result.error)throw new Error(mode==='login'?'Usuário ou senha incorretos.':mode==='signup'?'Conta criada, mas não foi possível entrar.':'Cadastro migrado, mas não foi possível entrar.');
     }catch(error){setMessage(error instanceof Error?error.message:'Não foi possível concluir a solicitação.')}
     finally{setBusy(false)}
   }
@@ -75,11 +78,15 @@ export default function Home() {
         </div>
       </div>
       <div className="auth-form-panel">
-        <small className="auth-form-kicker">{mode==='login'?'ACESSO AO PAINEL':'NOVA CONTA'}</small>
-        <h2>{mode==='login'?'Entrar':'Criar conta'}</h2>
-        <p>{mode==='login'?'Use seu nome de usuário e sua senha.':'Escolha seu nome de usuário e uma senha segura.'}</p>
+        <small className="auth-form-kicker">{mode==='login'?'ACESSO AO PAINEL':mode==='signup'?'NOVA CONTA':'CADASTRO ANTIGO'}</small>
+        <h2>{mode==='login'?'Entrar':mode==='signup'?'Criar conta':'Migrar cadastro'}</h2>
+        <p>{mode==='login'?'Use seu nome de usuário e sua senha.':mode==='signup'?'Escolha seu nome de usuário e uma senha segura.':'Informe o e-mail antigo e escolha seu nome de usuário.'}</p>
         <form onSubmit={submit}>
-          <label>Nome de usuário</label>
+          {mode==='migrate'&&<>
+            <label>E-mail do cadastro antigo</label>
+            <input value={email} onChange={event=>setEmail(event.target.value)} type="email" autoComplete="email" placeholder="Seu e-mail antigo"/>
+          </>}
+          <label>{mode==='migrate'?'Novo nome de usuário':'Nome de usuário'}</label>
           <input value={username} onChange={event=>setUsername(event.target.value)} type="text" autoComplete="username" maxLength={24} placeholder="Seu nome de usuário"/>
           <label>Senha (mínimo 6 caracteres)</label>
           <input value={password} onChange={event=>setPassword(event.target.value)} type="password" autoComplete={mode==='login'?'current-password':'new-password'} placeholder="••••••••"/>
@@ -87,12 +94,13 @@ export default function Home() {
             <label>Confirmar senha</label>
             <input value={passwordConfirmation} onChange={event=>setPasswordConfirmation(event.target.value)} type="password" autoComplete="new-password" placeholder="••••••••"/>
           </>}
-          <button type="submit" disabled={busy}>{busy?'AGUARDE...':mode==='login'?'ENTRAR':'CRIAR CONTA'}</button>
+          <button type="submit" disabled={busy}>{busy?'AGUARDE...':mode==='login'?'ENTRAR':mode==='signup'?'CRIAR CONTA':'MIGRAR E ENTRAR'}</button>
         </form>
         {message&&<div className="auth-message">{message}</div>}
-        <button className="auth-switch" disabled={busy} onClick={()=>{setMode(mode==='login'?'signup':'login');setMessage('');setPassword('');setPasswordConfirmation('')}}>
-          {mode==='login'?'Não tem uma conta? Criar conta':'Já tem uma conta? Entrar'}
-        </button>
+        {mode==='login'?<>
+          <button className="auth-switch" disabled={busy} onClick={()=>{setMode('signup');setMessage('');setEmail('');setPassword('');setPasswordConfirmation('')}}>Não tem uma conta? Criar conta</button>
+          <button className="auth-switch" disabled={busy} onClick={()=>{setMode('migrate');setMessage('');setEmail('');setPassword('');setPasswordConfirmation('')}}>Possui cadastro antigo? Migrar acesso</button>
+        </>:<button className="auth-switch" disabled={busy} onClick={()=>{setMode('login');setMessage('');setEmail('');setPassword('');setPasswordConfirmation('')}}>Já tem um nome de usuário? Entrar</button>}
       </div>
     </section></div>
   </main>;
