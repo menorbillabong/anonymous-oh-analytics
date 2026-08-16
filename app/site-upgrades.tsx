@@ -22,12 +22,12 @@ function exportCsv(posts:any[]){
   output+=`MISSÃO: ${mission}\nData,Rede,Link,Visualizações,Curtidas\n`;
   [...rows]
    .sort((a,b)=>{
-    const aTime=a.published_at?new Date(a.published_at).getTime():Number.POSITIVE_INFINITY;
-    const bTime=b.published_at?new Date(b.published_at).getTime():Number.POSITIVE_INFINITY;
+    const aTime=publishedDate(a.published_at).sort;
+    const bTime=publishedDate(b.published_at).sort;
     return aTime-bTime;
    })
    .forEach(post=>{
-    const published=post.published_at?new Date(post.published_at).toLocaleDateString('pt-BR'):'';
+    const published=publishedDate(post.published_at).label;
     const url=String(post.post_url||'').replaceAll('"','""');
     output+=`"${published}","X","${url}",${Number(post.views||0)},${Number(post.likes||0)}\n`;
    });
@@ -37,6 +37,12 @@ function exportCsv(posts:any[]){
  link.download='publicacoes-por-missao.csv';
  link.click();
  setTimeout(()=>URL.revokeObjectURL(link.href),500);
+}
+function publishedDate(value:any){
+ const match=String(value||'').match(/^(\d{4})-(\d{2})-(\d{2})/);
+ if(!match)return {sort:Number.POSITIVE_INFINITY,label:''};
+ const[,year,month,day]=match;
+ return {sort:Number(`${year}${month}${day}`),label:`${day}/${month}/${year}`};
 }
 function Password({close}:{close:()=>void}){const[password,setPassword]=useState(''),[confirmation,setConfirmation]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);async function submit(){if(password.length<8)return setMessage('A senha precisa ter pelo menos 8 caracteres.');if(password!==confirmation)return setMessage('As senhas não são iguais.');setBusy(true);const{error}=await supabase.auth.updateUser({password});setBusy(false);setMessage(error?'Não foi possível alterar a senha.':'Senha alterada com sucesso.')}return <div className="upgrade-backdrop"><div className="upgrade-password"><button className="upgrade-x" onClick={close}>×</button><small>SEGURANÇA DA CONTA</small><h2>Alterar senha</h2><label>Nova senha<input type="password" value={password} onChange={event=>setPassword(event.target.value)}/></label><label>Confirmar nova senha<input type="password" value={confirmation} onChange={event=>setConfirmation(event.target.value)}/></label>{message&&<p>{message}</p>}<div><button onClick={close}>Cancelar</button><button className="upgrade-primary" disabled={busy} onClick={submit}>{busy?'ALTERANDO...':'ALTERAR SENHA'}</button></div></div></div>}
 
