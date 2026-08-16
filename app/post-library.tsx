@@ -237,7 +237,7 @@ export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;se
  </div>;
 }
 
-function formatDate(value:any){if(!value)return'';try{return new Date(value).toLocaleDateString('pt-BR')}catch{return''}}
+function formatDate(value:any){if(!value)return'';const match=String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(match)return `${match[3]}/${match[2]}/${match[1]}`;try{return new Date(value).toLocaleDateString('pt-BR')}catch{return''}}
 function postDateValue(post:any){const value=new Date(post?.published_at||post?.created_at||0).getTime();return Number.isFinite(value)?value:0}
 function formatDateTime(value:any){if(!value)return'';try{return new Date(value).toLocaleString('pt-BR')}catch{return''}}
 function dateInputValue(value:any){if(!value)return'';try{return new Date(value).toISOString().slice(0,10)}catch{return''}}
