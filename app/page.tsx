@@ -56,21 +56,38 @@ export default function Home() {
   if(loading)return <div className="auth-loading">ANONIMOUS_OH Analytics</div>;
   if(session)return <><Dashboard session={session}/><DatabaseRefreshTimer/><ReferencePreviewInjector/></>;
 
-  return <main className="auth-shell"><section className="auth-card">
-    <div className="auth-brand"><span className="auth-dot"/>ANONIMOUS_OH</div>
-    <p className="auth-kicker">ANALYTICS V2</p>
-    <h1>Transforme<br/>métricas em <span>crescimento.</span></h1>
-    <p className="auth-copy">Analise suas publicações, acompanhe o cálculo das missões e gerencie sua performance em um único painel.</p>
-    <form onSubmit={submit}>
-      <label>Nome de usuário</label>
-      <input value={username} onChange={event=>setUsername(event.target.value)} type="text" autoComplete="username" maxLength={24} placeholder="Seu nome de usuário"/>
-      <label>Senha (mínimo 6 caracteres)</label>
-      <input value={password} onChange={event=>setPassword(event.target.value)} type="password" autoComplete={mode==='login'?'current-password':'new-password'} placeholder="••••••••"/>
-      <button type="submit" disabled={busy}>{busy?'AGUARDE...':mode==='login'?'ENTRAR':'CRIAR CONTA'}</button>
-    </form>
-    {message&&<div className="auth-message">{message}</div>}
-    <button className="auth-switch" disabled={busy} onClick={()=>{setMode(mode==='login'?'signup':'login');setMessage('');setPassword('')}}>
-      {mode==='login'?'Não tem uma conta? Criar conta':'Já tem uma conta? Entrar'}
-    </button>
-  </section></main>;
+  return <main className="auth-shell">
+    <header className="auth-topbar">
+      <strong>AVALIAÇÃO DE MÉTRICAS</strong>
+      <span><i/> ANONYMOUS_OH</span>
+    </header>
+    <div className="auth-stage"><section className="auth-card">
+      <div className="auth-intro">
+        <div className="auth-brand"><span className="auth-dot"/>ANONYMOUS_OH</div>
+        <p className="auth-kicker">ANALYTICS V2</p>
+        <h1>Transforme<br/>métricas em <span>crescimento.</span></h1>
+        <p className="auth-copy">Analise suas publicações, acompanhe o cálculo das missões e gerencie sua performance em um único painel.</p>
+        <div className="auth-summary">
+          <div><small>PAINEL</small><b>Métricas em tempo real</b></div>
+          <div><small>MISSÕES</small><b>Progresso organizado</b></div>
+        </div>
+      </div>
+      <div className="auth-form-panel">
+        <small className="auth-form-kicker">{mode==='login'?'ACESSO AO PAINEL':'NOVA CONTA'}</small>
+        <h2>{mode==='login'?'Entrar':'Criar conta'}</h2>
+        <p>{mode==='login'?'Use seu nome de usuário e sua senha.':'Escolha seu nome de usuário e uma senha segura.'}</p>
+        <form onSubmit={submit}>
+          <label>Nome de usuário</label>
+          <input value={username} onChange={event=>setUsername(event.target.value)} type="text" autoComplete="username" maxLength={24} placeholder="Seu nome de usuário"/>
+          <label>Senha (mínimo 6 caracteres)</label>
+          <input value={password} onChange={event=>setPassword(event.target.value)} type="password" autoComplete={mode==='login'?'current-password':'new-password'} placeholder="••••••••"/>
+          <button type="submit" disabled={busy}>{busy?'AGUARDE...':mode==='login'?'ENTRAR':'CRIAR CONTA'}</button>
+        </form>
+        {message&&<div className="auth-message">{message}</div>}
+        <button className="auth-switch" disabled={busy} onClick={()=>{setMode(mode==='login'?'signup':'login');setMessage('');setPassword('')}}>
+          {mode==='login'?'Não tem uma conta? Criar conta':'Já tem uma conta? Entrar'}
+        </button>
+      </div>
+    </section></div>
+  </main>;
 }
