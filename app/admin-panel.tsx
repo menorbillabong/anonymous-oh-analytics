@@ -102,7 +102,7 @@ export default function AdminPanel() {
       .some(value => String(value || '').toLowerCase().includes(normalizedSearch))
   ), [posts, normalizedSearch]);
 
-  async function run(key: string, request: () => Promise<{ error: { message?: string } | null }>, success: string) {
+  async function run(key: string, request: () => PromiseLike<{ error: { message?: string } | null }>, success: string) {
     setBusy(key);
     setMessage('');
     try {
