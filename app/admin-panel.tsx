@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { formatPostDate, postPublishedDate } from '@/lib/post-date';
 import './admin.css';
 
 type AdminSection = 'Visão geral' | 'Usuários' | 'Publicações' | 'Auditoria' | 'Controles';
@@ -31,6 +32,7 @@ type AdminPost = {
   post_url?: string;
   author_handle?: string;
   published_at?: string;
+  x_published_at?: string;
   views?: number;
   likes?: number;
   admin_eligible?: boolean;
@@ -90,7 +92,7 @@ export default function AdminPanel() {
   }, [load]);
 
   const users = dashboard.users || [];
-  const posts = dashboard.posts || [];
+  const posts = useMemo(()=>[...(dashboard.posts || [])].sort((a,b)=>(postPublishedDate(b)?.getTime()||0)-(postPublishedDate(a)?.getTime()||0)),[dashboard.posts]);
   const logs = dashboard.logs || [];
   const normalizedSearch = search.trim().toLowerCase();
   const filteredUsers = useMemo(() => users.filter(user =>
@@ -260,7 +262,7 @@ export default function AdminPanel() {
         {filteredPosts.map(post => <article className="admin-post-card" key={post.id}>
           <div className="admin-post-top"><StatusTag tone={post.admin_eligible === false ? 'danger' : 'success'}>{post.admin_eligible === false ? 'DESQUALIFICADA' : 'ELEGÍVEL'}</StatusTag><small>#{post.id}</small></div>
           <h3>{post.title || 'Publicação do X'}</h3>
-          <p>@{String(post.author_handle || 'sem_identificação').replace(/^@/, '')} · {formatDate(post.published_at)}</p>
+          <p>@{String(post.author_handle || 'sem_identificação').replace(/^@/, '')} · {formatDate(post.x_published_at || post.published_at)}</p>
           <div className="admin-post-metrics"><span><small>VISUALIZAÇÕES</small><b>{Number(post.views || 0).toLocaleString('pt-BR')}</b></span><span><small>CURTIDAS</small><b>{Number(post.likes || 0).toLocaleString('pt-BR')}</b></span></div>
           {post.admin_reason && <div className="admin-post-reason">Motivo: {post.admin_reason}</div>}
           <button disabled={busy === `post-${post.id}`} className={post.admin_eligible === false ? 'safe' : 'danger'} onClick={() => reviewPost(post, post.admin_eligible === false ? 'requalify_post' : 'disqualify_post')}>{post.admin_eligible === false ? 'REQUALIFICAR PUBLICAÇÃO' : 'DESQUALIFICAR PUBLICAÇÃO'}</button>
@@ -327,7 +329,6 @@ function actionLabel(action:string) {
 
 function formatDate(value?:string, withTime=false) {
   if (!value) return 'Sem registro';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return 'Sem registro';
-  return withTime ? date.toLocaleString('pt-BR') : date.toLocaleDateString('pt-BR');
+  return formatPostDate(value, withTime) || 'Sem registro';
 }
+
