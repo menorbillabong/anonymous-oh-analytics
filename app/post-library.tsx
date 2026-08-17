@@ -4,6 +4,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {useEscapeClose} from '@/lib/use-escape-close';
 import {monthlyReward,postContribution} from '@/lib/reward';
+import {formatPostDate,postDateKey,postPublishedDate,postPublishedValue} from '@/lib/post-date';
 import XPostPreview,{VideoPreview} from './x-post-preview';
 import './x-post-preview.css';
 import './post-experience.css';
@@ -68,7 +69,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  },[]);
 
  function openEditor(post:any){
-  setEdit({...post,edit_date:dateInputValue(post.published_at||post.created_at)});
+  setEdit({...post,edit_date:dateInputValue(postPublishedValue(post))});
  }
 
  function toggleExpanded(id:any){
@@ -88,7 +89,6 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
    video_url:edit.video_url||null,
    metrics_updated_at:new Date().toISOString(),
   };
-  if(edit.edit_date)payload.published_at=edit.edit_date;
   if(profiles.length){
    payload.mission_profile_id=missionProfile?.id||null;
    payload.mission_name=missionProfile?.name||null;
@@ -165,7 +165,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
      <input className="ref-select-check" type="checkbox" checked={selected} onClick={event=>event.stopPropagation()} onChange={()=>toggleOne(post.id)} aria-label={`Selecionar ${post.title||'publicação'}`}/>
      <div className="ref-post-cell">
       <button type="button" className="ref-edit-square" onClick={event=>{event.stopPropagation();openEditor(post)}} aria-label="Editar publicação">✎</button>
-      <div><strong>𝕏 <span>{displayMissionName(post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatDate(post.published_at||post.created_at)}</small></div>
+      <div><strong>𝕏 <span>{displayMissionName(post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatPostDate(postPublishedValue(post))}</small></div>
      </div>
      <b>{engagement.toLocaleString('pt-BR')}</b>
      <span>{Number(post.likes||0).toLocaleString('pt-BR')}</span>
@@ -190,7 +190,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
   <div className="ref-card-grid">
    {sortedPosts.map(post=><article className="ref-card" key={post.id}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
-    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatDate(post.published_at||post.created_at)}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
+    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatPostDate(postPublishedValue(post))}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
     <div className="ref-card-foot"><span>⌁ <b>{Number(post.likes||0).toLocaleString('pt-BR')}</b></span><strong>{postContribution(post).toLocaleString('pt-BR')}</strong><small>Crystgin</small><button type="button" className="ref-pencil" onClick={()=>openEditor(post)} aria-label="Editar publicação">✎</button></div>
    </article>)}
   </div>
@@ -218,7 +218,7 @@ export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;se
       {([['Visualizações','views'],['Comentários','comments'],['Reposts','reposts'],['Curtidas','likes']] as const).map(([label,key])=><label key={key}>{label}<input type="number" min="0" value={edit[key]||0} onChange={event=>setEdit({...edit,[key]:Number(event.target.value)})}/></label>)}
      </div>
      <div className="edit-post-secondary-grid">
-      <label>Data da publicação<input type="date" value={edit.edit_date||''} onChange={event=>setEdit({...edit,edit_date:event.target.value})}/></label>
+      <label>Data da publicação no X<input type="date" value={edit.edit_date||''} disabled title="Data obtida automaticamente pelo link da publicação no X"/></label>
       <label>Missão<select value={edit.mission_profile_id||''} onChange={event=>setEdit({...edit,mission_profile_id:event.target.value})}><option value="">Sem missão especial</option>{profiles.map(profile=><option key={String(profile.id)} value={String(profile.id)}>{profile.name}</option>)}</select></label>
      </div>
      <h3 className="edit-section-title">BÔNUS</h3>
@@ -237,14 +237,12 @@ export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;se
  </div>;
 }
 
-function formatDate(value:any){if(!value)return'';const match=String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(match)return `${match[3]}/${match[2]}/${match[1]}`;try{return new Date(value).toLocaleDateString('pt-BR')}catch{return''}}
 function xStatusId(value:any){return String(value||'').match(/\/status\/(\d+)/)?.[1]||''}
 function compareXStatusIds(a:string,b:string){if(a.length!==b.length)return a.length-b.length;return a<b?-1:a>b?1:0}
-function postDateValue(post:any){const value=new Date(post?.x_published_at||post?.published_at||post?.created_at||0).getTime();return Number.isFinite(value)?value:0}
+function postDateValue(post:any){return postPublishedDate(post)?.getTime()||0}
 function comparePostChronology(a:any,b:any){const dateDifference=postDateValue(a)-postDateValue(b);if(dateDifference)return dateDifference;const aStatus=xStatusId(a?.post_url),bStatus=xStatusId(b?.post_url);if(aStatus&&bStatus){const statusDifference=compareXStatusIds(aStatus,bStatus);if(statusDifference)return statusDifference}const createdDifference=new Date(a?.created_at||0).getTime()-new Date(b?.created_at||0).getTime();return Number.isFinite(createdDifference)?createdDifference:0}
-function formatDateTime(value:any){if(!value)return'';try{return new Date(value).toLocaleString('pt-BR')}catch{return''}}
-function dateInputValue(value:any){if(!value)return'';try{return new Date(value).toISOString().slice(0,10)}catch{return''}}
-function mergePostDate(original:any,date:string){const current=original?new Date(original):new Date();const[year,month,day]=date.split('-').map(Number);if(!year||!month||!day)return original;current.setFullYear(year,month-1,day);return current.toISOString()}
+function formatDateTime(value:any){return formatPostDate(value,true)}
+function dateInputValue(value:any){return postDateKey(value)}
 function displayMissionName(name:string){return name.trim().toLowerCase()==='hight quality'?'High Quality':name}
 function findMissionProfile(post:any,profiles:MissionProfile[]){return profiles.find(profile=>String(profile.id)===String(post.mission_profile_id))||profiles.find(profile=>profile.name===post.mission_name)}
 
@@ -274,4 +272,5 @@ export function PostExpandedDetails({post,reward,missionProfile,crystalginLimit,
   <div className="post-expanded-actions"><button type="button" className="post-delete-button" onClick={onDelete}>🗑 EXCLUIR PUBLICAÇÃO</button></div>
  </section>;
 }
+
 

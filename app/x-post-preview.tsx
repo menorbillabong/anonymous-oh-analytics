@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useMemo,useRef,useState} from 'react';
+import {formatPostDate} from '@/lib/post-date';
 
 const xPostPattern=/^https?:\/\/(?:www\.)?(?:x\.com|twitter\.com)\/[^/]+\/status\/\d+/i;
 
@@ -40,7 +41,7 @@ function Media({data}:{data:any}){
 }
 
 function number(value:any){return Number(value||0).toLocaleString('pt-BR')}
-function dateTime(value:any){if(!value)return'';try{return new Date(value).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'})}catch{return''}}
+function dateTime(value:any){return formatPostDate(value,true)}
 
 export default function XPostPreview({post,compact=false}:PreviewProps){
  const[data,setData]=useState<any>(post||{});
@@ -55,7 +56,7 @@ export default function XPostPreview({post,compact=false}:PreviewProps){
  },[postUrl]);
  const handle=String(data.author_handle||'').replace(/^@/,'');
  const text=data.text||data.title||'Publicação do X';
- const published=data.published_at||data.created_at||data.published_date;
+ const published=data.x_published_at||data.published_at||data.published_date||data.created_at;
  return <article className={`x-reference-preview${compact?' compact':''}`}>
   <header className="x-preview-head">
    <div className="x-preview-author">{data.author_avatar?<img src={data.author_avatar} alt={data.author_name||handle||'Autor'}/>:<span className="x-avatar-fallback">𝕏</span>}<div><strong>{data.author_name||handle||'Autor da publicação'}</strong><small>{handle?`@${handle}`:'X'}</small></div></div>
