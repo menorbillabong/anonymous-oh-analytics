@@ -33,6 +33,7 @@ export async function refreshStoredPostMetrics(posts:any[],userId:string,onProgr
      likes:metric(data.likes,post.likes),
      reposts:metric(data.reposts,post.reposts),
      comments:metric(data.comments,post.comments),
+     x_published_at:data.published_at||post.x_published_at||null,
      metrics_source:data.source||'auto',
      metrics_updated_at:new Date().toISOString(),
     }).eq('id',post.id).eq('user_id',userId);

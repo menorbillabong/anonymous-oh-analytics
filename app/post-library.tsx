@@ -39,7 +39,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  const effectiveView=view||(typeof window!=='undefined'&&localStorage.getItem('aoh:post-view')==='cards'?'cards':'list');
  const reward=monthlyReward(posts);
  const missionCrystal=posts.reduce((total,post)=>total+postContribution(post),0);
- const sortedPosts=useMemo(()=>[...posts].sort((a,b)=>(sortAsc?1:-1)*(postDateValue(a)-postDateValue(b))),[posts,sortAsc]);
+ const sortedPosts=useMemo(()=>[...posts].sort((a,b)=>(sortAsc?1:-1)*comparePostChronology(a,b)),[posts,sortAsc]);
  const selectableIds=useMemo(()=>posts.map(post=>String(post.id)),[posts]);
  const selectedCount=selectedIds.size;
  const allSelected=selectableIds.length>0&&selectableIds.every(id=>selectedIds.has(id));
@@ -238,7 +238,10 @@ export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;se
 }
 
 function formatDate(value:any){if(!value)return'';const match=String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);if(match)return `${match[3]}/${match[2]}/${match[1]}`;try{return new Date(value).toLocaleDateString('pt-BR')}catch{return''}}
-function postDateValue(post:any){const value=new Date(post?.published_at||post?.created_at||0).getTime();return Number.isFinite(value)?value:0}
+function xStatusId(value:any){return String(value||'').match(/\/status\/(\d+)/)?.[1]||''}
+function compareXStatusIds(a:string,b:string){if(a.length!==b.length)return a.length-b.length;return a<b?-1:a>b?1:0}
+function postDateValue(post:any){const value=new Date(post?.x_published_at||post?.published_at||post?.created_at||0).getTime();return Number.isFinite(value)?value:0}
+function comparePostChronology(a:any,b:any){const dateDifference=postDateValue(a)-postDateValue(b);if(dateDifference)return dateDifference;const aStatus=xStatusId(a?.post_url),bStatus=xStatusId(b?.post_url);if(aStatus&&bStatus){const statusDifference=compareXStatusIds(aStatus,bStatus);if(statusDifference)return statusDifference}const createdDifference=new Date(a?.created_at||0).getTime()-new Date(b?.created_at||0).getTime();return Number.isFinite(createdDifference)?createdDifference:0}
 function formatDateTime(value:any){if(!value)return'';try{return new Date(value).toLocaleString('pt-BR')}catch{return''}}
 function dateInputValue(value:any){if(!value)return'';try{return new Date(value).toISOString().slice(0,10)}catch{return''}}
 function mergePostDate(original:any,date:string){const current=original?new Date(original):new Date();const[year,month,day]=date.split('-').map(Number);if(!year||!month||!day)return original;current.setFullYear(year,month-1,day);return current.toISOString()}
