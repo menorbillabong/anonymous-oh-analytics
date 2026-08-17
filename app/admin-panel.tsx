@@ -1,4 +1,115 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-export default function AdminPanel({currentUserId}:{currentUserId:string}){const [users,setUsers]=useState<any[]>([]);const [logs,setLogs]=useState<any[]>([]);async function load(){const [{data:u},{data:l}]=await Promise.all([supabase.from('profiles').select('*').order('created_at',{ascending:false}),supabase.from('admin_logs').select('*').order('created_at',{ascending:false}).limit(100)]);setUsers(u||[]);setLogs(l||[])}useEffect(()=>{load()},[]);async function patch(id:string,changes:any,action:string){await supabase.from('profiles').update(changes).eq('id',id);await supabase.from('admin_logs').insert({admin_id:currentUserId,target_user_id:id,action});await load()}return <div><h1 className="page-title">Administração</h1><p className="page-subtitle">Gerencie usuários, ranking e auditoria.</p><div className="admin-grid">{users.map(u=><div className="admin-user" key={u.id}><h4>{u.username||u.email||u.id}</h4><div className="muted" style={{fontSize:11}}>{u.id}</div><div className="admin-actions"><button className="btn" onClick={()=>patch(u.id,{suspended:!u.suspended},u.suspended?'reativou usuário':'suspendeu usuário')}>{u.suspended?'Reativar':'Suspender'}</button><button className="btn" onClick={()=>patch(u.id,{ranking_blocked:!u.ranking_blocked},u.ranking_blocked?'liberou ranking':'bloqueou ranking')}>{u.ranking_blocked?'Liberar ranking':'Bloquear ranking'}</button></div></div>)}</div><div style={{height:18}}/><div className="panel"><div className="panel-title"><h3>Histórico administrativo</h3></div>{logs.length?logs.map(l=><div className="admin-log" key={l.id}><strong>{l.action}</strong><div className="muted">{new Date(l.created_at).toLocaleString('pt-BR')} · {l.target_user_id}</div></div>):<div className="empty">Nenhuma ação registrada.</div>}</div></div>}
+
+type AdminUser = {
+  id: string;
+  email?: string;
+  username?: string;
+  display_name?: string;
+  suspended?: boolean;
+  ranking_blocked?: boolean;
+  is_admin?: boolean;
+};
+
+type AuditLog = {
+  id: number;
+  action: string;
+  reason?: string;
+  target_email?: string;
+  target_username?: string;
+  created_at: string;
+};
+
+export default function AdminPanel() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [busyUser, setBusyUser] = useState<string | null>(null);
+  const [message, setMessage] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setMessage('');
+    const { data, error } = await supabase.rpc('admin_dashboard');
+    if (error) {
+      setMessage('Não foi possível carregar os dados administrativos.');
+      setLoading(false);
+      return;
+    }
+    const dashboard = data as { users?: AdminUser[]; logs?: AuditLog[] } | null;
+    setUsers(dashboard?.users || []);
+    setLogs(dashboard?.logs || []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function manage(user: AdminUser, action: 'suspend' | 'reactivate' | 'block_ranking' | 'unblock_ranking') {
+    const labels = {
+      suspend: 'suspender esta conta',
+      reactivate: 'reativar esta conta',
+      block_ranking: 'bloquear esta conta no ranking',
+      unblock_ranking: 'liberar esta conta no ranking',
+    };
+    const reason = window.prompt(`Informe o motivo para ${labels[action]}:`);
+    if (!reason) return;
+    if (reason.trim().length < 3) {
+      setMessage('O motivo precisa ter pelo menos 3 caracteres.');
+      return;
+    }
+    setBusyUser(user.id);
+    setMessage('');
+    const { error } = await supabase.rpc('admin_manage_account', {
+      p_action: action,
+      p_target_user: user.id,
+      p_reason: reason.trim(),
+      p_post_id: null,
+    });
+    if (error) {
+      setMessage(error.message || 'Não foi possível concluir a ação.');
+      setBusyUser(null);
+      return;
+    }
+    await load();
+    setBusyUser(null);
+  }
+
+  return <div>
+    <h1 className="page-title">Administração</h1>
+    <p className="page-subtitle">Gerencie usuários, ranking e auditoria.</p>
+    {message && <div className="auth-message">{message}</div>}
+    {loading ? <div className="empty">Carregando painel administrativo...</div> :
+      <div className="admin-grid">{users.map(user =>
+        <div className="admin-user" key={user.id}>
+          <h4>{user.username || user.display_name || user.email || user.id}</h4>
+          <div className="muted" style={{fontSize:11}}>{user.email || user.id}</div>
+          {user.is_admin && <div className="muted" style={{fontSize:11}}>Administrador</div>}
+          <div className="admin-actions">
+            <button className="btn" disabled={busyUser === user.id || user.is_admin} onClick={() => manage(user, user.suspended ? 'reactivate' : 'suspend')}>
+              {user.suspended ? 'Reativar' : 'Suspender'}
+            </button>
+            <button className="btn" disabled={busyUser === user.id} onClick={() => manage(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking')}>
+              {user.ranking_blocked ? 'Liberar ranking' : 'Bloquear ranking'}
+            </button>
+          </div>
+        </div>
+      )}</div>
+    }
+    <div style={{height:18}}/>
+    <div className="panel">
+      <div className="panel-title"><h3>Histórico administrativo</h3></div>
+      {logs.length ? logs.map(log =>
+        <div className="admin-log" key={log.id}>
+          <strong>{log.action}</strong>
+          <div className="muted">
+            {new Date(log.created_at).toLocaleString('pt-BR')} · {log.target_username || log.target_email || 'Conta'}{log.reason ? ` · ${log.reason}` : ''}
+          </div>
+        </div>
+      ) : <div className="empty">Nenhuma ação registrada.</div>}
+    </div>
+  </div>;
+}
