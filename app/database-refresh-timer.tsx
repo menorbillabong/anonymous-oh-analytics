@@ -1,10 +1,9 @@
 'use client';
-import {useEffect,useRef,useState} from 'react';
+import {useCallback,useEffect,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
 
 type TimerState={active:boolean;hours:number;next:string|null};
-const msFor=(hours:number)=>Math.max(.5,Number(hours)||.5)*3600000;
 const format=(seconds:number)=>{const s=Math.max(0,Math.floor(seconds));const h=Math.floor(s/3600),m=Math.floor((s%3600)/60),r=s%60;return h>0?`${h}:${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`:`${String(m).padStart(2,'0')}:${String(r).padStart(2,'0')}`};
 
 export default function DatabaseRefreshTimer(){
@@ -12,58 +11,33 @@ export default function DatabaseRefreshTimer(){
  const[state,setState]=useState<TimerState>({active:false,hours:.5,next:null});
  const[left,setLeft]=useState(0);
  const[host,setHost]=useState<HTMLElement|null>(null);
- const firing=useRef(false);
- const remainingSeconds=useRef<number|null>(null);
 
- const sync=async(userId:string)=>{
+ const sync=useCallback(async(userId:string)=>{
   const{data}=await supabase.from('user_settings').select('show_refresh_timer,refresh_interval,last_refresh_at,next_refresh_at').eq('user_id',userId).maybeSingle();
   if(!data)return;
   const active=!!data.show_refresh_timer,hours=Number(data.refresh_interval||.5);
   const next=data.next_refresh_at as string|null;
   setState({active,hours,next});
- };
+ },[]);
 
- useEffect(()=>{let mounted=true;supabase.auth.getSession().then(({data})=>{const id=data.session?.user.id||'';if(mounted&&id){setUid(id);sync(id)}});const{data:auth}=supabase.auth.onAuthStateChange((_e,session)=>{const id=session?.user.id||'';setUid(id);if(id)sync(id);else setState({active:false,hours:.5,next:null})});return()=>{mounted=false;auth.subscription.unsubscribe()}},[]);
+ useEffect(()=>{let mounted=true;supabase.auth.getSession().then(({data})=>{const id=data.session?.user.id||'';if(mounted&&id){setUid(id);sync(id)}});const{data:auth}=supabase.auth.onAuthStateChange((_e,session)=>{const id=session?.user.id||'';setUid(id);if(id)sync(id);else setState({active:false,hours:.5,next:null})});return()=>{mounted=false;auth.subscription.unsubscribe()}},[sync]);
 
  useEffect(()=>{
-  const changed=async(event:Event)=>{
-   if(!uid)return;
-   const detail=(event as CustomEvent).detail||{},active=!!detail.active,newHours=Number(detail.hours||.5);
-   const{data}=await supabase.from('user_settings').select('refresh_interval,last_refresh_at,next_refresh_at').eq('user_id',uid).maybeSingle();
-   const oldHours=Number(data?.refresh_interval||newHours);
-   const now=Date.now();
-   if(!active){
-    await supabase.from('user_settings').update({next_refresh_at:null}).eq('user_id',uid);
-    setState({active:false,hours:newHours,next:null});
-    return;
-   }
-   let nextIso=data?.next_refresh_at as string|null;
-   if(!nextIso){
-    let start:number;
-    if(data?.last_refresh_at) start=new Date(data.last_refresh_at).getTime();
-    else start=now;
-    nextIso=new Date(start+msFor(newHours)).toISOString();
-    await supabase.from('user_settings').update({last_refresh_at:new Date(start).toISOString(),next_refresh_at:nextIso}).eq('user_id',uid);
-   }else if(newHours!==oldHours){
-    let start:number;
-    if(data?.last_refresh_at) start=new Date(data.last_refresh_at).getTime();
-    else start=new Date(nextIso).getTime()-msFor(oldHours);
-    nextIso=new Date(start+msFor(newHours)).toISOString();
-    await supabase.from('user_settings').update({last_refresh_at:new Date(start).toISOString(),next_refresh_at:nextIso}).eq('user_id',uid);
-   }
-   setState({active:true,hours:newHours,next:nextIso});
-  };
+  const changed=()=>{if(uid)window.setTimeout(()=>sync(uid),200)};
   window.addEventListener('aoh:auto-refresh-changed',changed as EventListener);return()=>window.removeEventListener('aoh:auto-refresh-changed',changed as EventListener)
- },[uid]);
-
- useEffect(()=>{if(!state.active||!state.next){remainingSeconds.current=null;setLeft(0);return}const tick=()=>{const value=Math.max(0,Math.ceil((new Date(state.next!).getTime()-Date.now())/1000));remainingSeconds.current=value;setLeft(value)};tick();const id=window.setInterval(tick,1000);return()=>window.clearInterval(id)},[state.active,state.next]);
+ },[uid,sync]);
 
  useEffect(()=>{
-  if(!uid||!state.active||!state.next||left!==0||remainingSeconds.current!==0||firing.current)return;
-  firing.current=true;
-  const requestRefresh=()=>new Promise<boolean>(resolve=>{let settled=false;const finish=(success:boolean)=>{if(settled)return;settled=true;window.clearTimeout(timeout);resolve(success)};const detail:{handled:boolean;complete:(success:boolean)=>void}={handled:false,complete:finish};const timeout=window.setTimeout(()=>finish(false),180000);window.dispatchEvent(new CustomEvent('aoh:refresh-metrics',{detail}));if(!detail.handled)finish(false)});
-  const run=async()=>{const success=await requestRefresh(),now=new Date(),next=new Date(now.getTime()+msFor(state.hours));const schedule:any={next_refresh_at:next.toISOString()};if(success)schedule.last_refresh_at=now.toISOString();await supabase.from('user_settings').update(schedule).eq('user_id',uid);setState(s=>({...s,next:next.toISOString()}));window.setTimeout(()=>{firing.current=false},1200)};run()
- },[uid,state.active,state.next,state.hours,left]);
+  if(!uid)return;
+  const refresh=()=>sync(uid);
+  const visible=()=>{if(document.visibilityState==='visible')refresh()};
+  const poll=window.setInterval(refresh,15000);
+  window.addEventListener('focus',refresh);
+  document.addEventListener('visibilitychange',visible);
+  return()=>{window.clearInterval(poll);window.removeEventListener('focus',refresh);document.removeEventListener('visibilitychange',visible)};
+ },[uid,sync]);
+
+ useEffect(()=>{if(!state.active||!state.next){setLeft(0);return}const tick=()=>setLeft(Math.max(0,Math.ceil((new Date(state.next!).getTime()-Date.now())/1000)));tick();const id=window.setInterval(tick,1000);return()=>window.clearInterval(id)},[state.active,state.next]);
 
  useEffect(()=>{if(!state.active){document.querySelectorAll('.db-refresh-timer-host').forEach(el=>el.remove());setHost(null);return}const attach=()=>{const topbar=document.querySelector('.exact-topbar');if(!topbar)return;const brand=topbar.querySelector('.exact-brand');if(!brand)return;let target=topbar.querySelector<HTMLElement>(':scope > .db-refresh-timer-host');if(!target){target=document.createElement('div');target.className='db-refresh-timer-host';brand.insertAdjacentElement('afterend',target)}setHost(target)};attach();const obs=new MutationObserver(attach);obs.observe(document.body,{childList:true,subtree:true});return()=>{obs.disconnect();document.querySelectorAll('.db-refresh-timer-host').forEach(el=>el.remove());setHost(null)}},[state.active]);
 

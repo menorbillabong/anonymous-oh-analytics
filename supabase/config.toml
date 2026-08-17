@@ -1,0 +1,2 @@
+[functions.automatic-metrics-refresh]
+verify_jwt = false
