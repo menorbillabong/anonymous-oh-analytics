@@ -3,7 +3,7 @@
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {useEscapeClose} from '@/lib/use-escape-close';
-import {monthlyReward,postContribution} from '@/lib/reward';
+import {minimumPostProgress,monthlyReward,postContribution,viewGoalProgress} from '@/lib/reward';
 import {formatPostDate,postDateKey,postPublishedDate,postPublishedValue} from '@/lib/post-date';
 import XPostPreview,{VideoPreview} from './x-post-preview';
 import './x-post-preview.css';
@@ -199,7 +199,9 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
 }
 
 function SummaryTail({posts,reward,missionCrystal,crystalginLimit}:{posts:any[];reward:any;missionCrystal:number;crystalginLimit:number}){
- return <div className="ref-summary-tail"><div className="ref-summary-total"><b>TOTAL</b><strong>{posts.length}</strong><strong>{reward.views.toLocaleString('pt-BR')}</strong><strong>{reward.likes.toLocaleString('pt-BR')}</strong><strong>{missionCrystal.toLocaleString('pt-BR')}</strong></div><div className="ref-reward-line"><span>RECOMPENSA BÁSICA (MÍN. 10 POSTAGENS)</span><b>+ {reward.base.toLocaleString('pt-BR')} CG</b></div><div className="ref-reward-line"><span>BÔNUS DE VISUALIZAÇÕES (COLCHETES)</span><b>+ {reward.viewsReward.toLocaleString('pt-BR')} CG</b></div><div className="ref-official"><strong>PROGRESSO OFICIAL (COM LIMITE)</strong><b>{Math.min(reward.raw,crystalginLimit).toLocaleString('pt-BR')}</b></div></div>;
+ const minimum=minimumPostProgress(posts.length);
+ const viewsGoal=viewGoalProgress(reward.views);
+ return <div className="ref-summary-tail"><div className="ref-summary-total"><b>TOTAL</b><strong>{posts.length}</strong><strong>{reward.views.toLocaleString('pt-BR')}</strong><strong>{reward.likes.toLocaleString('pt-BR')}</strong><strong>{missionCrystal.toLocaleString('pt-BR')}</strong></div><div className="ref-reward-line"><span>RECOMPENSA MÍNIMA {minimum.reached?'(MÍNIMO ATINGIDO · 100%)':`(${minimum.current.toLocaleString('pt-BR')}/${minimum.goal.toLocaleString('pt-BR')} POSTAGENS · ${minimum.percent}%)`}</span><b>+ {reward.base.toLocaleString('pt-BR')} CG</b></div><div className="ref-reward-line"><span>BÔNUS DE VISUALIZAÇÕES {viewsGoal.maximumReached?`(META MÁXIMA ATINGIDA: ${viewsGoal.current.toLocaleString('pt-BR')} VISUALIZAÇÕES)`:`(META ATUAL: ${viewsGoal.current.toLocaleString('pt-BR')} / ${viewsGoal.goal.toLocaleString('pt-BR')} VISUALIZAÇÕES)`}</span><b>+ {reward.viewsReward.toLocaleString('pt-BR')} CG</b></div><div className="ref-official"><strong>PROGRESSO OFICIAL (COM LIMITE)</strong><b>{Math.min(reward.raw,crystalginLimit).toLocaleString('pt-BR')}</b></div></div>;
 }
 
 export function EditPostModal({edit,setEdit,save,profiles,onDelete}:{edit:any;setEdit:(value:any)=>void;save:()=>Promise<void>|void;profiles:MissionProfile[];onDelete:()=>Promise<void>|void}){
@@ -268,9 +270,8 @@ export function PostExpandedDetails({post,reward,missionProfile,crystalginLimit,
   <div className="mission-overview"><small>PERFIL / MISSÃO</small><h3>{mission}</h3><p>{description}</p></div>
   <div className="mission-rule-grid"><div><small>MULTIPLICADOR</small><b>× 2</b></div><div><small>BÔNUS</small><b>{special.toLocaleString('pt-BR')} CG</b></div><div><small>LIMITE</small><b>{String(limit)}</b></div></div>
   <div className="calc-detail-head"><div><span className="formula-badge">FÓRMULA OFICIAL V2</span><h4>Detalhamento do Cálculo de Crystgin</h4></div><strong>◆ {contribution.toLocaleString('pt-BR')} CG</strong></div>
-  <div className="calc-detail-grid"><div><small>CONTRIBUIÇÃO INDIVIDUAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>VIEWS</small><b>{Number(post.views||0).toLocaleString('pt-BR')}</b></div><div><small>CURTIDAS × 2</small><b>{(likes*2).toLocaleString('pt-BR')} CG</b></div><div><small>RECOMPENSA BÁSICA</small><b>{reward.base.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE VIEWS</small><b>{reward.viewsReward.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE ENGAJAMENTO</small><b>{(likes*2).toLocaleString('pt-BR')} CG desta publicação</b></div><div><small>MISSÕES ESPECIAIS</small><b>{special.toLocaleString('pt-BR')} CG</b></div><div className="calc-total"><small>CRYSTGIN TOTAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>LIMITE DE PROGRESSO</small><b>{crystalginLimit.toLocaleString('pt-BR')} CG</b></div><div className="calc-month-total"><small>PROGRESSO OFICIAL</small><b>{Math.min(reward.raw,crystalginLimit).toLocaleString('pt-BR')} CG</b></div></div>
+  <div className="calc-detail-grid"><div><small>CONTRIBUIÇÃO INDIVIDUAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>VIEWS</small><b>{Number(post.views||0).toLocaleString('pt-BR')}</b></div><div><small>CURTIDAS × 2</small><b>{(likes*2).toLocaleString('pt-BR')} CG</b></div><div><small>RECOMPENSA MÍNIMA</small><b>{reward.base.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE VIEWS</small><b>{reward.viewsReward.toLocaleString('pt-BR')} CG mensal</b></div><div><small>RECOMPENSA DE ENGAJAMENTO</small><b>{(likes*2).toLocaleString('pt-BR')} CG desta publicação</b></div><div><small>MISSÕES ESPECIAIS</small><b>{special.toLocaleString('pt-BR')} CG</b></div><div className="calc-total"><small>CRYSTGIN TOTAL</small><b>{contribution.toLocaleString('pt-BR')} CG</b></div><div><small>LIMITE DE PROGRESSO</small><b>{crystalginLimit.toLocaleString('pt-BR')} CG</b></div><div className="calc-month-total"><small>PROGRESSO OFICIAL</small><b>{Math.min(reward.raw,crystalginLimit).toLocaleString('pt-BR')} CG</b></div></div>
   <div className="post-expanded-actions"><button type="button" className="post-delete-button" onClick={onDelete}>🗑 EXCLUIR PUBLICAÇÃO</button></div>
  </section>;
 }
-
 
