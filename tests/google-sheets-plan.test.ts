@@ -13,8 +13,8 @@ function referenceRows(){
 
 test('updates existing links and appends only posts from the selected month',()=>{
   const plan=planSheetUpdates('ANONIMOUS',referenceRows(),[
-    {post_url:'https://x.com/test/status/100',published_at:'2026-08-03',views:10,likes:2,sheets_is_special:false},
-    {post_url:'https://x.com/test/status/200',published_at:'2026-08-04',views:20,likes:3,special_reward:300,mission_name:'Video Mission',sheets_is_special:true},
+    {post_url:'https://x.com/test/status/100',network:'x',published_at:'2026-08-03',views:10,likes:2,sheets_is_special:false},
+    {post_url:'https://x.com/test/status/200',network:'twitter',published_at:'2026-08-04',views:20,likes:3,special_reward:300,mission_name:'Video Mission',sheets_is_special:true},
     {post_url:'https://x.com/test/status/300',published_at:'2026-08-05',views:30,likes:4,sheets_is_special:false},
     {post_url:'https://x.com/test/status/400',published_at:'2026-08-06',views:40,likes:5,special_reward:200,mission_name:'High Quality',sheets_is_special:true},
     {post_url:'https://x.com/test/status/500',published_at:'2026-07-31',views:50,likes:6,sheets_is_special:false},
@@ -23,10 +23,15 @@ test('updates existing links and appends only posts from the selected month',()=
   assert.equal(plan.normalCount,2);
   assert.equal(plan.specialCount,2);
   assert.equal(plan.skippedOutsideMonth,1);
-  assert.equal(plan.updates.length,20);
+  assert.equal(plan.updates.length,24);
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!E102"));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!N103"));
-  assert.ok(plan.updates.every(update=>!/[BDHKMQ]\d+$/.test(update.range)));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!D102"&&update.values[0][0]==='X'));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!M103"&&update.values[0][0]==='X'));
+  const platformUpdates=plan.updates.filter(update=>/[DM]\d+$/.test(update.range));
+  assert.equal(platformUpdates.length,4);
+  assert.ok(platformUpdates.every(update=>update.values[0][0]==='X'));
+  assert.ok(plan.updates.every(update=>!/[BHKQ]\d+$/.test(update.range)));
 });
 
 test('escapes apostrophes in a sheet tab name',()=>{
