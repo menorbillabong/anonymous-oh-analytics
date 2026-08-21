@@ -53,11 +53,12 @@ function postPlatform(post:SheetPost){
   return xStatusId(post.post_url)?'X':'';
 }
 
-export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost[]):SheetPlan{
+export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost[],sheetMonth=''):SheetPlan{
   const header=findLastHeader(rows);
   if(header<0)throw new Error('Não encontrei os cabeçalhos Normal Mission e Special Mission nessa aba.');
 
-  const selectedMonth=monthKey(rows?.[2]?.[2]);
+  const manualMonth=monthKey(sheetMonth);
+  const selectedMonth=manualMonth||monthKey(rows?.[2]?.[2]);
   const existing=new Map<string,{row:number;special:boolean}>();
   let lastNormal=header;
   let lastSpecial=header;
@@ -98,6 +99,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     }
 
     if(special){
+      if(manualMonth&&!clean(rows?.[row]?.[10]))updates.push({range:cellRange(tabName,'K',row),values:[[manualMonth]]});
       updates.push(
         {range:cellRange(tabName,'L',row),values:[[date]]},
         {range:cellRange(tabName,'M',row),values:[[postPlatform(post)]]},
@@ -109,6 +111,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
       );
       specialCount++;
     }else{
+      if(manualMonth&&!clean(rows?.[row]?.[1]))updates.push({range:cellRange(tabName,'B',row),values:[[manualMonth]]});
       updates.push(
         {range:cellRange(tabName,'C',row),values:[[date]]},
         {range:cellRange(tabName,'D',row),values:[[postPlatform(post)]]},

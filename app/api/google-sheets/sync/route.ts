@@ -29,7 +29,7 @@ export async function POST(request:Request){
 
   const{data:claim,error:claimError}=await supabase.rpc('claim_google_sheets_sync');
   if(claimError)return NextResponse.json({error:'A atualização do Google Sheets não está liberada para este perfil.'},{status:403});
-  const permission=(claim||{}) as {allowed?:boolean;retry_after_seconds?:number;sheet_tab_name?:string};
+  const permission=(claim||{}) as {allowed?:boolean;retry_after_seconds?:number;sheet_tab_name?:string;sheet_month?:string};
   if(!permission.allowed){
     const retry=Math.max(1,Number(permission.retry_after_seconds||300));
     return NextResponse.json({error:`Aguarde ${Math.ceil(retry/60)} minuto(s) para atualizar novamente.`,retryAfterSeconds:retry},{status:429,headers:{'Retry-After':String(retry)}});
@@ -43,7 +43,7 @@ export async function POST(request:Request){
       .eq('user_id',user.id)
       .order('published_at',{ascending:true});
     if(postsError)throw postsError;
-    const result=await syncGoogleSheet(String(permission.sheet_tab_name||''),posts||[]);
+    const result=await syncGoogleSheet(String(permission.sheet_tab_name||''),posts||[],String(permission.sheet_month||''));
     normalCount=result.normalCount;
     specialCount=result.specialCount;
     await supabase.rpc('complete_google_sheets_sync',{p_success:true,p_normal_count:normalCount,p_special_count:specialCount,p_error:null});
@@ -54,5 +54,4 @@ export async function POST(request:Request){
     return NextResponse.json({error:friendly.message},{status:friendly.status});
   }
 }
-
 

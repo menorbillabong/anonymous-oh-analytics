@@ -28,14 +28,14 @@ async function googleRequest(url:string,token:string,init?:RequestInit){
   return response.json();
 }
 
-export async function syncGoogleSheet(tabName:string,posts:SheetPost[]){
+export async function syncGoogleSheet(tabName:string,posts:SheetPost[],sheetMonth=''){
   const spreadsheetId=process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
   if(!spreadsheetId)throw new Error('GOOGLE_SHEETS_SERVER_NOT_CONFIGURED');
   const token=await accessToken();
   const readRange=`${a1Tab(tabName)}!A1:S${GOOGLE_SHEETS_MAX_ROWS}`;
   const readUrl=`${SHEETS_API}/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(readRange)}?majorDimension=ROWS&valueRenderOption=FORMATTED_VALUE`;
   const sheet=await googleRequest(readUrl,token) as {values?:unknown[][]};
-  const plan=planSheetUpdates(tabName,sheet.values||[],posts);
+  const plan=planSheetUpdates(tabName,sheet.values||[],posts,sheetMonth);
 
   if(plan.updates.length){
     await googleRequest(`${SHEETS_API}/${encodeURIComponent(spreadsheetId)}/values:batchUpdate`,token,{

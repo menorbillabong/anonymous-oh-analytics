@@ -12,7 +12,8 @@ const defaults={name:'',description:'',multiplier:2,reward:0,submissionLimit:0,c
 export default function MissionControlPage({uid,reloadProfiles}:{uid:string;reloadProfiles:()=>Promise<void>}){
  const[rows,setRows]=useState<Mission[]>([]),[name,setName]=useState(defaults.name),[description,setDescription]=useState(defaults.description),[multiplier,setMultiplier]=useState(defaults.multiplier),[reward,setReward]=useState(defaults.reward),[submissionLimit,setSubmissionLimit]=useState(defaults.submissionLimit),[color,setColor]=useState(defaults.color),[isSpecial,setIsSpecial]=useState(false),[sheetsEnabled,setSheetsEnabled]=useState(false);
  const[editing,setEditing]=useState<Mission|null>(null),[deleting,setDeleting]=useState<Mission|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
- const load=useCallback(async()=>{const[{data,error},{data:config}]=await Promise.all([supabase.from('mission_profiles').select('*').eq('user_id',uid).order('active',{ascending:false}).order('name'),supabase.from('google_sheets_user_config').select('enabled').eq('user_id',uid).maybeSingle()]);if(error){setNotice('Não foi possível carregar as missões.');return}setRows((data||[]) as Mission[]);setSheetsEnabled(Boolean(config?.enabled))},[uid]);
+ const[sheetMonth,setSheetMonth]=useState(''),[monthSaving,setMonthSaving]=useState(false),[monthNotice,setMonthNotice]=useState('');
+ const load=useCallback(async()=>{const[{data,error},{data:config}]=await Promise.all([supabase.from('mission_profiles').select('*').eq('user_id',uid).order('active',{ascending:false}).order('name'),supabase.from('google_sheets_user_config').select('enabled,sheet_tab_name,sheet_month').eq('user_id',uid).maybeSingle()]);if(error){setNotice('Não foi possível carregar as missões.');return}setRows((data||[]) as Mission[]);setSheetsEnabled(Boolean(config?.enabled&&String(config?.sheet_tab_name||'').trim()));setSheetMonth(String(config?.sheet_month||''))},[uid]);
  useEffect(()=>{load()},[load]);
 
  function resetForm(){setName(defaults.name);setDescription(defaults.description);setMultiplier(defaults.multiplier);setReward(defaults.reward);setSubmissionLimit(defaults.submissionLimit);setColor(defaults.color);setIsSpecial(false);setEditing(null)}
@@ -32,7 +33,22 @@ export default function MissionControlPage({uid,reloadProfiles}:{uid:string;relo
   setNotice('Missão excluída com sucesso.');setDeleting(null);if(editing?.id===deleting.id)resetForm();await load();await reloadProfiles();setBusy(false);
  }
 
+ async function saveSheetMonth(){
+  if(monthSaving)return;
+  const clean=sheetMonth.trim();
+  if(clean&&!/^\d{4}-(0[1-9]|1[0-2])$/.test(clean)){setMonthNotice('Escolha um mês válido.');return}
+  setMonthSaving(true);setMonthNotice('');
+  const{error}=await supabase.from('google_sheets_user_config').update({sheet_month:clean}).eq('user_id',uid);
+  if(error){setMonthNotice('Não foi possível salvar o mês. Atualize a página e tente novamente.');setMonthSaving(false);return}
+  setMonthNotice(clean?`Mês ${clean} salvo. A alteração continuará manual.`:'Mês removido. A coluna Month será ignorada.');setMonthSaving(false);
+ }
+
  return <section className="mission-control-reference">
+  {sheetsEnabled&&<section className="mission-sheets-month" aria-labelledby="mission-sheets-month-title">
+   <div><small>GOOGLE SHEETS</small><h2 id="mission-sheets-month-title">Mês da planilha</h2><p>Escolha manualmente o mês usado na coluna Month. Ele permanecerá salvo até você alterá-lo.</p></div>
+   <div className="mission-sheets-month-actions"><label htmlFor="mission-sheet-month">Mês<input id="mission-sheet-month" type="month" value={sheetMonth} onChange={event=>{setSheetMonth(event.target.value);setMonthNotice('')}}/></label><button type="button" disabled={monthSaving} onClick={saveSheetMonth}>{monthSaving?'SALVANDO...':'SALVAR MÊS'}</button></div>
+   <p className="mission-sheets-month-note" role="status">{monthNotice||'Se deixar vazio, o site não modificará a coluna Month.'}</p>
+  </section>}
   <div className="mission-control-create"><h2>{editing?'Editar missão':'Nova missão'}</h2><div className="mission-create-panel">
    <label>Nome da missão<input value={name} onChange={e=>setName(e.target.value)} autoFocus={!!editing}/></label>
    <label>Cor da missão<div className="mission-color-wrap"><input aria-label="Cor da missão" type="color" value={color} onChange={e=>setColor(e.target.value)}/></div></label>

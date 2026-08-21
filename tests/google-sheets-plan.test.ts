@@ -41,6 +41,35 @@ test('escapes apostrophes in a sheet tab name',()=>{
   assert.ok(plan.updates.every(update=>update.range.startsWith("'D''Angelo'!")));
 });
 
+test('fills a manually selected Month only when the target cell is empty',()=>{
+  const rows=referenceRows();
+  rows[101]![1]='MANTER ESTE VALOR';
+  const plan=planSheetUpdates('ANONIMOUS',rows,[
+    {post_url:'https://x.com/test/status/100',published_at:'2026-08-03',views:10,likes:2},
+    {post_url:'https://x.com/test/status/200',published_at:'2026-08-04',views:20,likes:3,sheets_is_special:true},
+    {post_url:'https://x.com/test/status/300',published_at:'2026-08-05',views:30,likes:4},
+  ],'2026-08');
+
+  assert.ok(!plan.updates.some(update=>update.range==="'ANONIMOUS'!B102"));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!K103"&&update.values[0][0]==='2026-08'));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!B103"&&update.values[0][0]==='2026-08'));
+});
+
+test('uses the manual month to select new posts and ignores Month when it is empty',()=>{
+  const manual=planSheetUpdates('ANONIMOUS',referenceRows(),[
+    {post_url:'https://x.com/test/status/300',published_at:'2026-08-05',views:30,likes:4},
+    {post_url:'https://x.com/test/status/500',published_at:'2026-07-31',views:50,likes:6},
+  ],'2026-07');
+  assert.equal(manual.normalCount,1);
+  assert.equal(manual.skippedOutsideMonth,1);
+  assert.ok(manual.updates.some(update=>/!B\d+$/.test(update.range)&&update.values[0][0]==='2026-07'));
+
+  const empty=planSheetUpdates('ANONIMOUS',referenceRows(),[
+    {post_url:'https://x.com/test/status/300',published_at:'2026-08-05',views:30,likes:4},
+  ],'');
+  assert.ok(empty.updates.every(update=>!/[BK]\d+$/.test(update.range)));
+});
+
 test('fails safely when the expected table headers are missing',()=>{
   assert.throws(()=>planSheetUpdates('Página1',[],[]),/cabeçalhos/);
 });
