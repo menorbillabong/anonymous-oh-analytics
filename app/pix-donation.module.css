@@ -1,0 +1,25 @@
+.root{position:relative;z-index:1100}
+.trigger{position:fixed;top:50%;right:max(18px,calc((100vw - 1152px)/4 - 48px));transform:translateY(-50%);display:flex;align-items:center;justify-content:center;gap:8px;min-width:96px;height:46px;padding:0 16px;border:1px solid #f6ad55;border-radius:999px;background:#f6ad55;color:#17120b;box-shadow:0 12px 28px rgba(0,0,0,.42),0 0 18px rgba(246,173,85,.16);font-size:12px;font-weight:900;cursor:pointer;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
+.trigger:hover{transform:translateY(-50%) scale(1.03);filter:brightness(1.05);box-shadow:0 14px 32px rgba(0,0,0,.48),0 0 24px rgba(246,173,85,.22)}
+.trigger:focus-visible,.close:focus-visible,.copyButton:focus-visible,.codeDetails summary:focus-visible{outline:2px solid #fff;outline-offset:3px}
+.trigger span{font-size:16px;line-height:1}
+.backdrop{position:fixed;inset:0;z-index:20000;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.78);backdrop-filter:blur(4px)}
+.dialog{position:relative;width:min(430px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;padding:30px;border:1px solid #343434;border-radius:14px;background:#1b1b1b;color:#f2f2f2;box-shadow:0 28px 90px rgba(0,0,0,.7);text-align:center}
+.dialog>small{display:block;margin:0 42px 8px;color:#f6ad55;font-size:10px;font-weight:900;letter-spacing:.18em}
+.dialog h2{margin:0;font-size:29px;font-style:italic;font-weight:950}
+.dialog>p{margin:10px auto 20px;max-width:330px;color:#b8bdc6;font-size:13px;line-height:1.55}
+.close{position:absolute;top:13px;right:13px;width:38px;height:38px;border:1px solid #3a3a3a;border-radius:8px;background:#242424;color:#eee;font-size:24px;line-height:1;cursor:pointer}
+.close:hover{border-color:#f6ad55;color:#f6ad55}
+.qrFrame{width:226px;height:226px;margin:0 auto 18px;padding:8px;border-radius:12px;background:#fff}
+.qrFrame img{display:block;width:100%;height:100%;object-fit:contain;image-rendering:auto}
+.copyButton{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;height:46px;border:1px solid #f6ad55;border-radius:8px;background:#f6ad55;color:#17120b;font-size:12px;font-weight:950;cursor:pointer}
+.copyButton:hover{filter:brightness(1.06)}
+.codeDetails{margin-top:12px;border:1px solid #303030;border-radius:8px;background:#151515;text-align:left}
+.codeDetails summary{padding:11px 13px;color:#b8bdc6;font-size:11px;font-weight:800;cursor:pointer}
+.codeDetails code{display:block;max-height:90px;overflow:auto;padding:0 13px 13px;color:#949aa5;font-size:10px;line-height:1.5;overflow-wrap:anywhere;word-break:break-all;user-select:all}
+.dialog .safetyNote{margin:14px auto 0;color:#9197a2;font-size:10px}
+.copyStatus{min-height:18px;margin-top:8px;color:#52d59b;font-size:11px;font-weight:800}
+@media(max-width:1250px){.trigger{top:auto;right:18px;bottom:18px;transform:none}.trigger:hover{transform:scale(1.03)}}
+@media(max-width:520px){.trigger{right:12px;bottom:12px;min-width:88px;height:43px;padding:0 13px}.dialog{padding:26px 18px}.qrFrame{width:214px;height:214px}}
+@media(prefers-reduced-motion:reduce){.trigger{transition:none}}
+@media print{.root{display:none!important}}
