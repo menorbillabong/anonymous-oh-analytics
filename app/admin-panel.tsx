@@ -23,6 +23,10 @@ type AdminUser = {
   is_admin?: boolean;
   deletion_scheduled_at?: string;
   deletion_execute_after?: string;
+  sheets_sync_enabled?: boolean;
+  sheets_tab_name?: string;
+  sheets_last_sync_at?: string;
+  sheets_last_sync_status?: string;
 };
 
 type AdminPost = {
@@ -73,13 +77,21 @@ export default function AdminPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase.rpc('admin_dashboard');
+    const [{ data, error }, { data: sheetsData }] = await Promise.all([
+      supabase.rpc('admin_dashboard'),
+      supabase.rpc('admin_google_sheets_users'),
+    ]);
     if (error) {
       setMessage('Não foi possível carregar o painel administrativo.');
       setLoading(false);
       return;
     }
     const next = (data || {}) as AdminDashboard;
+    const sheetsByUser = new Map((Array.isArray(sheetsData) ? sheetsData : []).map((config:any) => [String(config.user_id), config]));
+    next.users = (next.users || []).map(user => {
+      const config:any = sheetsByUser.get(user.id) || {};
+      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status};
+    });
     setDashboard(next);
     setCleanupEnabled(Boolean(next.cleanup?.auto_delete_enabled));
     setInactivityDays(Number(next.cleanup?.inactivity_days || 90));
@@ -239,12 +251,13 @@ export default function AdminPanel() {
     {section === 'Usuários' && <div className="admin-panel">
       <PanelHeading eyebrow="GESTÃO DE CONTAS" title="Usuários" search={search} setSearch={setSearch}/>
       <div className="admin-table-scroll"><div className="admin-user-table">
-        <div className="admin-table-head"><span>USUÁRIO</span><span>STATUS</span><span>RANKING</span><span>ATIVIDADE</span><span>AÇÕES</span></div>
+        <div className="admin-table-head"><span>USUÁRIO</span><span>STATUS</span><span>RANKING</span><span>ATIVIDADE</span><span>GOOGLE SHEETS</span><span>AÇÕES</span></div>
         {filteredUsers.map(user => <div className="admin-user-row" key={user.id}>
           <div className="admin-user-identity"><i>{String(user.username || user.display_name || user.email || '?').slice(0, 1).toUpperCase()}</i><div><strong>{user.username || user.display_name || user.x_handle || 'Sem nome'}</strong><small>{user.email || user.id}</small>{user.is_admin && <em>ADMINISTRADOR</em>}</div></div>
           <div><StatusTag tone={user.suspended ? 'danger' : 'success'}>{user.suspended ? 'SUSPENSA' : 'ATIVA'}</StatusTag>{user.suspension_reason && <small className="admin-reason">{user.suspension_reason}</small>}</div>
           <div><StatusTag tone={user.ranking_blocked ? 'danger' : user.ranking_control_unlocked ? 'warning' : 'neutral'}>{user.ranking_blocked ? 'BLOQUEADO' : user.ranking_control_unlocked ? 'LIBERADO' : 'PADRÃO'}</StatusTag></div>
           <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small></div>
+          <SheetsAccess user={user} onSaved={load}/>
           <div className="admin-row-actions">
             <button disabled={busy === `user-${user.id}` || user.is_admin} onClick={() => manageUser(user, user.suspended ? 'reactivate' : 'suspend', user.suspended ? 'reativar esta conta' : 'suspender esta conta')}>{user.suspended ? 'REATIVAR' : 'SUSPENDER'}</button>
             <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking', user.ranking_blocked ? 'liberar esta conta no ranking' : 'bloquear esta conta no ranking')}>{user.ranking_blocked ? 'LIBERAR RANKING' : 'BLOQUEAR RANKING'}</button>
@@ -307,6 +320,30 @@ function StatusTag({children, tone}:{children:React.ReactNode; tone:'success'|'d
   return <span className={`admin-tag ${tone}`}>{children}</span>;
 }
 
+function SheetsAccess({user,onSaved}:{user:AdminUser;onSaved:()=>Promise<void>}){
+  const[enabled,setEnabled]=useState(Boolean(user.sheets_sync_enabled));
+  const[tabName,setTabName]=useState(user.sheets_tab_name||'');
+  const[saving,setSaving]=useState(false);
+  const[notice,setNotice]=useState('');
+  useEffect(()=>{setEnabled(Boolean(user.sheets_sync_enabled));setTabName(user.sheets_tab_name||'')},[user.sheets_sync_enabled,user.sheets_tab_name]);
+  async function save(){
+    const clean=tabName.trim();
+    if(enabled&&!clean){setNotice('Informe o nome da aba.');return}
+    const reason=window.prompt(`Informe o motivo para ${enabled?'liberar':'desativar'} o Google Sheets deste perfil:`);
+    if(!reason||reason.trim().length<3){if(reason)setNotice('O motivo precisa ter pelo menos 3 caracteres.');return}
+    setSaving(true);setNotice('');
+    const{error}=await supabase.rpc('admin_set_google_sheets_user',{p_target_user:user.id,p_enabled:enabled,p_sheet_tab_name:clean,p_reason:reason.trim()});
+    if(error){setNotice(error.message||'Não foi possível salvar.');setSaving(false);return}
+    setNotice('Salvo.');setSaving(false);await onSaved();
+  }
+  return <div className="admin-sheets-access">
+    <label><input type="checkbox" checked={enabled} onChange={event=>setEnabled(event.target.checked)}/><span>Permitir atualização</span></label>
+    <input value={tabName} onChange={event=>setTabName(event.target.value)} placeholder="Nome exato da aba" aria-label={`Nome da aba de ${user.username||user.email||'usuário'}`}/>
+    <button type="button" disabled={saving} onClick={save}>{saving?'SALVANDO...':'SALVAR SHEETS'}</button>
+    <small>{notice||`${user.sheets_last_sync_status==='success'?'Última atualização: ':''}${user.sheets_last_sync_status==='success'?formatDate(user.sheets_last_sync_at,true):user.sheets_sync_enabled?'Liberado':'Desativado'}`}</small>
+  </div>;
+}
+
 function AuditRows({logs}:{logs:AuditLog[]}) {
   if (!logs.length) return <div className="admin-empty">Nenhuma ação administrativa registrada.</div>;
   return <div className="admin-audit-list">{logs.map(log => <div className="admin-audit-row" key={log.id}>
@@ -322,7 +359,7 @@ function actionLabel(action:string) {
     disable_global_ranking_control:'Controle global desativado', disqualify_post:'Publicação desqualificada',
     requalify_post:'Publicação requalificada', configure_account_cleanup:'Limpeza de contas configurada',
     schedule_account_deletion:'Exclusão agendada', cancel_account_deletion:'Exclusão cancelada',
-    delete_inactive_account:'Conta inativa excluída',
+    delete_inactive_account:'Conta inativa excluída', configure_google_sheets:'Google Sheets configurado',
   };
   return labels[action] || action.replaceAll('_', ' ');
 }
