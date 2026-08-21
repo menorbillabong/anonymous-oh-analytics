@@ -39,7 +39,7 @@ export async function POST(request:Request){
   try{
     const{data:posts,error:postsError}=await supabase
       .from('posts')
-      .select('post_url,published_at,views,likes,special_reward,mission_name,sheets_is_special')
+      .select('post_url,network,published_at,views,likes,special_reward,mission_name,sheets_is_special')
       .eq('user_id',user.id)
       .order('published_at',{ascending:true});
     if(postsError)throw postsError;
