@@ -2,6 +2,7 @@ const MAX_SHEET_ROWS = 2000;
 
 export type SheetPost = {
   post_url?: string | null;
+  network?: string | null;
   published_at?: string | null;
   views?: number | string | null;
   likes?: number | string | null;
@@ -46,6 +47,11 @@ function findLastHeader(rows:unknown[][]){
 
 function cellRange(tab:string,column:string,rowIndex:number){return `${a1Tab(tab)}!${column}${rowIndex+1}`}
 function postDate(post:SheetPost){return clean(post.published_at).slice(0,10)}
+function postPlatform(post:SheetPost){
+  const network=normalized(post.network);
+  if(network==='x'||network==='twitter')return'X';
+  return xStatusId(post.post_url)?'X':'';
+}
 
 export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost[]):SheetPlan{
   const header=findLastHeader(rows);
@@ -94,6 +100,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     if(special){
       updates.push(
         {range:cellRange(tabName,'L',row),values:[[date]]},
+        {range:cellRange(tabName,'M',row),values:[[postPlatform(post)]]},
         {range:cellRange(tabName,'N',row),values:[[clean(post.post_url)]]},
         {range:cellRange(tabName,'O',row),values:[[safeNumber(post.views)]]},
         {range:cellRange(tabName,'P',row),values:[[safeNumber(post.likes)]]},
@@ -104,6 +111,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     }else{
       updates.push(
         {range:cellRange(tabName,'C',row),values:[[date]]},
+        {range:cellRange(tabName,'D',row),values:[[postPlatform(post)]]},
         {range:cellRange(tabName,'E',row),values:[[clean(post.post_url)]]},
         {range:cellRange(tabName,'F',row),values:[[safeNumber(post.views)]]},
         {range:cellRange(tabName,'G',row),values:[[safeNumber(post.likes)]]},
