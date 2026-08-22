@@ -7,10 +7,12 @@ import './mission-control-v2.css';
 import './mission-actions.css';
 
 type Mission={id:string|number;name:string;description:string;multiplier:number;reward:number;submission_limit:number;color:string;active:boolean;is_special?:boolean};
+type NumericInputValue=number|'';
 const defaults={name:'',description:'',multiplier:2,reward:0,submissionLimit:0,color:'#54c27a'};
+const numericValue=(value:NumericInputValue)=>value===''?0:value;
 
 export default function MissionControlPage({uid,reloadProfiles}:{uid:string;reloadProfiles:()=>Promise<void>}){
- const[rows,setRows]=useState<Mission[]>([]),[name,setName]=useState(defaults.name),[description,setDescription]=useState(defaults.description),[multiplier,setMultiplier]=useState(defaults.multiplier),[reward,setReward]=useState(defaults.reward),[submissionLimit,setSubmissionLimit]=useState(defaults.submissionLimit),[color,setColor]=useState(defaults.color),[isSpecial,setIsSpecial]=useState(false),[sheetsEnabled,setSheetsEnabled]=useState(false);
+ const[rows,setRows]=useState<Mission[]>([]),[name,setName]=useState(defaults.name),[description,setDescription]=useState(defaults.description),[multiplier,setMultiplier]=useState<NumericInputValue>(defaults.multiplier),[reward,setReward]=useState<NumericInputValue>(defaults.reward),[submissionLimit,setSubmissionLimit]=useState<NumericInputValue>(defaults.submissionLimit),[color,setColor]=useState(defaults.color),[isSpecial,setIsSpecial]=useState(false),[sheetsEnabled,setSheetsEnabled]=useState(false);
  const[editing,setEditing]=useState<Mission|null>(null),[deleting,setDeleting]=useState<Mission|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
  const[sheetMonth,setSheetMonth]=useState(''),[monthSaving,setMonthSaving]=useState(false),[monthNotice,setMonthNotice]=useState('');
  const load=useCallback(async()=>{const[{data,error},{data:config}]=await Promise.all([supabase.from('mission_profiles').select('*').eq('user_id',uid).order('active',{ascending:false}).order('name'),supabase.from('google_sheets_user_config').select('enabled,sheet_tab_name,sheet_month').eq('user_id',uid).maybeSingle()]);if(error){setNotice('Não foi possível carregar as missões.');return}setRows((data||[]) as Mission[]);setSheetsEnabled(Boolean(config?.enabled&&String(config?.sheet_tab_name||'').trim()));setSheetMonth(String(config?.sheet_month||''))},[uid]);
@@ -20,8 +22,8 @@ export default function MissionControlPage({uid,reloadProfiles}:{uid:string;relo
  function startEdit(mission:Mission){setEditing(mission);setName(mission.name||'');setDescription(mission.description||'');setMultiplier(Number(mission.multiplier||defaults.multiplier));setReward(Number(mission.reward||0));setSubmissionLimit(Number(mission.submission_limit||0));setColor(mission.color||defaults.color);setIsSpecial(Boolean(mission.is_special));setNotice('');window.scrollTo({top:0,behavior:'smooth'})}
 
  async function save(){
-  const cleanName=name.trim();if(!cleanName||busy||multiplier<=0||reward<0||submissionLimit<0)return;
-  setBusy(true);setNotice('');const missionData={name:cleanName,description:description.trim(),multiplier:Number(multiplier),reward:Number(reward),submission_limit:Number(submissionLimit),color,...(sheetsEnabled?{is_special:isSpecial}:{})};
+  const cleanName=name.trim(),cleanMultiplier=numericValue(multiplier),cleanReward=numericValue(reward),cleanSubmissionLimit=numericValue(submissionLimit);if(!cleanName||busy||cleanMultiplier<=0||cleanReward<0||cleanSubmissionLimit<0)return;
+  setBusy(true);setNotice('');const missionData={name:cleanName,description:description.trim(),multiplier:cleanMultiplier,reward:cleanReward,submission_limit:cleanSubmissionLimit,color,...(sheetsEnabled?{is_special:isSpecial}:{})};
   const query=editing?supabase.from('mission_profiles').update(missionData).eq('id',editing.id).eq('user_id',uid):supabase.from('mission_profiles').insert({user_id:uid,network:'X',active:true,...missionData});
   const{error}=await query;if(error){setNotice(editing?'Não foi possível salvar as alterações.':'Não foi possível criar a missão.');setBusy(false);return}
   setNotice(editing?'Missão atualizada com sucesso.':'Missão criada com sucesso.');resetForm();await load();await reloadProfiles();setBusy(false);
@@ -53,11 +55,11 @@ export default function MissionControlPage({uid,reloadProfiles}:{uid:string;relo
    <label>Nome da missão<input value={name} onChange={e=>setName(e.target.value)} autoFocus={!!editing}/></label>
    <label>Cor da missão<div className="mission-color-wrap"><input aria-label="Cor da missão" type="color" value={color} onChange={e=>setColor(e.target.value)}/></div></label>
    <label>Descrição<textarea value={description} onChange={e=>setDescription(e.target.value)} rows={4}/></label>
-   <label>Multiplicador de recompensa<input type="number" min="0.01" step="0.1" value={multiplier} onChange={e=>setMultiplier(Number(e.target.value))}/></label>
-   <label>Bônus fixo<input type="number" min="0" value={reward} onChange={e=>setReward(Number(e.target.value))}/></label>
+   <label>Multiplicador de recompensa<input className="mission-number-input" type="number" min="0.01" step="0.1" value={multiplier} onChange={e=>setMultiplier(e.target.value===''?'':Number(e.target.value))}/></label>
+   <label>Bônus fixo<input className="mission-number-input" type="number" min="0" value={reward} onChange={e=>setReward(e.target.value===''?'':Number(e.target.value))}/></label>
    {sheetsEnabled&&<label className="mission-special-option"><span><strong>Esta é uma missão especial</strong><small>As publicações irão para a área Special Mission da planilha.</small></span><input type="checkbox" checked={isSpecial} onChange={e=>setIsSpecial(e.target.checked)}/></label>}
-   <label>Limite de envios (0 para ilimitado)<input type="number" min="0" step="1" value={submissionLimit} onChange={e=>setSubmissionLimit(Number(e.target.value))}/></label>
-   <button className="mission-orange-btn create" disabled={busy||!name.trim()||multiplier<=0||reward<0||submissionLimit<0} onClick={save}><span>{editing?'✓':'＋'}</span>{busy?'SALVANDO...':editing?'Salvar alterações':'Criar missão'}</button>
+   <label>Limite de envios (0 para ilimitado)<input className="mission-number-input" type="number" min="0" step="1" value={submissionLimit} onChange={e=>setSubmissionLimit(e.target.value===''?'':Number(e.target.value))}/></label>
+   <button className="mission-orange-btn create" disabled={busy||!name.trim()||numericValue(multiplier)<=0||numericValue(reward)<0||numericValue(submissionLimit)<0} onClick={save}><span>{editing?'✓':'＋'}</span>{busy?'SALVANDO...':editing?'Salvar alterações':'Criar missão'}</button>
    {editing&&<button className="mission-cancel-edit" type="button" disabled={busy} onClick={resetForm}>Cancelar edição</button>}{notice&&<p className="mission-notice" role="status">{notice}</p>}
   </div></div>
   <div className="mission-control-existing"><h2>Missões existentes</h2><div className="mission-existing-grid">{rows.map(mission=><article key={mission.id} className="mission-existing-card" style={{'--mission-color':mission.color||defaults.color} as React.CSSProperties}>
@@ -70,4 +72,3 @@ export default function MissionControlPage({uid,reloadProfiles}:{uid:string;relo
   </section></div>}
  </section>
 }
-
