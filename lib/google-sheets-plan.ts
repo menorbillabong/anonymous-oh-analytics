@@ -46,6 +46,7 @@ function findLastHeader(rows:unknown[][]){
 }
 
 function cellRange(tab:string,column:string,rowIndex:number){return `${a1Tab(tab)}!${column}${rowIndex+1}`}
+function cellRowSpan(tab:string,startColumn:string,endColumn:string,rowIndex:number){return `${a1Tab(tab)}!${startColumn}${rowIndex+1}:${endColumn}${rowIndex+1}`}
 function postDate(post:SheetPost){return clean(post.published_at).slice(0,10)}
 function postPlatform(post:SheetPost){
   const network=normalized(post.network);
@@ -59,7 +60,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
 
   const manualMonth=monthKey(sheetMonth);
   const selectedMonth=manualMonth||monthKey(rows?.[2]?.[2]);
-  const existing=new Map<string,{row:number;special:boolean}>();
+  const existing=new Map<string,Array<{row:number;special:boolean}>>();
   let lastNormal=header;
   let lastSpecial=header;
 
@@ -68,8 +69,8 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     const specialLink=clean(row?.[13]);
     if(index>header&&normalLink)lastNormal=Math.max(lastNormal,index);
     if(index>header&&specialLink)lastSpecial=Math.max(lastSpecial,index);
-    if(normalLink&&!existing.has(linkKey(normalLink)))existing.set(linkKey(normalLink),{row:index,special:false});
-    if(specialLink&&!existing.has(linkKey(specialLink)))existing.set(linkKey(specialLink),{row:index,special:true});
+    if(normalLink){const key=linkKey(normalLink);existing.set(key,[...(existing.get(key)||[]),{row:index,special:false}])}
+    if(specialLink){const key=linkKey(specialLink);existing.set(key,[...(existing.get(key)||[]),{row:index,special:true}])}
   });
 
   let nextNormal=lastNormal+1;
@@ -81,21 +82,30 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
 
   const ordered=[...uniquePosts.entries()].sort((a,b)=>postDate(a[1]).localeCompare(postDate(b[1])));
   for(const[key,post]of ordered){
-    const existingCell=existing.get(key);
+    const existingCells=existing.get(key)||[];
     const date=postDate(post);
     if(!date)continue;
 
     let row:number;
-    let special:boolean;
-    if(existingCell){
-      row=existingCell.row;
-      special=existingCell.special;
-    }else{
-      if(!selectedMonth||monthKey(date)!==selectedMonth){skippedOutsideMonth++;continue}
-      special=Boolean(post.sheets_is_special);
+    const special=Boolean(post.sheets_is_special);
+    const matchingCell=existingCells.find(cell=>cell.special===special);
+    if(matchingCell){
+      row=matchingCell.row;
+    }else if(existingCells.length){
       row=special?nextSpecial++:nextNormal++;
       if(row>=MAX_SHEET_ROWS)throw new Error('A aba não possui linhas livres suficientes para concluir a atualização.');
-      existing.set(key,{row,special});
+    }else{
+      if(!selectedMonth||monthKey(date)!==selectedMonth){skippedOutsideMonth++;continue}
+      row=special?nextSpecial++:nextNormal++;
+      if(row>=MAX_SHEET_ROWS)throw new Error('A aba não possui linhas livres suficientes para concluir a atualização.');
+    }
+    existing.set(key,[{row,special}]);
+
+    for(const oldCell of existingCells){
+      if(oldCell.row===row&&oldCell.special===special)continue;
+      updates.push(oldCell.special
+        ?{range:cellRowSpan(tabName,'K','S',oldCell.row),values:[[...Array(9).fill('')]]}
+        :{range:cellRowSpan(tabName,'B','H',oldCell.row),values:[[...Array(7).fill('')]]});
     }
 
     if(special){

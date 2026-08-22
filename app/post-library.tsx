@@ -1,6 +1,6 @@
 'use client';
 
-import {useEffect,useMemo,useRef,useState} from 'react';
+import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
 import {supabase} from '@/lib/supabase';
 import {useEscapeClose} from '@/lib/use-escape-close';
 import {minimumPostProgress,monthlyReward,postContribution,viewGoalProgress} from '@/lib/reward';
@@ -15,8 +15,9 @@ type MissionProfile={
  reward?:number;
  active?:boolean;
  description?:string;
- limit?:string|number|null;
- color?:string;
+  limit?:string|number|null;
+  color?:string;
+  is_special?:boolean;
 };
 
 type PostLibraryProps={
@@ -154,9 +155,11 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
     const selected=selectedIds.has(String(post.id));
     const isExpanded=expanded===post.id;
     const missionProfile=findMissionProfile(post,profiles);
+    const missionColor=profileColor(missionProfile);
     return <div
      className={`ref-list-row${selected?' selected':''}${isExpanded?' is-expanded':''}`}
      key={post.id}
+     style={{'--post-mission-color':missionColor} as CSSProperties}
      tabIndex={0}
      aria-expanded={isExpanded}
      onClick={()=>toggleExpanded(post.id)}
@@ -165,7 +168,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
      <input className="ref-select-check" type="checkbox" checked={selected} onClick={event=>event.stopPropagation()} onChange={()=>toggleOne(post.id)} aria-label={`Selecionar ${post.title||'publicação'}`}/>
      <div className="ref-post-cell">
       <button type="button" className="ref-edit-square" onClick={event=>{event.stopPropagation();openEditor(post)}} aria-label="Editar publicação">✎</button>
-      <div><strong>𝕏 <span>{displayMissionName(post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatPostDate(postPublishedValue(post))}</small></div>
+      <div><strong>𝕏 <span>{displayMissionName(missionProfile?.name||post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatPostDate(postPublishedValue(post))}</small></div>
      </div>
      <b>{engagement.toLocaleString('pt-BR')}</b>
      <span>{Number(post.likes||0).toLocaleString('pt-BR')}</span>
@@ -188,11 +191,11 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  return <>
   <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
   <div className="ref-card-grid">
-   {sortedPosts.map(post=><article className="ref-card" key={post.id}>
+   {sortedPosts.map(post=>{const missionProfile=findMissionProfile(post,profiles),missionColor=profileColor(missionProfile);return <article className="ref-card" key={post.id} style={{'--post-mission-color':missionColor} as CSSProperties}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
-    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatPostDate(postPublishedValue(post))}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
+    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(missionProfile?.name||post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatPostDate(postPublishedValue(post))}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
     <div className="ref-card-foot"><span>⌁ <b>{Number(post.likes||0).toLocaleString('pt-BR')}</b></span><strong>{postContribution(post).toLocaleString('pt-BR')}</strong><small>Crystgin</small><button type="button" className="ref-pencil" onClick={()=>openEditor(post)} aria-label="Editar publicação">✎</button></div>
-   </article>)}
+   </article>})}
   </div>
   {edit&&<EditPostModal edit={edit} setEdit={setEdit} save={save} profiles={profiles} onDelete={()=>removePost(edit)}/>}
  </>;
@@ -247,6 +250,7 @@ function formatDateTime(value:any){return formatPostDate(value,true)}
 function dateInputValue(value:any){return postDateKey(value)}
 function displayMissionName(name:string){return name.trim().toLowerCase()==='hight quality'?'High Quality':name}
 function findMissionProfile(post:any,profiles:MissionProfile[]){return profiles.find(profile=>String(profile.id)===String(post.mission_profile_id))||profiles.find(profile=>profile.name===post.mission_name)}
+function profileColor(profile?:MissionProfile){const value=String(profile?.color||'').trim();return /^#[0-9a-f]{3,8}$/i.test(value)?value:'#38d27f'}
 
 function Media({post}:{post:any}){
  const images=Array.isArray(post.image_urls)?post.image_urls.filter(Boolean):[];
