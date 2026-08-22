@@ -70,6 +70,32 @@ test('uses the manual month to select new posts and ignores Month when it is emp
   assert.ok(empty.updates.every(update=>!/[BK]\d+$/.test(update.range)));
 });
 
+test('moves an existing normal publication to Special Mission without changing its historical reward and theme',()=>{
+  const plan=planSheetUpdates('ANONIMOUS',referenceRows(),[
+    {post_url:'https://x.com/test/status/100',published_at:'2026-08-03',views:10,likes:2,sheets_is_special:true,special_reward:200,mission_name:'High Quality'},
+  ]);
+
+  assert.equal(plan.normalCount,0);
+  assert.equal(plan.specialCount,1);
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!B102:H102"&&update.values[0].every(value=>value==='')));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!N104"&&update.values[0][0]==='https://x.com/test/status/100'));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!R104"&&update.values[0][0]===200));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!S104"&&update.values[0][0]==='High Quality'));
+});
+
+test('moves an existing special publication to Normal Mission and clears duplicate placements',()=>{
+  const rows=referenceRows();
+  rows[103]=['','','','','https://x.com/test/status/200/photo/1'];
+  const plan=planSheetUpdates('ANONIMOUS',rows,[
+    {post_url:'https://x.com/test/status/200',published_at:'2026-08-04',views:20,likes:3,sheets_is_special:false,special_reward:300,mission_name:'Video Mission'},
+  ]);
+
+  assert.equal(plan.normalCount,1);
+  assert.equal(plan.specialCount,0);
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!E104"&&update.values[0][0]==='https://x.com/test/status/200'));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!K103:S103"&&update.values[0].every(value=>value==='')));
+});
+
 test('fails safely when the expected table headers are missing',()=>{
   assert.throws(()=>planSheetUpdates('Página1',[],[]),/cabeçalhos/);
 });
