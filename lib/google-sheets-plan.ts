@@ -46,6 +46,7 @@ function findLastHeader(rows:unknown[][]){
 }
 
 function cellRange(tab:string,column:string,rowIndex:number){return `${a1Tab(tab)}!${column}${rowIndex+1}`}
+function cellRowSpan(tab:string,startColumn:string,endColumn:string,rowIndex:number){return `${a1Tab(tab)}!${startColumn}${rowIndex+1}:${endColumn}${rowIndex+1}`}
 function postDate(post:SheetPost){return clean(post.published_at).slice(0,10)}
 function postPlatform(post:SheetPost){
   const network=normalized(post.network);
@@ -103,8 +104,8 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     for(const oldCell of existingCells){
       if(oldCell.row===row&&oldCell.special===special)continue;
       updates.push(oldCell.special
-        ?{range:`${cellRange(tabName,'K',oldCell.row)}:${cellRange(tabName,'S',oldCell.row).split('!')[1]}`,values:[[...Array(9).fill('')]]}
-        :{range:`${cellRange(tabName,'B',oldCell.row)}:${cellRange(tabName,'H',oldCell.row).split('!')[1]}`,values:[[...Array(7).fill('')]]});
+        ?{range:cellRowSpan(tabName,'K','S',oldCell.row),values:[[...Array(9).fill('')]]}
+        :{range:cellRowSpan(tabName,'B','H',oldCell.row),values:[[...Array(7).fill('')]]});
     }
 
     if(special){
