@@ -57,3 +57,8 @@
 .post-display-switch button:hover::after,.post-display-switch button:focus-visible::after{opacity:1;visibility:visible;transform:translate(-50%,0)}
 .hero-actions button:disabled:not(.green-btn){opacity:.55!important;cursor:not-allowed;filter:saturate(.55)}
 
+/* Keep the Crystgin progress bar fully framed inside its metric card. */
+.exact-stat.progress-stat{position:relative}
+.progress-stat .stat-value-line>strong{margin-top:8px}
+.progress-stat .progress-line{position:absolute;left:20px;right:20px;bottom:10px;margin-top:0;overflow:hidden}
+.progress-stat .progress-line>i{border-radius:inherit}
