@@ -3,8 +3,10 @@ import SiteUpgrades from './site-upgrades';
 import PostSortEnhancer from './post-sort-enhancer';
 import SettingsPersistenceSync from './settings-persistence-sync';
 import PixDonation from './pix-donation';
+import {SiteLanguageProvider} from './site-language';
 import './site-upgrades.css';
 import './full-settings-v2.css';
 import './color-customization.css';
 // Single automatic refresh timer is mounted from app/page.tsx.
-export default function Template({children}:{children:React.ReactNode}){return <>{children}<BulkReviewInjector/><SiteUpgrades/><PostSortEnhancer/><SettingsPersistenceSync/><PixDonation/></>}
+export default function Template({children}:{children:React.ReactNode}){return <SiteLanguageProvider>{children}<BulkReviewInjector/><SiteUpgrades/><PostSortEnhancer/><SettingsPersistenceSync/><PixDonation/></SiteLanguageProvider>}
+
