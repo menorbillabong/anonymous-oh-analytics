@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Dashboard from './dashboard';
 import DatabaseRefreshTimer from './database-refresh-timer';
 import ReferencePreviewInjector from './reference-preview-injector';
+import {LanguageSelect} from './site-language';
 import { supabase } from '@/lib/supabase';
 import './globals.css';
 import './auth.css';
@@ -75,7 +76,10 @@ export default function Home() {
   return <main className="auth-shell">
     <header className="auth-topbar">
       <strong>AVALIAÇÃO DE MÉTRICAS</strong>
-      <span><i/> ANONYMOUS_OH</span>
+      <div className="auth-topbar-actions">
+        <LanguageSelect compact/>
+        <span className="auth-account-badge"><i/> ANONYMOUS_OH</span>
+      </div>
     </header>
     <div className="auth-stage"><section className="auth-card">
       <div className="auth-intro">
@@ -116,3 +120,4 @@ export default function Home() {
     </section></div>
   </main>;
 }
+
