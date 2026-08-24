@@ -7,6 +7,7 @@ import {SiteLanguageProvider} from './site-language';
 import './site-upgrades.css';
 import './full-settings-v2.css';
 import './color-customization.css';
+import './mobile-accessibility.css';
 // Single automatic refresh timer is mounted from app/page.tsx.
 export default function Template({children}:{children:React.ReactNode}){return <SiteLanguageProvider>{children}<BulkReviewInjector/><SiteUpgrades/><PostSortEnhancer/><SettingsPersistenceSync/><PixDonation/></SiteLanguageProvider>}
 
