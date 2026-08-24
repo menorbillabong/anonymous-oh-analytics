@@ -97,8 +97,42 @@
 .admin-check strong{display:block;font-size:11px}
 .admin-check small{display:block;margin-top:4px;color:#aeb3bd;font-size:9px}
 .admin-check input{width:18px;height:18px;accent-color:#f4a640}
+.admin-form-note{margin:0;color:#9fa5ae;font-size:9px;line-height:1.5}
+.admin-period-copy{padding-bottom:16px;border-bottom:1px solid #292929}
+.admin-period-selection{display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #292929;background:#171717}
+.admin-period-selection label{display:flex;align-items:center;gap:8px;color:#c8cbd1;font-size:9px;font-weight:900}
+.admin-period-selection input,.admin-period-select input{width:17px;height:17px;accent-color:#f4a640}
+.admin-period-selection strong{margin-left:auto;color:#aeb3bd;font-size:8px}
+.admin-period-selection button{min-height:36px;border:1px solid #5d2929;border-radius:7px;background:#261111;color:#ff7474;padding:0 13px;font-size:8px;font-weight:900}
+.admin-period-selection button:disabled{opacity:.48;cursor:not-allowed}
+.admin-closed-periods{display:grid;gap:11px;padding:16px}
+.admin-closed-period-card{overflow:hidden;border:1px solid #2d2d2d;border-radius:10px;background:#121212}
+.admin-closed-period-main{display:grid;grid-template-columns:auto minmax(190px,1.15fr) minmax(360px,2fr) auto;align-items:center;gap:18px;padding:16px}
+.admin-period-select{display:grid;place-items:center}
+.admin-closed-period-title{display:flex;align-items:center;gap:11px;min-width:0}
+.admin-closed-period-title>i{width:38px;height:38px;display:grid;place-items:center;flex:0 0 38px;border:1px solid #5a411e;border-radius:9px;background:#24190d;color:#ffb45f;font-style:normal;font-weight:900}
+.admin-closed-period-title>div{min-width:0}
+.admin-closed-period-title strong,.admin-closed-period-title small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-closed-period-title strong{font-size:12px}
+.admin-closed-period-title small{margin-top:5px;color:#aeb3bd;font-size:9px}
+.admin-closed-period-facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.admin-closed-period-facts span{min-width:0;padding:9px 10px;border:1px solid #292929;border-radius:7px;background:#181818}
+.admin-closed-period-facts small,.admin-closed-period-facts strong{display:block}
+.admin-closed-period-facts small{color:#959ba5;font-size:7px;font-weight:900}
+.admin-closed-period-facts strong{overflow:hidden;margin-top:5px;color:#e1e2e5;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
+.admin-closed-period-actions{display:grid;grid-template-columns:minmax(155px,.8fr) minmax(170px,1fr) minmax(120px,.7fr) minmax(190px,1fr);align-items:end;gap:10px;padding:13px 16px;border-top:1px solid #292929;background:#171717}
+.admin-period-check{min-height:40px;display:flex;align-items:center;gap:8px;color:#c4c8cf;font-size:9px;font-weight:900}
+.admin-period-check input{width:17px;height:17px;accent-color:#f4a640}
+.admin-period-days{display:grid;gap:5px;color:#aeb3bd;font-size:8px;font-weight:800}
+.admin-period-days input{height:36px;border:1px solid #343434;border-radius:7px;background:#101010;color:#eee;padding:0 10px;outline:0}
+.admin-period-days input:disabled{opacity:.45}
+.admin-closed-period-actions button{min-height:36px;border:1px solid #3a3a3a;border-radius:7px;background:#202020;color:#c9cdd3;padding:0 10px;font-size:8px;font-weight:900}
+.admin-closed-period-actions button.danger{border-color:#5d2929;background:#261111;color:#ff7474}
+.admin-closed-period-actions button:disabled{opacity:.48;cursor:not-allowed}
+.admin-period-error,.admin-period-deleted{margin:0;padding:10px 16px;border-top:1px solid #442525;background:#211313;color:#e3a1a1;font-size:9px}
+.admin-period-deleted{border-color:#29352f;background:#122019;color:#79c9aa}
 @keyframes admin-spin{to{transform:rotate(360deg)}}
-@media(max-width:1000px){.admin-stats{grid-template-columns:repeat(2,1fr)}.admin-overview,.admin-controls-grid{grid-template-columns:1fr}.admin-post-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:720px){.admin-hero{align-items:flex-start;flex-direction:column;gap:20px;padding:24px 20px}.admin-hero h1{font-size:27px}.admin-tabs .admin-refresh{margin-left:0}.admin-stats,.admin-post-grid{grid-template-columns:1fr}.admin-panel-head{align-items:flex-start;flex-direction:column}.admin-search{width:100%}.admin-audit-row{grid-template-columns:30px 1fr}.admin-audit-row time{grid-column:2}.admin-stat{min-height:100px}}
+@media(max-width:1000px){.admin-stats{grid-template-columns:repeat(2,1fr)}.admin-overview,.admin-controls-grid{grid-template-columns:1fr}.admin-post-grid{grid-template-columns:repeat(2,1fr)}.admin-closed-period-main{grid-template-columns:auto 1fr auto}.admin-closed-period-facts{grid-column:1/-1}.admin-closed-period-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:720px){.admin-hero{align-items:flex-start;flex-direction:column;gap:20px;padding:24px 20px}.admin-hero h1{font-size:27px}.admin-tabs .admin-refresh{margin-left:0}.admin-stats,.admin-post-grid{grid-template-columns:1fr}.admin-panel-head{align-items:flex-start;flex-direction:column}.admin-search{width:100%}.admin-audit-row{grid-template-columns:30px 1fr}.admin-audit-row time{grid-column:2}.admin-stat{min-height:100px}.admin-period-selection{align-items:flex-start;flex-wrap:wrap}.admin-period-selection strong{margin-left:0}.admin-period-selection button{width:100%}.admin-closed-period-main{grid-template-columns:auto 1fr}.admin-closed-period-facts,.admin-closed-period-actions{grid-template-columns:1fr}.admin-closed-period-main>.admin-tag{grid-column:2;justify-self:start}}
 @media(prefers-reduced-motion:reduce){.admin-loading span{animation:none}}
 

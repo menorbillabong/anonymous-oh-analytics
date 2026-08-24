@@ -64,7 +64,7 @@ export default function ClosePeriodModal({posts,crystalginLimit,onClose,onSucces
     </div>
     {!start||!end?<p className="archive-helper">Selecione as duas datas para visualizar o resumo.</p>:!valid?<p className="archive-error">A data final deve ser igual ou posterior à inicial e não pode ser futura.</p>:!selectedPosts.length?<p className="archive-error">Nenhuma publicação do X foi encontrada nesse intervalo.</p>:null}
     {message&&<p className="archive-error">{message}</p>}
-    <p className="archive-warning">Após confirmar, as datas não poderão ser alteradas. O registro será excluído automaticamente 40 dias depois, sem apagar as publicações originais.</p>
+    <p className="archive-warning">Após confirmar, as datas não poderão ser alteradas. O registro histórico permanece protegido por 40 dias. Se o administrador configurar a exclusão das publicações, o prazo começará somente neste fechamento.</p>
    </div>
    <div className="modal-actions">
     <button type="button" className="btn" disabled={saving} onClick={onClose}>Cancelar</button>

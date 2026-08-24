@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { formatPostDate, postPublishedDate } from '@/lib/post-date';
 import './admin.css';
 
-type AdminSection = 'Visão geral' | 'Usuários' | 'Publicações' | 'Auditoria' | 'Controles';
+type AdminSection = 'Visão geral' | 'Usuários' | 'Publicações' | 'Períodos fechados' | 'Auditoria' | 'Controles';
 
 type AdminUser = {
   id: string;
@@ -54,16 +54,38 @@ type AuditLog = {
   created_at: string;
 };
 
+type ClosedPeriodCleanup = {
+  id: number;
+  archive_id?: number;
+  user_id: string;
+  email?: string;
+  username?: string;
+  display_name?: string;
+  profile_name?: string;
+  period_start: string;
+  period_end: string;
+  closed_at: string;
+  retention_days?: number;
+  delete_after?: string;
+  posts_deleted_at?: string;
+  posts_deleted_count?: number;
+  delete_source?: 'manual' | 'automatic';
+  last_error?: string;
+  remaining_posts?: number;
+};
+
 type AdminDashboard = {
   controls?: { ranking_self_service_enabled?: boolean };
   cleanup?: { auto_delete_enabled?: boolean; inactivity_days?: number; grace_days?: number; updated_at?: string };
+  post_cleanup?: { auto_delete_enabled?: boolean; retention_days?: number; updated_at?: string };
   users?: AdminUser[];
   posts?: AdminPost[];
   periods?: Array<{ id: number; status?: string }>;
+  closed_periods?: ClosedPeriodCleanup[];
   logs?: AuditLog[];
 };
 
-const sections: AdminSection[] = ['Visão geral', 'Usuários', 'Publicações', 'Auditoria', 'Controles'];
+const sections: AdminSection[] = ['Visão geral', 'Usuários', 'Publicações', 'Períodos fechados', 'Auditoria', 'Controles'];
 
 export default function AdminPanel() {
   const [section, setSection] = useState<AdminSection>('Visão geral');
@@ -75,6 +97,9 @@ export default function AdminPanel() {
   const [cleanupEnabled, setCleanupEnabled] = useState(false);
   const [inactivityDays, setInactivityDays] = useState(90);
   const [graceDays, setGraceDays] = useState(7);
+  const [postCleanupEnabled, setPostCleanupEnabled] = useState(false);
+  const [postRetentionDays, setPostRetentionDays] = useState(40);
+  const [selectedClosedPeriods, setSelectedClosedPeriods] = useState<number[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -97,6 +122,8 @@ export default function AdminPanel() {
     setCleanupEnabled(Boolean(next.cleanup?.auto_delete_enabled));
     setInactivityDays(Number(next.cleanup?.inactivity_days || 90));
     setGraceDays(Number(next.cleanup?.grace_days || 7));
+    setPostCleanupEnabled(Boolean(next.post_cleanup?.auto_delete_enabled));
+    setPostRetentionDays(Number(next.post_cleanup?.retention_days || 40));
     setLoading(false);
   }, []);
 
@@ -107,6 +134,7 @@ export default function AdminPanel() {
   const users = dashboard.users || [];
   const posts = useMemo(()=>[...(dashboard.posts || [])].sort((a,b)=>(postPublishedDate(b)?.getTime()||0)-(postPublishedDate(a)?.getTime()||0)),[dashboard.posts]);
   const logs = dashboard.logs || [];
+  const closedPeriods = dashboard.closed_periods || [];
   const normalizedSearch = search.trim().toLowerCase();
   const filteredUsers = useMemo(() => users.filter(user =>
     !normalizedSearch || [user.profile_name, user.username, user.display_name, user.email, user.x_handle]
@@ -116,6 +144,28 @@ export default function AdminPanel() {
     !normalizedSearch || [post.title, post.author_handle, post.post_url]
       .some(value => String(value || '').toLowerCase().includes(normalizedSearch))
   ), [posts, normalizedSearch]);
+  const filteredClosedPeriods = useMemo(() => closedPeriods.filter(period =>
+    !normalizedSearch || [
+      period.profile_name,
+      period.username,
+      period.display_name,
+      period.email,
+      period.period_start,
+      period.period_end,
+    ].some(value => String(value || '').toLowerCase().includes(normalizedSearch))
+  ), [closedPeriods, normalizedSearch]);
+  const selectableClosedPeriods = useMemo(() => filteredClosedPeriods.filter(period =>
+    !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0
+  ), [filteredClosedPeriods]);
+  const allVisibleClosedPeriodsSelected = selectableClosedPeriods.length > 0
+    && selectableClosedPeriods.every(period => selectedClosedPeriods.includes(period.id));
+
+  useEffect(() => {
+    const available = new Set(closedPeriods
+      .filter(period => !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0)
+      .map(period => period.id));
+    setSelectedClosedPeriods(current => current.filter(id => available.has(id)));
+  }, [closedPeriods]);
 
   async function run(key: string, request: () => PromiseLike<{ error: { message?: string } | null }>, success: string) {
     setBusy(key);
@@ -200,10 +250,94 @@ export default function AdminPanel() {
     }), 'Política de limpeza automática atualizada.');
   }
 
+  async function savePostCleanup() {
+    if (postRetentionDays < 1 || postRetentionDays > 3650) {
+      setMessage('Escolha um prazo entre 1 e 3.650 dias.');
+      return;
+    }
+    if (postCleanupEnabled && !window.confirm('Ativar o prazo padrão de ' + postRetentionDays + ' dia(s) para novos períodos fechados? Os períodos já fechados não serão alterados.')) return;
+    await run('post-cleanup', () => supabase.rpc('admin_set_closed_period_post_cleanup', {
+      p_enabled: postCleanupEnabled,
+      p_retention_days: postRetentionDays,
+    }), postCleanupEnabled ? 'Prazo padrão salvo para novos períodos fechados.' : 'Exclusão automática desativada para novos períodos.');
+  }
+
+  async function saveClosedPeriodSchedule(period: ClosedPeriodCleanup, enabled: boolean, days: number) {
+    if (enabled && (days < 1 || days > 3650)) {
+      setMessage('Escolha um prazo entre 1 e 3.650 dias.');
+      return;
+    }
+    const reason = reasonFor(enabled ? 'agendar a exclusão das publicações deste período' : 'cancelar a exclusão automática deste período');
+    if (!reason) return;
+    if (enabled) {
+      const deletionDate = new Date(new Date(period.closed_at).getTime() + days * 86400000);
+      if (deletionDate.getTime() <= Date.now() && !window.confirm('Esse prazo já terminou. As publicações poderão ser excluídas na próxima execução automática. Deseja continuar?')) return;
+    }
+    await run('period-schedule-' + period.id, () => supabase.rpc('admin_schedule_closed_period_posts', {
+      p_cleanup_id: period.id,
+      p_enabled: enabled,
+      p_retention_days: days,
+      p_reason: reason,
+    }), enabled ? 'Exclusão automática deste período agendada.' : 'Exclusão automática deste período cancelada.');
+  }
+
+  async function deleteClosedPeriodPosts(period: ClosedPeriodCleanup) {
+    const remaining = Number(period.remaining_posts || 0);
+    if (!remaining || period.posts_deleted_at) return;
+    const profile = closedPeriodName(period);
+    const warning = 'Excluir definitivamente ' + remaining + ' publicação(ões) de ' + profile + ', somente do período de ' + formatPeriodDate(period.period_start) + ' a ' + formatPeriodDate(period.period_end) + '? A conta e os outros períodos não serão alterados.';
+    if (!window.confirm(warning)) return;
+    const reason = reasonFor('excluir agora as publicações deste usuário e período fechado');
+    if (!reason) return;
+    setBusy('period-delete-' + period.id);
+    setMessage('');
+    try {
+      const { data, error } = await supabase.rpc('admin_delete_closed_period_posts', {
+        p_cleanup_id: period.id,
+        p_reason: reason,
+      });
+      if (error) throw error;
+      setMessage(Number(data || 0).toLocaleString('pt-BR') + ' publicação(ões) excluída(s) somente desse usuário e período.');
+      await load();
+    } catch (error:any) {
+      setMessage(String(error?.message || 'Não foi possível excluir as publicações.'));
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function deleteSelectedClosedPeriodPosts() {
+    const periods = closedPeriods.filter(period => selectedClosedPeriods.includes(period.id) && !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0);
+    if (!periods.length) return;
+    const totalPosts = periods.reduce((total, period) => total + Number(period.remaining_posts || 0), 0);
+    const warning = 'Excluir definitivamente ' + totalPosts.toLocaleString('pt-BR') + ' publicação(ões) de ' + periods.length + ' período(s) fechado(s)? As contas, os outros períodos e o ranking arquivado não serão alterados.';
+    if (!window.confirm(warning)) return;
+    const reason = reasonFor('excluir as publicações dos períodos fechados selecionados');
+    if (!reason) return;
+    setBusy('period-delete-selected');
+    setMessage('');
+    try {
+      const { data, error } = await supabase.rpc('admin_delete_closed_period_posts_bulk', {
+        p_cleanup_ids: periods.map(period => period.id),
+        p_reason: reason,
+      });
+      if (error) throw error;
+      const result = (data || {}) as { periods?: number; posts?: number };
+      setSelectedClosedPeriods([]);
+      setMessage(Number(result.posts || 0).toLocaleString('pt-BR') + ' publicação(ões) excluída(s) de ' + Number(result.periods || 0).toLocaleString('pt-BR') + ' período(s).');
+      await load();
+    } catch (error:any) {
+      setMessage(String(error?.message || 'Não foi possível excluir as publicações selecionadas.'));
+    } finally {
+      setBusy('');
+    }
+  }
+
   const suspendedCount = users.filter(user => user.suspended).length;
   const blockedCount = users.filter(user => user.ranking_blocked).length;
   const reviewedCount = posts.filter(post => post.admin_eligible === false).length;
   const scheduledCount = users.filter(user => user.deletion_scheduled_at).length;
+  const scheduledPeriodCount = closedPeriods.filter(period => period.delete_after && !period.posts_deleted_at).length;
 
   if (loading) return <div className="admin-loading"><span>↻</span> CARREGANDO CONTROLE ADMINISTRATIVO</div>;
 
@@ -228,7 +362,7 @@ export default function AdminPanel() {
       <AdminStat label="CONTAS CADASTRADAS" value={users.length} detail={`${suspendedCount} suspensa(s)`}/>
       <AdminStat label="PUBLICAÇÕES" value={posts.length} detail={`${reviewedCount} desqualificada(s)`}/>
       <AdminStat label="BLOQUEIOS DE RANKING" value={blockedCount} detail="Controle individual"/>
-      <AdminStat label="EXCLUSÕES AGENDADAS" value={scheduledCount} detail="Fila de segurança"/>
+      <AdminStat label="EXCLUSÕES AGENDADAS" value={scheduledCount + scheduledPeriodCount} detail={scheduledPeriodCount + ' período(s) fechado(s)'}/>
     </div>
 
     {section === 'Visão geral' && <div className="admin-overview">
@@ -241,6 +375,10 @@ export default function AdminPanel() {
         <div className="admin-control-row">
           <div><strong>Limpeza automática de contas</strong><p>{cleanupEnabled ? `Contas inativas por ${inactivityDays} dias · carência de ${graceDays} dias.` : 'A limpeza automática está desativada.'}</p></div>
           <button className="admin-outline" onClick={() => setSection('Controles')}>CONFIGURAR</button>
+        </div>
+        <div className="admin-control-row">
+          <div><strong>Publicações de períodos fechados</strong><p>{postCleanupEnabled ? 'Novos fechamentos: exclusão após ' + postRetentionDays + ' dia(s).' : 'A exclusão automática está desativada.'}</p></div>
+          <button className="admin-outline" onClick={() => setSection('Períodos fechados')}>GERENCIAR</button>
         </div>
       </div>
       <div className="admin-panel">
@@ -285,6 +423,38 @@ export default function AdminPanel() {
       </div>
     </div>}
 
+    {section === 'Períodos fechados' && <div className="admin-panel">
+      <PanelHeading eyebrow="RETENÇÃO DE PUBLICAÇÕES" title="Períodos fechados" search={search} setSearch={setSearch}/>
+      <p className="admin-panel-copy admin-period-copy">O prazo começa na data do fechamento. Somente as publicações do usuário e do intervalo selecionado podem ser excluídas.</p>
+      <div className="admin-period-selection">
+        <label><input
+          type="checkbox"
+          checked={allVisibleClosedPeriodsSelected}
+          disabled={!selectableClosedPeriods.length || busy === 'period-delete-selected'}
+          onChange={event => {
+            const visibleIds = selectableClosedPeriods.map(period => period.id);
+            setSelectedClosedPeriods(current => event.target.checked
+              ? Array.from(new Set([...current, ...visibleIds]))
+              : current.filter(id => !visibleIds.includes(id)));
+          }}
+        /><span>Selecionar todos os períodos exibidos</span></label>
+        <strong>{selectedClosedPeriods.length.toLocaleString('pt-BR')} SELECIONADO(S)</strong>
+        <button type="button" className="danger" disabled={!selectedClosedPeriods.length || busy === 'period-delete-selected'} onClick={deleteSelectedClosedPeriodPosts}>{busy === 'period-delete-selected' ? 'EXCLUINDO...' : 'EXCLUIR SELECIONADOS'}</button>
+      </div>
+      <div className="admin-closed-periods">
+        {filteredClosedPeriods.map(period => <ClosedPeriodRow
+          key={period.id}
+          period={period}
+          busy={busy}
+          selected={selectedClosedPeriods.includes(period.id)}
+          onSelectedChange={selected => setSelectedClosedPeriods(current => selected ? Array.from(new Set([...current, period.id])) : current.filter(id => id !== period.id))}
+          onSave={saveClosedPeriodSchedule}
+          onDelete={deleteClosedPeriodPosts}
+        />)}
+        {!filteredClosedPeriods.length && <div className="admin-empty">Nenhum período fechado encontrado.</div>}
+      </div>
+    </div>}
+
     {section === 'Auditoria' && <div className="admin-panel">
       <div className="admin-panel-head"><div><small>REGISTRO DE SEGURANÇA</small><h2>Histórico administrativo</h2></div><span className="admin-counter">{logs.length} REGISTROS</span></div>
       <AuditRows logs={logs}/>
@@ -305,6 +475,15 @@ export default function AdminPanel() {
           <button className="admin-primary" disabled={busy === 'cleanup'} onClick={saveCleanup}>SALVAR POLÍTICA DE LIMPEZA</button>
         </div>
       </div>
+      <div className="admin-panel">
+        <div className="admin-panel-head"><div><small>PERÍODOS FECHADOS</small><h2>Prazo padrão das publicações</h2></div><StatusTag tone={postCleanupEnabled ? 'warning' : 'neutral'}>{postCleanupEnabled ? 'CONFIGURADO' : 'DESATIVADO'}</StatusTag></div>
+        <div className="admin-form">
+          <label className="admin-check"><span><strong>Ativar para novos fechamentos</strong><small>O prazo começa somente quando o período é fechado.</small></span><input type="checkbox" checked={postCleanupEnabled} onChange={event => setPostCleanupEnabled(event.target.checked)}/></label>
+          <label><span>Excluir publicações depois de quantos dias?</span><input type="number" min="1" max="3650" value={postRetentionDays} onChange={event => setPostRetentionDays(Number(event.target.value))}/></label>
+          <p className="admin-form-note">Essa configuração vale para os próximos fechamentos. Períodos já fechados podem ser ajustados individualmente na aba “Períodos fechados”.</p>
+          <button className="admin-primary" disabled={busy === 'post-cleanup'} onClick={savePostCleanup}>SALVAR PRAZO DAS PUBLICAÇÕES</button>
+        </div>
+      </div>
     </div>}
   </section>;
 }
@@ -319,6 +498,50 @@ function PanelHeading({eyebrow, title, search, setSearch}:{eyebrow:string; title
 
 function StatusTag({children, tone}:{children:React.ReactNode; tone:'success'|'danger'|'warning'|'neutral'}) {
   return <span className={`admin-tag ${tone}`}>{children}</span>;
+}
+
+function ClosedPeriodRow({period,busy,selected,onSelectedChange,onSave,onDelete}:{
+  period:ClosedPeriodCleanup;
+  busy:string;
+  selected:boolean;
+  onSelectedChange:(selected:boolean)=>void;
+  onSave:(period:ClosedPeriodCleanup,enabled:boolean,days:number)=>Promise<void>;
+  onDelete:(period:ClosedPeriodCleanup)=>Promise<void>;
+}) {
+  const [enabled,setEnabled] = useState(Boolean(period.delete_after));
+  const [days,setDays] = useState(Number(period.retention_days || 40));
+  useEffect(() => {
+    setEnabled(Boolean(period.delete_after));
+    setDays(Number(period.retention_days || 40));
+  }, [period.delete_after,period.retention_days]);
+  const deleted = Boolean(period.posts_deleted_at);
+  const remaining = Number(period.remaining_posts || 0);
+  const statusTone = deleted ? 'neutral' : period.last_error ? 'danger' : period.delete_after ? 'warning' : 'success';
+  const status = deleted ? 'EXCLUÍDAS' : period.last_error ? 'ERRO' : period.delete_after ? 'AGENDADA' : 'MANUAL';
+  const scheduleBusy = busy === 'period-schedule-' + period.id;
+  const deleteBusy = busy === 'period-delete-' + period.id;
+  return <article className="admin-closed-period-card">
+    <div className="admin-closed-period-main">
+      <label className="admin-period-select" title={remaining && !deleted ? 'Selecionar este período' : 'Não há publicações para excluir'}><input type="checkbox" checked={selected} disabled={!remaining || deleted || busy === 'period-delete-selected'} onChange={event => onSelectedChange(event.target.checked)}/></label>
+      <div className="admin-closed-period-title">
+        <i>{closedPeriodName(period).slice(0,1).toUpperCase()}</i>
+        <div><strong>{closedPeriodName(period)}</strong><small>{formatPeriodDate(period.period_start)} até {formatPeriodDate(period.period_end)}</small></div>
+      </div>
+      <div className="admin-closed-period-facts">
+        <span><small>FECHADO EM</small><strong>{formatDate(period.closed_at,true)}</strong></span>
+        <span><small>PUBLICAÇÕES ATUAIS</small><strong>{remaining.toLocaleString('pt-BR')}</strong></span>
+        <span><small>EXCLUSÃO</small><strong>{period.delete_after ? formatDate(period.delete_after,true) : 'Sem prazo'}</strong></span>
+      </div>
+      <StatusTag tone={statusTone}>{status}</StatusTag>
+    </div>
+    {period.last_error && <p className="admin-period-error">Última tentativa: {period.last_error}</p>}
+    {deleted ? <div className="admin-period-deleted">Exclusão {period.delete_source === 'automatic' ? 'automática' : 'manual'} concluída em {formatDate(period.posts_deleted_at,true)} · {Number(period.posts_deleted_count || 0).toLocaleString('pt-BR')} publicação(ões).</div> : <div className="admin-closed-period-actions">
+      <label className="admin-period-check"><input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)}/><span>Exclusão automática</span></label>
+      <label className="admin-period-days"><span>Dias após o fechamento</span><input type="number" min="1" max="3650" value={days} disabled={!enabled} onChange={event => setDays(Number(event.target.value))}/></label>
+      <button type="button" disabled={scheduleBusy} onClick={() => onSave(period,enabled,days)}>{scheduleBusy ? 'SALVANDO...' : 'SALVAR PRAZO'}</button>
+      <button type="button" className="danger" disabled={!remaining || deleteBusy} onClick={() => onDelete(period)}>{deleteBusy ? 'EXCLUINDO...' : 'EXCLUIR PUBLICAÇÕES AGORA'}</button>
+    </div>}
+  </article>;
 }
 
 function SheetsAccess({user,onSaved}:{user:AdminUser;onSaved:()=>Promise<void>}){
@@ -361,6 +584,10 @@ function actionLabel(action:string) {
     requalify_post:'Publicação requalificada', configure_account_cleanup:'Limpeza de contas configurada',
     schedule_account_deletion:'Exclusão agendada', cancel_account_deletion:'Exclusão cancelada',
     delete_inactive_account:'Conta inativa excluída', configure_google_sheets:'Google Sheets configurado',
+    configure_closed_period_post_cleanup:'Prazo padrão de publicações configurado',
+    schedule_closed_period_post_cleanup:'Exclusão de período agendada',
+    cancel_closed_period_post_cleanup:'Exclusão de período cancelada',
+    delete_closed_period_posts:'Publicações do período excluídas',
   };
   return labels[action] || action.replaceAll('_', ' ');
 }
@@ -368,5 +595,15 @@ function actionLabel(action:string) {
 function formatDate(value?:string, withTime=false) {
   if (!value) return 'Sem registro';
   return formatPostDate(value, withTime) || 'Sem registro';
+}
+
+function closedPeriodName(period:ClosedPeriodCleanup) {
+  return period.profile_name || period.username || period.display_name || period.email || 'Usuário sem nome';
+}
+
+function formatPeriodDate(value?:string) {
+  if (!value) return 'Sem data';
+  const [year,month,day] = value.slice(0,10).split('-');
+  return year && month && day ? day + '/' + month + '/' + year : value;
 }
 
