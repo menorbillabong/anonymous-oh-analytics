@@ -21,11 +21,11 @@ export type SheetPlan = {
 };
 
 type HeaderField = 'month'|'publishDate'|'platform'|'contentLink'|'views'|'likes'|'eligible'|'reward'|'theme';
-type SectionColumns = Partial<Record<HeaderField,number>> & {start:number;end:number};
+type SectionColumns = Partial<Record<HeaderField,number>>;
 type HeaderLayout = {row:number;normal:SectionColumns;special:SectionColumns};
 
-const NORMAL_REQUIRED:HeaderField[]=['publishDate','platform','contentLink','views','likes'];
-const SPECIAL_REQUIRED:HeaderField[]=[...NORMAL_REQUIRED,'reward','theme'];
+const ESSENTIAL_FIELDS:HeaderField[]=['contentLink'];
+const ALL_FIELDS:HeaderField[]=['month','publishDate','platform','contentLink','views','likes','eligible','reward','theme'];
 
 function clean(value:unknown){return String(value ?? '').trim()}
 function normalized(value:unknown){return clean(value).toLowerCase().replace(/\s+/g,' ')}
@@ -63,11 +63,7 @@ function sectionColumns(cells:Array<{column:number;field:HeaderField}>):SectionC
     fields.set(cell.field,cell.column);
   }
   if(!cells.length)return null;
-  return {
-    ...Object.fromEntries(fields),
-    start:Math.min(...cells.map(cell=>cell.column)),
-    end:Math.max(...cells.map(cell=>cell.column)),
-  } as SectionColumns;
+  return Object.fromEntries(fields) as SectionColumns;
 }
 
 function hasRequired(section:SectionColumns|null,required:HeaderField[]){
@@ -83,7 +79,7 @@ function headerLayoutForRow(row:unknown[],rowIndex:number):HeaderLayout|null{
   for(let split=1;split<cells.length;split++){
     const normal=sectionColumns(cells.slice(0,split));
     const special=sectionColumns(cells.slice(split));
-    if(!hasRequired(normal,NORMAL_REQUIRED)||!hasRequired(special,SPECIAL_REQUIRED))continue;
+    if(!hasRequired(normal,ESSENTIAL_FIELDS)||!hasRequired(special,ESSENTIAL_FIELDS))continue;
     const gap=cells[split]!.column-cells[split-1]!.column;
     if(!best||gap>best.gap)best={normal:normal!,special:special!,gap};
   }
@@ -120,7 +116,6 @@ function columnName(columnIndex:number){
 }
 
 function cellRange(tab:string,columnIndex:number,rowIndex:number){return `${a1Tab(tab)}!${columnName(columnIndex)}${rowIndex+1}`}
-function cellRowSpan(tab:string,startColumn:number,endColumn:number,rowIndex:number){return `${a1Tab(tab)}!${columnName(startColumn)}${rowIndex+1}:${columnName(endColumn)}${rowIndex+1}`}
 function postDate(post:SheetPost){return clean(post.published_at).slice(0,10)}
 function postPlatform(post:SheetPost){
   const network=normalized(post.network);
@@ -130,7 +125,7 @@ function postPlatform(post:SheetPost){
 
 export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost[],sheetMonth=''):SheetPlan{
   const layout=findLastHeaderLayout(rows);
-  if(!layout)throw new Error('Não encontrei os cabeçalhos necessários de Normal Mission e Special Mission nessa aba.');
+  if(!layout)throw new Error('Não encontrei os dois cabeçalhos Content Link de Normal Mission e Special Mission nessa aba.');
 
   const manualMonth=monthKey(sheetMonth);
   const selectedMonth=manualMonth||selectedSheetMonth(rows);
@@ -179,10 +174,10 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     for(const oldCell of existingCells){
       if(oldCell.row===row&&oldCell.special===special)continue;
       const section=oldCell.special?layout.special:layout.normal;
-      updates.push({
-        range:cellRowSpan(tabName,section.start,section.end,oldCell.row),
-        values:[[...Array(section.end-section.start+1).fill('')]],
-      });
+      for(const field of ALL_FIELDS){
+        const column=section[field];
+        if(column!==undefined)updates.push({range:cellRange(tabName,column,oldCell.row),values:[['']]});
+      }
     }
 
     const section=special?layout.special:layout.normal;
