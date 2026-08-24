@@ -77,7 +77,7 @@ test('moves an existing normal publication to Special Mission without changing i
 
   assert.equal(plan.normalCount,0);
   assert.equal(plan.specialCount,1);
-  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!B102:H102"&&update.values[0].every(value=>value==='')));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!E102"&&update.values[0][0]===''));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!N104"&&update.values[0][0]==='https://x.com/test/status/100'));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!R104"&&update.values[0][0]===200));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!S104"&&update.values[0][0]==='High Quality'));
@@ -93,7 +93,7 @@ test('moves an existing special publication to Normal Mission and clears duplica
   assert.equal(plan.normalCount,1);
   assert.equal(plan.specialCount,0);
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!E104"&&update.values[0][0]==='https://x.com/test/status/200'));
-  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!K103:S103"&&update.values[0].every(value=>value==='')));
+  assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!N103"&&update.values[0][0]===''));
 });
 
 test('finds the Gaucho_07 columns by their names even when both tables start earlier',()=>{
@@ -134,10 +134,30 @@ test('uses header names when columns are reordered inside each side',()=>{
   assert.ok(plan.updates.some(update=>update.range==="'FLEXIVEL'!L7"&&update.values[0][0]===200));
 });
 
-test('fails before writing when an essential named column is absent',()=>{
+test('ignores optional columns that are absent from either section',()=>{
   const rows=referenceRows();
   rows[100]![2]='';
-  assert.throws(()=>planSheetUpdates('Página1',rows,[]),/cabeçalhos necessários/);
+  rows[100]![3]='';
+  rows[100]![5]='';
+  rows[100]![11]='';
+  rows[100]![12]='';
+  rows[100]![14]='';
+  rows[100]![15]='';
+  rows[100]![18]='';
+  const plan=planSheetUpdates('Página1',rows,[
+    {post_url:'https://x.com/test/status/300',published_at:'2026-08-05',views:30,likes:4,sheets_is_special:false},
+    {post_url:'https://x.com/test/status/400',published_at:'2026-08-06',views:40,likes:5,special_reward:200,mission_name:'High Quality',sheets_is_special:true},
+  ]);
+
+  assert.equal(plan.normalCount,1);
+  assert.equal(plan.specialCount,1);
+  assert.deepEqual(plan.updates.map(update=>update.range),["'Página1'!E103","'Página1'!G103","'Página1'!N104","'Página1'!R104"]);
+});
+
+test('fails safely when either essential Content Link column is absent',()=>{
+  const rows=referenceRows();
+  rows[100]![4]='';
+  assert.throws(()=>planSheetUpdates('Página1',rows,[]),/Content Link/);
 });
 
 test('fails safely when the expected table headers are missing',()=>{
