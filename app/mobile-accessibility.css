@@ -1,0 +1,146 @@
+/* Mobile-only accessibility layer. Desktop rules remain untouched. */
+@media(max-width:900px){
+ html,body{max-width:100%;overflow-x:hidden}
+ button,input,select,textarea{max-width:100%}
+
+ /* Keep every main navigation destination available on touch screens. */
+ .exact-topbar{height:auto!important;min-height:0!important;display:flex!important;flex-wrap:wrap!important;gap:8px!important;padding:10px 12px!important;overflow:visible!important}
+ .exact-brand{order:1!important;left:0!important;min-width:0!important;max-width:calc(100% - 132px);font-size:14px!important;white-space:normal!important}
+ .db-refresh-timer-host,.refresh-pill,.wait-pill{order:2!important;flex:0 0 auto!important;margin-left:auto!important}
+ .user-pill{order:2!important;min-height:42px!important;max-width:48%;margin-left:auto!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important}
+ .exact-nav{order:3!important;display:flex!important;visibility:visible!important;flex:1 0 100%!important;width:100%!important;height:52px!important;justify-content:flex-start!important;overflow-x:auto!important;overflow-y:hidden!important;scrollbar-width:thin;overscroll-behavior-x:contain;touch-action:pan-x;-webkit-overflow-scrolling:touch}
+ .exact-nav button{display:flex!important;visibility:visible!important;flex:0 0 auto!important;min-height:44px!important;padding:0 13px!important;white-space:nowrap!important}
+ .tracker-top{height:auto!important;min-height:58px!important;flex-wrap:wrap!important;overflow:visible!important;padding:8px 12px!important}
+ .tracker-top nav{order:3!important;display:flex!important;visibility:visible!important;flex:1 0 100%!important;width:100%!important;overflow-x:auto!important;overflow-y:hidden!important;justify-content:flex-start!important;-webkit-overflow-scrolling:touch}
+ .tracker-top nav button{display:flex!important;flex:0 0 auto!important;min-height:44px!important;white-space:nowrap!important}
+
+ /* Dashboard actions wrap into usable rows instead of being covered. */
+ .exact-main{width:calc(100% - 20px)!important;max-width:none!important;margin:14px 10px 56px!important}
+ .exact-hero{height:auto!important;min-height:0!important;padding:22px 16px!important}
+ .hero-title{align-items:flex-start!important;justify-content:space-between!important}
+ .hero-title h1{font-size:30px!important}
+ .hero-actions{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:9px!important;align-items:stretch!important;margin-top:20px!important}
+ .hero-actions>button,.hero-actions>.sheets-sync-button,.hero-actions>.split-btn{width:100%!important;min-width:0!important}
+ .hero-actions button,.split-btn button,.sheets-sync-button{min-height:44px!important;height:auto!important;padding:9px 10px!important;white-space:normal!important;line-height:1.25!important}
+ .split-btn{display:grid!important;grid-template-columns:1fr 1fr!important}
+ .split-btn button{width:100%!important}
+ .exact-stats{grid-template-columns:1fr!important;gap:10px!important;margin-top:16px!important}
+ .exact-stat{height:auto!important;min-height:112px!important}
+
+ /* Mission summary becomes readable cards, keeping profile buttons clickable. */
+ .mission-summary-card{overflow:visible!important}
+ .mission-summary-card .mission-head{height:auto!important;min-height:55px!important;gap:10px!important;padding:13px 14px!important}
+ .mission-summary-card .mission-columns{display:none!important}
+ .mission-summary-card .mission-row:not(.mission-columns){display:grid!important;grid-template-columns:1fr 1fr!important;gap:10px 16px!important;min-height:0!important;padding:15px 14px!important}
+ .mission-summary-card .mission-name{grid-column:1/-1!important}
+ .mission-summary-card .mission-row>span,.mission-summary-card .mission-row>strong{justify-self:stretch!important;text-align:left!important}
+ .mission-summary-card .mission-row>span::before,.mission-summary-card .mission-row>strong::before{display:block;margin-bottom:4px;color:#9097a2;font-size:8px;font-weight:900;letter-spacing:.06em}
+ .mission-summary-card .mission-row>span:nth-child(2)::before{content:"PUBLICAÇÕES"}
+ .mission-summary-card .mission-row>span:nth-child(3)::before{content:"VISUALIZAÇÕES"}
+ .mission-summary-card .mission-row>span:nth-child(4)::before{content:"CURTIDAS"}
+ .mission-summary-card .mission-row>strong:nth-child(5)::before{content:"CRYSTGIN"}
+ .mission-summary-card .mission-total-row{grid-template-columns:repeat(2,1fr)!important}
+ .mission-summary-card .mission-total-row>strong:first-child{grid-column:1/-1!important}
+ .mission-summary-card .mission-total-row>strong:nth-child(2)::before{content:"PUBLICAÇÕES"}
+ .mission-summary-card .mission-total-row>strong:nth-child(3)::before{content:"VISUALIZAÇÕES"}
+ .mission-summary-card .mission-total-row>strong:nth-child(4)::before{content:"CURTIDAS"}
+ .mission-summary-card .mission-total-row>strong:nth-child(5)::before{content:"CRYSTGIN"}
+ .mission-reward-summary{padding:14px!important}
+ .mission-reward-line,.mission-official-total{gap:14px!important}
+
+ /* Publication controls stay visible; list mode can be moved horizontally. */
+ .exact-posts{padding:14px 10px!important;margin-top:18px!important;overflow:visible!important}
+ .posts-head{align-items:flex-start!important;flex-wrap:wrap!important;gap:10px!important}
+ .post-display-switch{margin-left:auto!important}
+ .post-display-switch button,.ref-edit-square,.ref-more,.ref-pencil,.post-actions-menu button{min-width:44px!important;min-height:44px!important}
+ .ref-list{max-width:100%!important;overflow:visible!important}
+ .ref-list-head{display:none!important}
+ .ref-list-row{display:grid!important;grid-template-columns:34px repeat(2,minmax(0,1fr))!important;gap:12px!important;min-width:0!important;min-height:0!important;margin-bottom:10px!important;padding:14px 12px!important;border:1px solid #2d2d2d!important;border-left:4px solid var(--post-mission-color,#38d27f)!important;border-radius:9px!important;background:#171717!important}
+ .ref-list-row>.ref-select-check{grid-column:1!important;grid-row:1!important;align-self:center!important}
+ .ref-list-row>.ref-post-cell{grid-column:2/-1!important;grid-row:1!important;min-width:0!important}
+ .ref-list-row>b,.ref-list-row>span,.ref-list-row>strong{justify-self:stretch!important;text-align:left!important}
+ .ref-list-row>b::before,.ref-list-row>span::before,.ref-list-row>strong::before{display:block;margin-bottom:4px;color:#9097a2;font-size:8px;font-weight:900;letter-spacing:.06em}
+ .ref-list-row>b:nth-child(3)::before{content:"ENGAJAMENTO"}
+ .ref-list-row>span:nth-child(4)::before{content:"CURTIDAS"}
+ .ref-list-row>span:nth-child(5)::before{content:"COMENTÁRIOS"}
+ .ref-list-row>span:nth-child(6)::before{content:"REPOSTS"}
+ .ref-list-row>span:nth-child(7)::before{content:"VISUALIZAÇÕES"}
+ .ref-list-row>strong:nth-child(8)::before{content:"CRYSTGIN"}
+ .ref-list-row>.post-actions-menu-wrap{grid-column:1/-1!important;justify-self:stretch!important}
+ .ref-list-row>.post-actions-menu-wrap>.ref-more{width:100%!important;border:1px solid #343434!important;border-radius:7px!important;background:#1e1e1e!important}
+ .ref-list-row>.ref-expanded{grid-column:1/-1!important;width:100%!important}
+ .ref-card-grid{grid-template-columns:1fr!important}
+ .post-actions-menu{position:fixed!important;left:12px!important;right:12px!important;top:auto!important;bottom:12px!important;width:auto!important;max-height:70dvh!important;overflow-y:auto!important;z-index:12000!important}
+
+ /* Administrative functions are stacked instead of living off-screen. */
+ .admin-tabs{width:100%!important;overflow-x:auto!important;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+ .admin-tabs button{min-height:44px!important}
+ .admin-table-scroll{overflow:visible!important}
+ .admin-user-table{min-width:0!important}
+ .admin-table-head{display:none!important}
+ .admin-user-row{display:grid!important;grid-template-columns:1fr 1fr!important;gap:14px 12px!important;min-height:0!important;margin:12px!important;padding:16px!important;border:1px solid #2d2d2d!important;border-radius:10px!important;background:#121212!important}
+ .admin-user-row>div{min-width:0!important}
+ .admin-user-row>.admin-user-identity,.admin-user-row>.admin-sheets-access,.admin-user-row>.admin-row-actions{grid-column:1/-1!important}
+ .admin-user-row>div:nth-child(2)::before,.admin-user-row>div:nth-child(3)::before,.admin-user-row>div:nth-child(4)::before,.admin-user-row>.admin-sheets-access::before,.admin-user-row>.admin-row-actions::before{display:block;margin-bottom:7px;color:#9097a2;font-size:8px;font-weight:900;letter-spacing:.08em}
+ .admin-user-row>div:nth-child(2)::before{content:"STATUS"}
+ .admin-user-row>div:nth-child(3)::before{content:"RANKING"}
+ .admin-user-row>div:nth-child(4)::before{content:"ATIVIDADE"}
+ .admin-user-row>.admin-sheets-access::before{content:"GOOGLE SHEETS";grid-column:1/-1}
+ .admin-user-row>.admin-row-actions::before{content:"AÇÕES";grid-column:1/-1}
+ .admin-sheets-access{grid-template-columns:1fr!important}
+ .admin-sheets-access label,.admin-sheets-access>small{grid-column:1!important}
+ .admin-sheets-access>button{min-height:40px!important}
+ .admin-row-actions{grid-template-columns:1fr!important;padding:0!important}
+ .admin-action-posts{grid-column:1!important}
+ .admin-row-actions button{min-height:42px!important}
+ .admin-closed-period-actions button,.admin-period-selection button{min-height:42px!important}
+
+ /* Forms, settings and mission management keep all controls in reach. */
+ .settings-title{align-items:flex-start!important;flex-direction:column!important;gap:14px!important}
+ .settings-title .orange-btn{width:100%!important;min-height:44px!important}
+ .settings-grid-full,.reward-card .reward-highlights,.settings-lower{grid-template-columns:1fr!important}
+ .settings-lower>article>div{flex-direction:column!important}
+ .settings-lower button{width:100%!important;min-height:44px!important}
+ .mission-control-reference,.mission-existing-grid{grid-template-columns:1fr!important}
+ .mission-create-panel{padding:20px 16px!important}
+ .mission-card-actions button{width:44px!important;height:44px!important}
+ .mission-review-page,.bulk-review-page{inset:0!important;padding:18px 10px 64px!important}
+ .mission-review-shell,.bulk-review-shell{width:100%!important}
+ .mission-review-top,.bulk-review-top{flex-direction:column!important}
+ .mission-review-actions,.bulk-review-actions{width:100%!important;display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .mission-review-back,.mission-review-save,.bulk-review-back,.bulk-confirm{min-height:44px!important;width:100%!important}
+ .mission-review-grid.cards,.mission-review-grid.list,.bulk-review-grid.cards,.bulk-review-grid.list{grid-template-columns:1fr!important}
+ .mission-review-card,.mission-review-grid.list .mission-review-card,.bulk-review-card,.bulk-review-grid.list .bulk-review-card{width:100%!important;grid-template-columns:1fr!important}
+
+ /* Dialogs fit within the visible phone height and retain their action buttons. */
+ .modal-backdrop,.edit-post-overlay,.admin-date-delete-overlay,.mission-review-confirm-overlay,.mission-delete-backdrop,.profile-gate-overlay,.sheets-result-backdrop,.upgrade-backdrop{padding:8px!important;align-items:flex-start!important;overflow-y:auto!important}
+ .modal,.edit-post-modal,.admin-date-delete-dialog,.mission-review-confirm,.mission-delete-dialog,.profile-gate-card,.sheets-result-dialog,.upgrade-password{width:100%!important;max-width:100%!important;max-height:calc(100dvh - 16px)!important;margin:auto!important;overflow-y:auto!important}
+ .modal-actions,.edit-post-actions,.admin-date-delete-actions{display:grid!important;grid-template-columns:1fr!important;gap:8px!important}
+ .modal-actions button,.edit-post-actions button,.admin-date-delete-actions button{width:100%!important;min-height:44px!important}
+ .profile-menu{left:10px!important;right:10px!important;top:76px!important;width:auto!important}
+ .profile-menu button{min-height:44px!important}
+}
+
+@media(max-width:520px){
+ .exact-brand{max-width:100%!important;flex:1 0 100%!important}
+ .db-refresh-timer-host,.refresh-pill,.wait-pill{margin-left:0!important}
+ .user-pill{max-width:58%!important}
+ .hero-actions{grid-template-columns:1fr!important}
+ .mission-summary-card .mission-head{align-items:flex-start!important;flex-direction:column!important}
+ .mission-summary-card .mission-row:not(.mission-columns),.mission-summary-card .mission-total-row{grid-template-columns:1fr!important}
+ .mission-review-actions,.bulk-review-actions{grid-template-columns:1fr!important}
+ .admin-user-row{grid-template-columns:1fr!important;margin:9px!important;padding:14px!important}
+ .admin-user-row>div{grid-column:1!important}
+ .auth-topbar{height:auto!important;min-height:68px!important;gap:10px!important;padding:10px 14px!important}
+ .auth-topbar strong{max-width:44%;font-size:12px!important}
+ .site-language-control.compact{min-width:145px!important}
+ .auth-stage{padding:10px!important}
+ .auth-intro,.auth-form-panel{padding:28px 20px!important}
+ .auth-intro h1{font-size:34px!important}
+}
+
+@media(max-width:900px) and (hover:none) and (pointer:coarse){
+ .mission-card-actions,.post-display-switch,.post-actions-menu-wrap{opacity:1!important;visibility:visible!important}
+ button{touch-action:manipulation}
+}
+
