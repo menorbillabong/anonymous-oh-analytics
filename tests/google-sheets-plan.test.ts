@@ -96,6 +96,50 @@ test('moves an existing special publication to Normal Mission and clears duplica
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!K103:S103"&&update.values[0].every(value=>value==='')));
 });
 
+test('finds the Gaucho_07 columns by their names even when both tables start earlier',()=>{
+  const rows:unknown[][]=Array.from({length:80},()=>[]);
+  rows[2]=['Settlement Month (YYYY-MM)','2026-08'];
+  rows[30]=['Month','Publish Date','Platform','Content Link','Impressions / Views','Likes','Eligible','','','Month','Publish Date','Platform','Content Link','Impressions / Views','Likes','Eligible','Reward','Theme'];
+  rows[31]=['2026-08','2026-08-01','X','https://x.com/test/status/100','','','','','','2026-08','2026-08-02','X','https://x.com/test/status/200'];
+
+  const plan=planSheetUpdates('Gaucho_07',rows,[
+    {post_url:'https://x.com/test/status/100',published_at:'2026-08-01',views:110,likes:11,sheets_is_special:false},
+    {post_url:'https://x.com/test/status/200',published_at:'2026-08-02',views:220,likes:22,sheets_is_special:true,special_reward:300,mission_name:'Vídeos especiais'},
+    {post_url:'https://x.com/test/status/300',published_at:'2026-08-03',views:330,likes:33,sheets_is_special:false},
+  ],'2026-08');
+
+  assert.equal(plan.normalCount,2);
+  assert.equal(plan.specialCount,1);
+  assert.ok(plan.updates.some(update=>update.range==="'Gaucho_07'!D32"&&update.values[0][0]==='https://x.com/test/status/100'));
+  assert.ok(plan.updates.some(update=>update.range==="'Gaucho_07'!M32"&&update.values[0][0]==='https://x.com/test/status/200'));
+  assert.ok(plan.updates.some(update=>update.range==="'Gaucho_07'!B33"&&update.values[0][0]==='2026-08-03'));
+  assert.ok(plan.updates.some(update=>update.range==="'Gaucho_07'!Q32"&&update.values[0][0]===300));
+  assert.ok(plan.updates.some(update=>update.range==="'Gaucho_07'!R32"&&update.values[0][0]==='Vídeos especiais'));
+});
+
+test('uses header names when columns are reordered inside each side',()=>{
+  const rows:unknown[][]=Array.from({length:20},()=>[]);
+  rows[1]=['Settlement Month','2026-08'];
+  rows[5]=['','Content Link','Likes','Month','Platform','Publish Date','Eligible','Impressions / Views','','','Theme','Reward','Likes','Content Link','Month','Impressions / Views','Publish Date','Platform','Eligible'];
+
+  const plan=planSheetUpdates('FLEXIVEL',rows,[
+    {post_url:'https://x.com/test/status/400',published_at:'2026-08-04',views:44,likes:4,sheets_is_special:false},
+    {post_url:'https://x.com/test/status/500',published_at:'2026-08-05',views:55,likes:5,sheets_is_special:true,special_reward:200,mission_name:'High Quality'},
+  ],'2026-08');
+
+  assert.ok(plan.updates.some(update=>update.range==="'FLEXIVEL'!B7"&&update.values[0][0]==='https://x.com/test/status/400'));
+  assert.ok(plan.updates.some(update=>update.range==="'FLEXIVEL'!F7"&&update.values[0][0]==='2026-08-04'));
+  assert.ok(plan.updates.some(update=>update.range==="'FLEXIVEL'!N7"&&update.values[0][0]==='https://x.com/test/status/500'));
+  assert.ok(plan.updates.some(update=>update.range==="'FLEXIVEL'!K7"&&update.values[0][0]==='High Quality'));
+  assert.ok(plan.updates.some(update=>update.range==="'FLEXIVEL'!L7"&&update.values[0][0]===200));
+});
+
+test('fails before writing when an essential named column is absent',()=>{
+  const rows=referenceRows();
+  rows[100]![2]='';
+  assert.throws(()=>planSheetUpdates('Página1',rows,[]),/cabeçalhos necessários/);
+});
+
 test('fails safely when the expected table headers are missing',()=>{
   assert.throws(()=>planSheetUpdates('Página1',[],[]),/cabeçalhos/);
 });
