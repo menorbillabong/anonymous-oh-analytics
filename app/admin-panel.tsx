@@ -100,6 +100,7 @@ export default function AdminPanel() {
   const [postCleanupEnabled, setPostCleanupEnabled] = useState(false);
   const [postRetentionDays, setPostRetentionDays] = useState(40);
   const [selectedClosedPeriods, setSelectedClosedPeriods] = useState<number[]>([]);
+  const [dateDeleteUser, setDateDeleteUser] = useState<AdminUser | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -398,14 +399,28 @@ export default function AdminPanel() {
           <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small></div>
           <SheetsAccess user={user} onSaved={load}/>
           <div className="admin-row-actions">
-            <button disabled={busy === `user-${user.id}` || user.is_admin} onClick={() => manageUser(user, user.suspended ? 'reactivate' : 'suspend', user.suspended ? 'reativar esta conta' : 'suspender esta conta')}>{user.suspended ? 'REATIVAR' : 'SUSPENDER'}</button>
-            <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking', user.ranking_blocked ? 'liberar esta conta no ranking' : 'bloquear esta conta no ranking')}>{user.ranking_blocked ? 'LIBERAR RANKING' : 'BLOQUEAR RANKING'}</button>
-            <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_control_unlocked ? 'lock_ranking_control' : 'unlock_ranking_control', user.ranking_control_unlocked ? 'bloquear o controle individual do ranking' : 'liberar o controle individual do ranking')}>{user.ranking_control_unlocked ? 'TRAVAR CONTROLE' : 'LIBERAR CONTROLE'}</button>
-            {user.deletion_scheduled_at ? <button className="safe" disabled={busy === `delete-${user.id}`} onClick={() => cancelDeletion(user)}>CANCELAR EXCLUSÃO</button> : <button className="danger" disabled={busy === `delete-${user.id}` || user.is_admin} onClick={() => scheduleDeletion(user)}>AGENDAR EXCLUSÃO</button>}
+            <div className="admin-action-group"><small>CONTA</small><div>
+              <button disabled={busy === `user-${user.id}` || user.is_admin} onClick={() => manageUser(user, user.suspended ? 'reactivate' : 'suspend', user.suspended ? 'reativar esta conta' : 'suspender esta conta')}>{user.suspended ? 'REATIVAR' : 'SUSPENDER'}</button>
+              {user.deletion_scheduled_at ? <button className="safe" disabled={busy === `delete-${user.id}`} onClick={() => cancelDeletion(user)}>CANCELAR EXCLUSÃO</button> : <button className="danger" disabled={busy === `delete-${user.id}` || user.is_admin} onClick={() => scheduleDeletion(user)}>AGENDAR EXCLUSÃO</button>}
+            </div></div>
+            <div className="admin-action-group"><small>RANKING</small><div>
+              <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking', user.ranking_blocked ? 'liberar esta conta no ranking' : 'bloquear esta conta no ranking')}>{user.ranking_blocked ? 'LIBERAR RANKING' : 'BLOQUEAR RANKING'}</button>
+              <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_control_unlocked ? 'lock_ranking_control' : 'unlock_ranking_control', user.ranking_control_unlocked ? 'bloquear o controle individual do ranking' : 'liberar o controle individual do ranking')}>{user.ranking_control_unlocked ? 'TRAVAR CONTROLE' : 'LIBERAR CONTROLE'}</button>
+            </div></div>
+            <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button></div></div>
           </div>
         </div>)}
         {!filteredUsers.length && <div className="admin-empty">Nenhum usuário encontrado.</div>}
       </div></div>
+      {dateDeleteUser && <UserPostDateDeleteModal
+        user={dateDeleteUser}
+        onClose={() => setDateDeleteUser(null)}
+        onDeleted={async count => {
+          setDateDeleteUser(null);
+          setMessage(count.toLocaleString('pt-BR') + ' publicação(ões) excluída(s) somente do usuário e do intervalo escolhidos.');
+          await load();
+        }}
+      />}
     </div>}
 
     {section === 'Publicações' && <div className="admin-panel">
@@ -544,6 +559,109 @@ function ClosedPeriodRow({period,busy,selected,onSelectedChange,onSave,onDelete}
   </article>;
 }
 
+function UserPostDateDeleteModal({user,onClose,onDeleted}:{
+  user:AdminUser;
+  onClose:()=>void;
+  onDeleted:(count:number)=>Promise<void>;
+}) {
+  const [startDate,setStartDate] = useState('');
+  const [endDate,setEndDate] = useState('');
+  const [preview,setPreview] = useState<{count:number;start:string;end:string}|null>(null);
+  const [working,setWorking] = useState<'preview'|'delete'|''>('');
+  const [notice,setNotice] = useState('');
+  const profile = user.profile_name || user.username || user.display_name || user.x_handle || 'Sem nome';
+  const today = localDateInputValue(new Date());
+
+  useEffect(() => {
+    const onKeyDown = (event:KeyboardEvent) => {
+      if (event.key === 'Escape' && !working) onClose();
+    };
+    window.addEventListener('keydown',onKeyDown);
+    return () => window.removeEventListener('keydown',onKeyDown);
+  }, [onClose,working]);
+
+  function changeStart(value:string) {
+    setStartDate(value);
+    setPreview(null);
+    setNotice('');
+  }
+
+  function changeEnd(value:string) {
+    setEndDate(value);
+    setPreview(null);
+    setNotice('');
+  }
+
+  function validateDates() {
+    if (!startDate || !endDate) return 'Informe a data inicial e a data final.';
+    if (endDate < startDate) return 'A data final não pode ser anterior à data inicial.';
+    if (endDate > today) return 'A data final não pode estar no futuro.';
+    return '';
+  }
+
+  async function checkPosts() {
+    const validation = validateDates();
+    if (validation) { setNotice(validation); return; }
+    setWorking('preview');
+    setNotice('');
+    try {
+      const {data,error} = await supabase.rpc('admin_preview_user_posts_by_date', {
+        p_target_user:user.id,
+        p_period_start:startDate,
+        p_period_end:endDate,
+      });
+      if (error) throw error;
+      const result = (data || {}) as {count?:number;period_start?:string;period_end?:string};
+      setPreview({count:Number(result.count || 0),start:String(result.period_start || startDate),end:String(result.period_end || endDate)});
+    } catch (error:any) {
+      setNotice(String(error?.message || 'Não foi possível consultar as publicações.'));
+    } finally {
+      setWorking('');
+    }
+  }
+
+  async function deletePosts() {
+    if (!preview?.count) return;
+    const confirmation = 'Excluir definitivamente ' + preview.count.toLocaleString('pt-BR') + ' publicação(ões) de ' + profile + ', publicadas entre ' + formatPeriodDate(startDate) + ' e ' + formatPeriodDate(endDate) + '? A conta e as publicações fora desse intervalo não serão alteradas.';
+    if (!window.confirm(confirmation)) return;
+    const reason = requestAdminReason('excluir as publicações deste usuário no intervalo escolhido');
+    if (!reason) return;
+    setWorking('delete');
+    setNotice('');
+    try {
+      const {data,error} = await supabase.rpc('admin_delete_user_posts_by_date', {
+        p_target_user:user.id,
+        p_period_start:startDate,
+        p_period_end:endDate,
+        p_reason:reason,
+      });
+      if (error) throw error;
+      await onDeleted(Number(data || 0));
+    } catch (error:any) {
+      setNotice(String(error?.message || 'Não foi possível excluir as publicações.'));
+      setWorking('');
+    }
+  }
+
+  return <div className="admin-date-delete-overlay" role="presentation">
+    <section className="admin-date-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-date-delete-title">
+      <div className="admin-date-delete-head"><div><small>PUBLICAÇÕES DO USUÁRIO</small><h2 id="admin-date-delete-title">Excluir por intervalo de datas</h2><p>{profile}</p></div><button type="button" aria-label="Fechar" disabled={Boolean(working)} onClick={onClose}>×</button></div>
+      <div className="admin-date-delete-body">
+        <p className="admin-date-delete-warning">A consulta usa a data original da publicação no X, considerando o horário de São Paulo.</p>
+        <div className="admin-date-delete-fields">
+          <label><span>Data inicial</span><input type="date" max={today} value={startDate} disabled={Boolean(working)} onChange={event => changeStart(event.target.value)}/></label>
+          <label><span>Data final</span><input type="date" max={today} value={endDate} disabled={Boolean(working)} onChange={event => changeEnd(event.target.value)}/></label>
+        </div>
+        <button type="button" className="admin-date-preview" disabled={Boolean(working)} onClick={checkPosts}>{working === 'preview' ? 'CONSULTANDO...' : 'VERIFICAR PUBLICAÇÕES'}</button>
+        {preview && <div className={`admin-date-result ${preview.count ? 'found' : 'none'}`}><small>PUBLICAÇÕES ENCONTRADAS</small><strong>{preview.count.toLocaleString('pt-BR')}</strong><span>{formatPeriodDate(preview.start)} até {formatPeriodDate(preview.end)}</span></div>}
+        {notice && <div className="admin-date-notice">{notice}</div>}
+        <p className="admin-date-delete-note">A conta, as configurações, os outros usuários, as publicações fora do intervalo e os rankings arquivados serão preservados.</p>
+      </div>
+      <div className="admin-date-delete-actions"><button type="button" disabled={Boolean(working)} onClick={onClose}>CANCELAR</button><button type="button" className="danger" disabled={!preview?.count || Boolean(working)} onClick={deletePosts}>{working === 'delete' ? 'EXCLUINDO...' : preview?.count ? 'EXCLUIR ' + preview.count.toLocaleString('pt-BR') + ' PUBLICAÇÃO(ÕES)' : 'EXCLUIR PUBLICAÇÕES'}</button></div>
+    </section>
+  </div>;
+}
+
 function SheetsAccess({user,onSaved}:{user:AdminUser;onSaved:()=>Promise<void>}){
   const[enabled,setEnabled]=useState(Boolean(user.sheets_sync_enabled));
   const[tabName,setTabName]=useState(user.sheets_tab_name||'');
@@ -588,6 +706,7 @@ function actionLabel(action:string) {
     schedule_closed_period_post_cleanup:'Exclusão de período agendada',
     cancel_closed_period_post_cleanup:'Exclusão de período cancelada',
     delete_closed_period_posts:'Publicações do período excluídas',
+    delete_user_posts_by_date:'Publicações por intervalo excluídas',
   };
   return labels[action] || action.replaceAll('_', ' ');
 }
@@ -605,5 +724,23 @@ function formatPeriodDate(value?:string) {
   if (!value) return 'Sem data';
   const [year,month,day] = value.slice(0,10).split('-');
   return year && month && day ? day + '/' + month + '/' + year : value;
+}
+
+function localDateInputValue(value:Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2,'0');
+  const day = String(value.getDate()).padStart(2,'0');
+  return `${year}-${month}-${day}`;
+}
+
+function requestAdminReason(label:string) {
+  const value = window.prompt(`Informe o motivo para ${label}:`);
+  if (value === null) return '';
+  const clean = value.trim();
+  if (clean.length < 3) {
+    window.alert('O motivo precisa ter pelo menos 3 caracteres.');
+    return '';
+  }
+  return clean;
 }
 
