@@ -20,6 +20,13 @@ export type SheetPlan = {
   skippedOutsideMonth: number;
 };
 
+type HeaderField = 'month'|'publishDate'|'platform'|'contentLink'|'views'|'likes'|'eligible'|'reward'|'theme';
+type SectionColumns = Partial<Record<HeaderField,number>> & {start:number;end:number};
+type HeaderLayout = {row:number;normal:SectionColumns;special:SectionColumns};
+
+const NORMAL_REQUIRED:HeaderField[]=['publishDate','platform','contentLink','views','likes'];
+const SPECIAL_REQUIRED:HeaderField[]=[...NORMAL_REQUIRED,'reward','theme'];
+
 function clean(value:unknown){return String(value ?? '').trim()}
 function normalized(value:unknown){return clean(value).toLowerCase().replace(/\s+/g,' ')}
 function safeNumber(value:unknown){const number=Number(value);return Number.isFinite(number)&&number>0?Math.floor(number):0}
@@ -35,18 +42,85 @@ function linkKey(value:unknown){
   return status?`status:${status}`:clean(value).replace(/[?#].*$/,'').replace(/\/$/,'').toLowerCase();
 }
 
-function findLastHeader(rows:unknown[][]){
-  let header=-1;
-  rows.forEach((row,index)=>{
-    const normal=normalized(row?.[1])==='month'&&normalized(row?.[2]).includes('publish date')&&normalized(row?.[4]).includes('content link');
-    const special=normalized(row?.[10])==='month'&&normalized(row?.[11]).includes('publish date')&&normalized(row?.[13]).includes('content link');
-    if(normal&&special)header=index;
-  });
-  return header;
+function headerField(value:unknown):HeaderField|null{
+  const label=normalized(value);
+  if(label==='month')return'month';
+  if(label.includes('publish date'))return'publishDate';
+  if(label==='platform')return'platform';
+  if(label.includes('content link'))return'contentLink';
+  if(label.includes('impressions')&&label.includes('views'))return'views';
+  if(label==='likes')return'likes';
+  if(label==='eligible')return'eligible';
+  if(label==='reward')return'reward';
+  if(label==='theme')return'theme';
+  return null;
 }
 
-function cellRange(tab:string,column:string,rowIndex:number){return `${a1Tab(tab)}!${column}${rowIndex+1}`}
-function cellRowSpan(tab:string,startColumn:string,endColumn:string,rowIndex:number){return `${a1Tab(tab)}!${startColumn}${rowIndex+1}:${endColumn}${rowIndex+1}`}
+function sectionColumns(cells:Array<{column:number;field:HeaderField}>):SectionColumns|null{
+  const fields=new Map<HeaderField,number>();
+  for(const cell of cells){
+    if(fields.has(cell.field))return null;
+    fields.set(cell.field,cell.column);
+  }
+  if(!cells.length)return null;
+  return {
+    ...Object.fromEntries(fields),
+    start:Math.min(...cells.map(cell=>cell.column)),
+    end:Math.max(...cells.map(cell=>cell.column)),
+  } as SectionColumns;
+}
+
+function hasRequired(section:SectionColumns|null,required:HeaderField[]){
+  return Boolean(section&&required.every(field=>section[field]!==undefined));
+}
+
+function headerLayoutForRow(row:unknown[],rowIndex:number):HeaderLayout|null{
+  const cells:Array<{column:number;field:HeaderField}>=[];
+  row.forEach((value,column)=>{const field=headerField(value);if(field)cells.push({column,field})});
+  if(cells.filter(cell=>cell.field==='contentLink').length<2)return null;
+
+  let best:{normal:SectionColumns;special:SectionColumns;gap:number}|null=null;
+  for(let split=1;split<cells.length;split++){
+    const normal=sectionColumns(cells.slice(0,split));
+    const special=sectionColumns(cells.slice(split));
+    if(!hasRequired(normal,NORMAL_REQUIRED)||!hasRequired(special,SPECIAL_REQUIRED))continue;
+    const gap=cells[split]!.column-cells[split-1]!.column;
+    if(!best||gap>best.gap)best={normal:normal!,special:special!,gap};
+  }
+  return best?{row:rowIndex,normal:best.normal,special:best.special}:null;
+}
+
+function findLastHeaderLayout(rows:unknown[][]):HeaderLayout|null{
+  let layout:HeaderLayout|null=null;
+  rows.forEach((row,index)=>{const candidate=headerLayoutForRow(row,index);if(candidate)layout=candidate});
+  return layout;
+}
+
+function selectedSheetMonth(rows:unknown[][]){
+  for(const row of rows){
+    for(let column=0;column<row.length-1;column++){
+      if(normalized(row[column]).includes('settlement month')){
+        const month=monthKey(row[column+1]);
+        if(month)return month;
+      }
+    }
+  }
+  return'';
+}
+
+function columnName(columnIndex:number){
+  let value=columnIndex+1;
+  let output='';
+  while(value>0){
+    const remainder=(value-1)%26;
+    output=String.fromCharCode(65+remainder)+output;
+    value=Math.floor((value-1)/26);
+  }
+  return output;
+}
+
+function cellRange(tab:string,columnIndex:number,rowIndex:number){return `${a1Tab(tab)}!${columnName(columnIndex)}${rowIndex+1}`}
+function cellRowSpan(tab:string,startColumn:number,endColumn:number,rowIndex:number){return `${a1Tab(tab)}!${columnName(startColumn)}${rowIndex+1}:${columnName(endColumn)}${rowIndex+1}`}
 function postDate(post:SheetPost){return clean(post.published_at).slice(0,10)}
 function postPlatform(post:SheetPost){
   const network=normalized(post.network);
@@ -55,20 +129,21 @@ function postPlatform(post:SheetPost){
 }
 
 export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost[],sheetMonth=''):SheetPlan{
-  const header=findLastHeader(rows);
-  if(header<0)throw new Error('Não encontrei os cabeçalhos Normal Mission e Special Mission nessa aba.');
+  const layout=findLastHeaderLayout(rows);
+  if(!layout)throw new Error('Não encontrei os cabeçalhos necessários de Normal Mission e Special Mission nessa aba.');
 
   const manualMonth=monthKey(sheetMonth);
-  const selectedMonth=manualMonth||monthKey(rows?.[2]?.[2]);
+  const selectedMonth=manualMonth||selectedSheetMonth(rows);
   const existing=new Map<string,Array<{row:number;special:boolean}>>();
-  let lastNormal=header;
-  let lastSpecial=header;
+  let lastNormal=layout.row;
+  let lastSpecial=layout.row;
 
   rows.forEach((row,index)=>{
-    const normalLink=clean(row?.[4]);
-    const specialLink=clean(row?.[13]);
-    if(index>header&&normalLink)lastNormal=Math.max(lastNormal,index);
-    if(index>header&&specialLink)lastSpecial=Math.max(lastSpecial,index);
+    if(index<=layout.row)return;
+    const normalLink=clean(row?.[layout.normal.contentLink!]);
+    const specialLink=clean(row?.[layout.special.contentLink!]);
+    if(normalLink)lastNormal=Math.max(lastNormal,index);
+    if(specialLink)lastSpecial=Math.max(lastSpecial,index);
     if(normalLink){const key=linkKey(normalLink);existing.set(key,[...(existing.get(key)||[]),{row:index,special:false}])}
     if(specialLink){const key=linkKey(specialLink);existing.set(key,[...(existing.get(key)||[]),{row:index,special:true}])}
   });
@@ -103,32 +178,29 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
 
     for(const oldCell of existingCells){
       if(oldCell.row===row&&oldCell.special===special)continue;
-      updates.push(oldCell.special
-        ?{range:cellRowSpan(tabName,'K','S',oldCell.row),values:[[...Array(9).fill('')]]}
-        :{range:cellRowSpan(tabName,'B','H',oldCell.row),values:[[...Array(7).fill('')]]});
+      const section=oldCell.special?layout.special:layout.normal;
+      updates.push({
+        range:cellRowSpan(tabName,section.start,section.end,oldCell.row),
+        values:[[...Array(section.end-section.start+1).fill('')]],
+      });
     }
 
+    const section=special?layout.special:layout.normal;
+    const add=(field:HeaderField,value:string|number)=>{
+      const column=section[field];
+      if(column!==undefined)updates.push({range:cellRange(tabName,column,row),values:[[value]]});
+    };
+    if(manualMonth&&section.month!==undefined&&!clean(rows?.[row]?.[section.month]))add('month',manualMonth);
+    add('publishDate',date);
+    add('platform',postPlatform(post));
+    add('contentLink',clean(post.post_url));
+    add('views',safeNumber(post.views));
+    add('likes',safeNumber(post.likes));
     if(special){
-      if(manualMonth&&!clean(rows?.[row]?.[10]))updates.push({range:cellRange(tabName,'K',row),values:[[manualMonth]]});
-      updates.push(
-        {range:cellRange(tabName,'L',row),values:[[date]]},
-        {range:cellRange(tabName,'M',row),values:[[postPlatform(post)]]},
-        {range:cellRange(tabName,'N',row),values:[[clean(post.post_url)]]},
-        {range:cellRange(tabName,'O',row),values:[[safeNumber(post.views)]]},
-        {range:cellRange(tabName,'P',row),values:[[safeNumber(post.likes)]]},
-        {range:cellRange(tabName,'R',row),values:[[safeNumber(post.special_reward)]]},
-        {range:cellRange(tabName,'S',row),values:[[clean(post.mission_name)]]},
-      );
+      add('reward',safeNumber(post.special_reward));
+      add('theme',clean(post.mission_name));
       specialCount++;
     }else{
-      if(manualMonth&&!clean(rows?.[row]?.[1]))updates.push({range:cellRange(tabName,'B',row),values:[[manualMonth]]});
-      updates.push(
-        {range:cellRange(tabName,'C',row),values:[[date]]},
-        {range:cellRange(tabName,'D',row),values:[[postPlatform(post)]]},
-        {range:cellRange(tabName,'E',row),values:[[clean(post.post_url)]]},
-        {range:cellRange(tabName,'F',row),values:[[safeNumber(post.views)]]},
-        {range:cellRange(tabName,'G',row),values:[[safeNumber(post.likes)]]},
-      );
       normalCount++;
     }
   }
