@@ -12,6 +12,7 @@ type AdminUser = {
   email?: string;
   username?: string;
   display_name?: string;
+  profile_name?: string;
   x_handle?: string;
   created_at?: string;
   last_activity_at?: string;
@@ -108,7 +109,7 @@ export default function AdminPanel() {
   const logs = dashboard.logs || [];
   const normalizedSearch = search.trim().toLowerCase();
   const filteredUsers = useMemo(() => users.filter(user =>
-    !normalizedSearch || [user.username, user.display_name, user.email, user.x_handle]
+    !normalizedSearch || [user.profile_name, user.username, user.display_name, user.email, user.x_handle]
       .some(value => String(value || '').toLowerCase().includes(normalizedSearch))
   ), [users, normalizedSearch]);
   const filteredPosts = useMemo(() => posts.filter(post =>
@@ -253,7 +254,7 @@ export default function AdminPanel() {
       <div className="admin-table-scroll"><div className="admin-user-table">
         <div className="admin-table-head"><span>USUÁRIO</span><span>STATUS</span><span>RANKING</span><span>ATIVIDADE</span><span>GOOGLE SHEETS</span><span>AÇÕES</span></div>
         {filteredUsers.map(user => <div className="admin-user-row" key={user.id}>
-          <div className="admin-user-identity"><i>{String(user.username || user.display_name || user.email || '?').slice(0, 1).toUpperCase()}</i><div><strong>{user.username || user.display_name || user.x_handle || 'Sem nome'}</strong>{user.is_admin && <em>ADMINISTRADOR</em>}</div></div>
+          <div className="admin-user-identity"><i>{String(user.profile_name || user.username || user.display_name || user.email || '?').slice(0, 1).toUpperCase()}</i><div><strong>{user.profile_name || user.username || user.display_name || user.x_handle || 'Sem nome'}</strong>{user.is_admin && <em>ADMINISTRADOR</em>}</div></div>
           <div><StatusTag tone={user.suspended ? 'danger' : 'success'}>{user.suspended ? 'SUSPENSA' : 'ATIVA'}</StatusTag>{user.suspension_reason && <small className="admin-reason">{user.suspension_reason}</small>}</div>
           <div><StatusTag tone={user.ranking_blocked ? 'danger' : user.ranking_control_unlocked ? 'warning' : 'neutral'}>{user.ranking_blocked ? 'BLOQUEADO' : user.ranking_control_unlocked ? 'LIBERADO' : 'PADRÃO'}</StatusTag></div>
           <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small></div>
