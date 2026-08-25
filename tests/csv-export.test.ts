@@ -12,7 +12,7 @@ test('exports current publications grouped by mission and ordered by X date',()=
  assert.match(csv,/"MISSÃO: Vídeos"/);
  assert.match(csv,/"MISSÃO: Fotos"/);
  assert.ok(csv.indexOf('status/1')<csv.indexOf('status/2'));
- assert.match(csv,/"03\/08\/2026","X","https:\/\/x\.com\/test\/status\/1","10","2"/);
+ assert.match(csv,/"2026-08-03","X","https:\/\/x\.com\/test\/status\/1","10","2"/);
 });
 
 test('escapes mission names and links without corrupting the CSV',()=>{
