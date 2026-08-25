@@ -1,4 +1,4 @@
-import {formatPostDate,postPublishedDate,postPublishedValue} from './post-date.ts';
+import {postDateKey,postPublishedDate,postPublishedValue} from './post-date.ts';
 
 export type CsvPost={
  mission_name?:unknown;
@@ -40,7 +40,7 @@ export function buildPostsCsv(posts:CsvPost[]){
    })
    .forEach(post=>{
     lines.push([
-     formatPostDate(postPublishedValue(post)),
+     postDateKey(postPublishedValue(post)),
      'X',
      post.post_url,
      metric(post.views),
