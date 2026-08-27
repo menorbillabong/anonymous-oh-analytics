@@ -1,5 +1,5 @@
 'use client';
-import {useEffect,useMemo,useState} from 'react';
+import {useCallback,useEffect,useMemo,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
 import {formatPostDate,postDateParts,postPublishedDate} from '@/lib/post-date';
@@ -21,7 +21,8 @@ export default function BulkReviewInjector(){
  const[posts,setPosts]=useState<ReviewPost[]>([]),[profiles,setProfiles]=useState<any[]>([]),[open,setOpen]=useState(false),[loading,setLoading]=useState(false),[saving,setSaving]=useState(false),[mode,setMode]=useState<'cards'|'list'>('cards'),[msg,setMsg]=useState('');
  const validPosts=useMemo(()=>posts.filter(p=>!p.duplicate),[posts]);
  const closeReview=()=>{setOpen(false);setPosts([]);setMsg('')};
- useEffect(()=>{let active=true;supabase.auth.getUser().then(async({data})=>{if(!active||!data.user)return;const{data:p}=await supabase.from('mission_profiles').select('*').eq('user_id',data.user.id).order('name');if(active)setProfiles(p||[])});return()=>{active=false}},[]);
+ const refreshProfiles=useCallback(async(userId?:string)=>{let resolvedUserId=userId;if(!resolvedUserId){const{data}=await supabase.auth.getUser();resolvedUserId=data.user?.id}if(!resolvedUserId)return[];const{data,error}=await supabase.from('mission_profiles').select('*').eq('user_id',resolvedUserId).order('name');if(error)return null;const next=data||[];setProfiles(next);return next},[]);
+ useEffect(()=>{let active=true;const sync=async()=>{if(!active)return;await refreshProfiles()};void sync();const onProfilesChanged=()=>{void sync()};window.addEventListener('aoh:mission-profiles-changed',onProfilesChanged);return()=>{active=false;window.removeEventListener('aoh:mission-profiles-changed',onProfilesChanged)}},[refreshProfiles]);
  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.key!=='Escape')return;if(open){e.preventDefault();closeReview();return}const bulkBack=document.querySelector('.bulk-page .bulk-title>button') as HTMLButtonElement|null;if(bulkBack){e.preventDefault();bulkBack.click();return}const genericClose=document.querySelector('.modal-close,.dialog-close,[data-close-modal],[aria-label="Fechar"]') as HTMLButtonElement|null;if(genericClose){e.preventDefault();genericClose.click()}};const onNav=(e:MouseEvent)=>{if(!open)return;const t=e.target as HTMLElement|null;if(t?.closest?.('.exact-nav button'))closeReview()};window.addEventListener('keydown',onKey);document.addEventListener('click',onNav,true);return()=>{window.removeEventListener('keydown',onKey);document.removeEventListener('click',onNav,true)}},[open]);
  useEffect(()=>{const capture=async(e:MouseEvent)=>{
   const target=e.target as HTMLElement|null,btn=target?.closest?.('.bulk-process') as HTMLButtonElement|null;if(!btn||open||loading)return;
@@ -32,19 +33,21 @@ export default function BulkReviewInjector(){
   setLoading(true);setMsg('');const old=btn.textContent;btn.textContent='PROCESSANDO...';const mission=select?.value||'';
   try{
    const{data:{user}}=await supabase.auth.getUser();let existing:any[]=[],goal=60;
-   if(user){const[{data:found},{data:settings}]=await Promise.all([supabase.from('posts').select('id,post_url,x_published_at,published_at,created_at').eq('user_id',user.id),supabase.from('user_settings').select('monthly_post_goal').eq('user_id',user.id).maybeSingle()]);existing=found||[];goal=Math.max(1,Number(settings?.monthly_post_goal||60))}
+   if(user){const[{data:found},{data:settings}]=await Promise.all([supabase.from('posts').select('id,post_url,x_published_at,published_at,created_at').eq('user_id',user.id),supabase.from('user_settings').select('monthly_post_goal').eq('user_id',user.id).maybeSingle(),refreshProfiles(user.id)]);existing=found||[];goal=Math.max(1,Number(settings?.monthly_post_goal||60))}
    const existingByStatus=new Map<string,string>();for(const p of existing){const id=statusId(String(p.post_url||''));if(id&&!existingByStatus.has(id))existingByStatus.set(id,String(p.post_url||''))}
    const rows=await Promise.all(urls.map(async url=>{const id=statusId(url),existingUrl=id?existingByStatus.get(id)||'':'';if(existingUrl)return{url,title:'Postagem duplicada',views:0,comments:0,reposts:0,likes:0,image_urls:[],video_url:null,author_handle:'',author_name:'',author_avatar:'',published_date:new Date().toISOString().slice(0,10),x_published_at:'',mission_profile_id:mission,duplicate:true,existing_url:existingUrl};let d:any={};try{const r=await fetch('/api/x-metrics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});d=await r.json()}catch{}return{url,title:d.title||'Publicação do X',views:Number(d.views||0),comments:Number(d.comments||0),reposts:Number(d.reposts||0),likes:Number(d.likes||0),image_urls:Array.isArray(d.image_urls)?d.image_urls:[],video_url:d.video_url||null,author_handle:d.author_handle||'',author_name:d.author_name||d.author_handle||'X',author_avatar:d.author_avatar||'',published_date:d.published_date||new Date().toISOString().slice(0,10),x_published_at:d.published_at||'',mission_profile_id:mission,duplicate:false,existing_url:''}}));
    const duplicates=rows.filter(row=>row.duplicate),fresh=rows.filter(row=>!row.duplicate),limited=withinMonthlyLimit(fresh,existing,goal,row=>row.x_published_at||row.published_date);
    setPosts([...duplicates,...limited.accepted]);setOpen(true);
    if(limited.omitted.length)setMsg(`${limited.omitted.length} ${limited.omitted.length===1?'publicação não foi incluída':'publicações não foram incluídas'} porque a meta mensal de ${goal} foi atingida.`);
   }finally{setLoading(false);btn.textContent=old}
- };document.addEventListener('click',capture,true);return()=>document.removeEventListener('click',capture,true)},[open,loading]);
+ };document.addEventListener('click',capture,true);return()=>document.removeEventListener('click',capture,true)},[open,loading,refreshProfiles]);
  const update=(i:number,p:Partial<ReviewPost>)=>setPosts(rows=>rows.map((x,n)=>n===i?{...x,...p}:x));
  async function saveAll(){
   if(!validPosts.length)return;setSaving(true);setMsg('');
   const{data:{user}}=await supabase.auth.getUser();if(!user){setSaving(false);return}
-  const rows=validPosts.map(p=>{const mp=profiles.find(x=>String(x.id)===String(p.mission_profile_id));return{user_id:user.id,title:p.title||'Publicação do X',post_url:p.url,published_at:p.published_date||null,x_published_at:p.x_published_at||null,views:p.views,likes:p.likes,reposts:p.reposts,comments:p.comments,mission_profile_id:mp?.id||null,mission_name:mp?.name||null,special_reward:Number(mp?.reward||0),network:'X',author_handle:p.author_handle||null,image_urls:p.image_urls||[],video_url:p.video_url||null,metrics_source:'auto',metrics_updated_at:new Date().toISOString()}});
+  const latestProfiles=await refreshProfiles(user.id);if(latestProfiles===null){setMsg('Não foi possível confirmar os dados das missões. Tente novamente.');setSaving(false);return}
+  const missingMission=validPosts.some(post=>post.mission_profile_id&&!latestProfiles.some(profile=>String(profile.id)===String(post.mission_profile_id)));if(missingMission){setMsg('A lista de missões mudou. Revise a missão selecionada e tente novamente.');setSaving(false);return}
+  const rows=validPosts.map(p=>{const mp=latestProfiles.find(x=>String(x.id)===String(p.mission_profile_id));return{user_id:user.id,title:p.title||'Publicação do X',post_url:p.url,published_at:p.published_date||null,x_published_at:p.x_published_at||null,views:p.views,likes:p.likes,reposts:p.reposts,comments:p.comments,mission_profile_id:mp?.id||null,mission_name:mp?.name||null,special_reward:Number(mp?.reward||0),network:'X',author_handle:p.author_handle||null,image_urls:p.image_urls||[],video_url:p.video_url||null,metrics_source:'auto',metrics_updated_at:new Date().toISOString()}});
   const[{data:existing},{data:settings}]=await Promise.all([supabase.from('posts').select('post_url,x_published_at,published_at,created_at').eq('user_id',user.id),supabase.from('user_settings').select('monthly_post_goal').eq('user_id',user.id).maybeSingle()]);
   const goal=Math.max(1,Number(settings?.monthly_post_goal||60)),existingIds=new Set((existing||[]).map((p:any)=>statusId(String(p.post_url||''))).filter(Boolean));
   const uniqueRows=rows.filter(r=>{const id=statusId(r.post_url);return id&&!existingIds.has(id)});
