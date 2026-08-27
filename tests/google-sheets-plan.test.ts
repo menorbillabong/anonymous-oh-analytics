@@ -78,6 +78,7 @@ test('moves an existing normal publication to Special Mission without changing i
   assert.equal(plan.normalCount,0);
   assert.equal(plan.specialCount,1);
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!E102"&&update.values[0][0]===''));
+  assert.ok(!plan.updates.some(update=>update.range==="'ANONIMOUS'!H102"));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!N104"&&update.values[0][0]==='https://x.com/test/status/100'));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!R104"&&update.values[0][0]===200));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!S104"&&update.values[0][0]==='High Quality'));
@@ -94,6 +95,7 @@ test('moves an existing special publication to Normal Mission and clears duplica
   assert.equal(plan.specialCount,0);
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!E104"&&update.values[0][0]==='https://x.com/test/status/200'));
   assert.ok(plan.updates.some(update=>update.range==="'ANONIMOUS'!N103"&&update.values[0][0]===''));
+  assert.ok(!plan.updates.some(update=>update.range==="'ANONIMOUS'!Q103"));
 });
 
 test('finds the Gaucho_07 columns by their names even when both tables start earlier',()=>{
@@ -163,4 +165,5 @@ test('fails safely when either essential Content Link column is absent',()=>{
 test('fails safely when the expected table headers are missing',()=>{
   assert.throws(()=>planSheetUpdates('Página1',[],[]),/cabeçalhos/);
 });
+
 
