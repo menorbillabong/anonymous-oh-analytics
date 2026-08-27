@@ -25,7 +25,7 @@ type SectionColumns = Partial<Record<HeaderField,number>>;
 type HeaderLayout = {row:number;normal:SectionColumns;special:SectionColumns};
 
 const ESSENTIAL_FIELDS:HeaderField[]=['contentLink'];
-const ALL_FIELDS:HeaderField[]=['month','publishDate','platform','contentLink','views','likes','eligible','reward','theme'];
+const SITE_MANAGED_FIELDS:HeaderField[]=['month','publishDate','platform','contentLink','views','likes','reward','theme'];
 
 function clean(value:unknown){return String(value ?? '').trim()}
 function normalized(value:unknown){return clean(value).toLowerCase().replace(/\s+/g,' ')}
@@ -174,7 +174,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     for(const oldCell of existingCells){
       if(oldCell.row===row&&oldCell.special===special)continue;
       const section=oldCell.special?layout.special:layout.normal;
-      for(const field of ALL_FIELDS){
+      for(const field of SITE_MANAGED_FIELDS){
         const column=section[field];
         if(column!==undefined)updates.push({range:cellRange(tabName,column,oldCell.row),values:[['']]});
       }
@@ -204,4 +204,5 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
 }
 
 export const GOOGLE_SHEETS_MAX_ROWS=MAX_SHEET_ROWS;
+
 
