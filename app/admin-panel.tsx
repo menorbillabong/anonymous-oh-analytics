@@ -554,7 +554,7 @@ function UserAccessModal({user,onClose,onSaved}:{
 
   async function save() {
     const cleanUsername = username.trim();
-    const usernameChanged = cleanUsername.toLowerCase() !== currentUsername.toLowerCase();
+    const usernameChanged = cleanUsername !== currentUsername;
     const passwordChanged = password.length > 0;
     setNotice('');
     if (!cleanUsername && currentUsername) {
