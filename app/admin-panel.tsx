@@ -101,6 +101,7 @@ export default function AdminPanel() {
   const [postRetentionDays, setPostRetentionDays] = useState(40);
   const [selectedClosedPeriods, setSelectedClosedPeriods] = useState<number[]>([]);
   const [dateDeleteUser, setDateDeleteUser] = useState<AdminUser | null>(null);
+  const [accessUser, setAccessUser] = useState<AdminUser | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -400,6 +401,7 @@ export default function AdminPanel() {
           <SheetsAccess user={user} onSaved={load}/>
           <div className="admin-row-actions">
             <div className="admin-action-group"><small>CONTA</small><div>
+              <button className="access" onClick={() => setAccessUser(user)}>ALTERAR ACESSO</button>
               <button disabled={busy === `user-${user.id}` || user.is_admin} onClick={() => manageUser(user, user.suspended ? 'reactivate' : 'suspend', user.suspended ? 'reativar esta conta' : 'suspender esta conta')}>{user.suspended ? 'REATIVAR' : 'SUSPENDER'}</button>
               {user.deletion_scheduled_at ? <button className="safe" disabled={busy === `delete-${user.id}`} onClick={() => cancelDeletion(user)}>CANCELAR EXCLUSÃO</button> : <button className="danger" disabled={busy === `delete-${user.id}` || user.is_admin} onClick={() => scheduleDeletion(user)}>AGENDAR EXCLUSÃO</button>}
             </div></div>
@@ -418,6 +420,19 @@ export default function AdminPanel() {
         onDeleted={async count => {
           setDateDeleteUser(null);
           setMessage(count.toLocaleString('pt-BR') + ' publicação(ões) excluída(s) somente do usuário e do intervalo escolhidos.');
+          await load();
+        }}
+      />}
+      {accessUser && <UserAccessModal
+        user={accessUser}
+        onClose={() => setAccessUser(null)}
+        onSaved={async result => {
+          setAccessUser(null);
+          setMessage(result.usernameChanged && result.passwordChanged
+            ? 'Nome de acesso e senha atualizados com segurança.'
+            : result.passwordChanged
+              ? 'Senha atualizada com segurança.'
+              : 'Nome de acesso atualizado com segurança.');
           await load();
         }}
       />}
@@ -513,6 +528,102 @@ function PanelHeading({eyebrow, title, search, setSearch}:{eyebrow:string; title
 
 function StatusTag({children, tone}:{children:React.ReactNode; tone:'success'|'danger'|'warning'|'neutral'}) {
   return <span className={`admin-tag ${tone}`}>{children}</span>;
+}
+
+function UserAccessModal({user,onClose,onSaved}:{
+  user:AdminUser;
+  onClose:()=>void;
+  onSaved:(result:{usernameChanged:boolean;passwordChanged:boolean})=>Promise<void>;
+}) {
+  const currentUsername = String(user.username || '').trim();
+  const profile = user.profile_name || user.display_name || user.x_handle || currentUsername || 'Sem nome';
+  const [username,setUsername] = useState(currentUsername);
+  const [password,setPassword] = useState('');
+  const [passwordConfirmation,setPasswordConfirmation] = useState('');
+  const [reason,setReason] = useState('');
+  const [working,setWorking] = useState(false);
+  const [notice,setNotice] = useState('');
+
+  useEffect(() => {
+    const onKeyDown = (event:KeyboardEvent) => {
+      if (event.key === 'Escape' && !working) onClose();
+    };
+    window.addEventListener('keydown',onKeyDown);
+    return () => window.removeEventListener('keydown',onKeyDown);
+  }, [onClose,working]);
+
+  async function save() {
+    const cleanUsername = username.trim();
+    const usernameChanged = cleanUsername.toLowerCase() !== currentUsername.toLowerCase();
+    const passwordChanged = password.length > 0;
+    setNotice('');
+    if (!cleanUsername && currentUsername) {
+      setNotice('O nome de acesso não pode ficar vazio.');
+      return;
+    }
+    if (cleanUsername && !/^[a-zA-Z0-9._-]{3,24}$/.test(cleanUsername)) {
+      setNotice('Use de 3 a 24 caracteres: letras, números, ponto, traço ou sublinhado.');
+      return;
+    }
+    if (!usernameChanged && !passwordChanged) {
+      setNotice('Altere o nome de acesso ou informe uma nova senha.');
+      return;
+    }
+    if (passwordChanged && (password.length < 6 || password.length > 72)) {
+      setNotice('A nova senha deve ter entre 6 e 72 caracteres.');
+      return;
+    }
+    if (passwordChanged && password !== passwordConfirmation) {
+      setNotice('As duas senhas não são iguais.');
+      return;
+    }
+    if (reason.trim().length < 3) {
+      setNotice('Informe um motivo com pelo menos 3 caracteres.');
+      return;
+    }
+    if (!window.confirm(`Confirmar a alteração do acesso de ${profile}? As publicações, o ranking e as configurações serão preservados.`)) return;
+    setWorking(true);
+    try {
+      const {data,error} = await supabase.functions.invoke('username-auth',{body:{
+        action:'admin-update',
+        targetUserId:user.id,
+        username:usernameChanged ? cleanUsername : undefined,
+        password:passwordChanged ? password : undefined,
+        reason:reason.trim(),
+      }});
+      if (error) {
+        let message = 'Não foi possível alterar o acesso.';
+        try {
+          const payload = await (error as any).context?.json();
+          if (payload?.error) message = payload.error;
+        } catch {}
+        throw new Error(message);
+      }
+      if (data?.error) throw new Error(data.error);
+      await onSaved({usernameChanged,passwordChanged});
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível alterar o acesso.');
+      setWorking(false);
+    }
+  }
+
+  return <div className="admin-date-delete-overlay" role="presentation">
+    <section className="admin-date-delete-dialog admin-access-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-access-title">
+      <div className="admin-date-delete-head"><div><small>SEGURANÇA DA CONTA</small><h2 id="admin-access-title">Alterar acesso</h2><p>{profile}</p></div><button type="button" aria-label="Fechar" disabled={working} onClick={onClose}>×</button></div>
+      <div className="admin-date-delete-body">
+        <p className="admin-date-delete-warning">O nome público do perfil, as publicações, o ranking e todas as configurações serão preservados.</p>
+        <div className="admin-access-fields">
+          <label><span>Novo nome de acesso</span><input type="text" autoComplete="off" maxLength={24} value={username} disabled={working} placeholder="De 3 a 24 caracteres" onChange={event=>setUsername(event.target.value)}/><small>Este é o nome usado para entrar no site.</small></label>
+          <label><span>Nova senha (opcional)</span><input type="password" autoComplete="new-password" maxLength={72} value={password} disabled={working} placeholder="Deixe vazio para manter a senha" onChange={event=>setPassword(event.target.value)}/></label>
+          <label><span>Confirmar nova senha</span><input type="password" autoComplete="new-password" maxLength={72} value={passwordConfirmation} disabled={working||!password} placeholder="Digite a nova senha novamente" onChange={event=>setPasswordConfirmation(event.target.value)}/></label>
+          <label><span>Motivo da alteração</span><textarea value={reason} disabled={working} maxLength={300} placeholder="Ex.: solicitação do usuário" onChange={event=>setReason(event.target.value)}/></label>
+        </div>
+        {notice && <div className="admin-date-notice">{notice}</div>}
+        <p className="admin-date-delete-note">A senha atual nunca é exibida. A nova senha é enviada diretamente ao sistema seguro de autenticação e não fica registrada no histórico.</p>
+      </div>
+      <div className="admin-date-delete-actions"><button type="button" disabled={working} onClick={onClose}>CANCELAR</button><button type="button" className="admin-access-save" disabled={working} onClick={save}>{working?'SALVANDO...':'SALVAR NOVO ACESSO'}</button></div>
+    </section>
+  </div>;
 }
 
 function ClosedPeriodRow({period,busy,selected,onSelectedChange,onSave,onDelete}:{
@@ -707,6 +818,7 @@ function actionLabel(action:string) {
     cancel_closed_period_post_cleanup:'Exclusão de período cancelada',
     delete_closed_period_posts:'Publicações do período excluídas',
     delete_user_posts_by_date:'Publicações por intervalo excluídas',
+    update_account_access:'Acesso da conta atualizado',
   };
   return labels[action] || action.replaceAll('_', ' ');
 }
