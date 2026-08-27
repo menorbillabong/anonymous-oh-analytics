@@ -71,6 +71,7 @@
 .admin-row-actions button.danger,.admin-post-card>button.danger{border-color:#5d2929;background:#261111;color:#ff7474}
 .admin-row-actions button.safe,.admin-post-card>button.safe{border-color:#24513e;background:#10271f;color:#2ee7a8}
 .admin-row-actions button.warning{border-color:#684a22;background:#271b0e;color:#ffb45f}
+.admin-row-actions button.access{border-color:#29496f;background:#17253a;color:#72b6ff}
 .admin-sheets-access{display:grid;grid-template-columns:1fr auto;gap:6px}.admin-sheets-access label{grid-column:1/-1;display:flex;align-items:center;gap:7px;color:#b9bec7;font-size:9px;font-weight:900}.admin-sheets-access label input{width:15px;height:15px;accent-color:#4da4ff}.admin-sheets-access>input{min-width:0;height:31px;border:1px solid #343434;border-radius:6px;background:#101010;color:#eee;padding:0 8px;font-size:9px;outline:0}.admin-sheets-access>input:focus{border-color:#416a96}.admin-sheets-access>button{height:31px;border:1px solid #29496f;border-radius:6px;background:#17253a;color:#72b6ff;padding:0 8px;font-size:8px;font-weight:900}.admin-sheets-access>small{grid-column:1/-1;margin:0!important;color:#88919d!important;font-size:8px!important}
 .admin-empty{grid-column:1/-1;padding:44px 18px;text-align:center;color:#aeb3bd;font-size:11px}
 .admin-post-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:16px}
@@ -162,9 +163,21 @@
 .admin-date-delete-actions{display:flex;justify-content:flex-end;gap:9px;padding:15px 22px;border-top:1px solid #2e2e2e;background:#151515}
 .admin-date-delete-actions button{min-height:39px;border:1px solid #3a3a3a;border-radius:7px;background:#222;color:#d0d3d7;padding:0 14px;font-size:9px;font-weight:900}
 .admin-date-delete-actions button.danger{border-color:#713131;background:#321414;color:#ff7b7b}
+.admin-access-dialog{width:min(640px,100%)}
+.admin-access-fields{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.admin-access-fields label{display:grid;align-content:start;gap:6px;color:#aeb4bd;font-size:9px;font-weight:900}
+.admin-access-fields label:first-child,.admin-access-fields label:last-child{grid-column:1/-1}
+.admin-access-fields input,.admin-access-fields textarea{width:100%;border:1px solid #383838;border-radius:7px;background:#101010;color:#eee;padding:0 11px;outline:0}
+.admin-access-fields input{height:42px}
+.admin-access-fields textarea{min-height:76px;padding-top:10px;resize:vertical}
+.admin-access-fields input:focus,.admin-access-fields textarea:focus{border-color:#416a96}
+.admin-access-fields input:disabled,.admin-access-fields textarea:disabled{opacity:.55}
+.admin-access-fields small{color:#7f8792;font-size:8px;font-weight:700}
+.admin-date-delete-actions button.admin-access-save{border-color:#29496f;background:#17253a;color:#72b6ff}
 .admin-date-delete-actions button:disabled,.admin-date-delete-head>button:disabled,.admin-date-preview:disabled{opacity:.5;cursor:not-allowed}
 @keyframes admin-spin{to{transform:rotate(360deg)}}
 @media(max-width:1000px){.admin-stats{grid-template-columns:repeat(2,1fr)}.admin-overview,.admin-controls-grid{grid-template-columns:1fr}.admin-post-grid{grid-template-columns:repeat(2,1fr)}.admin-closed-period-main{grid-template-columns:auto 1fr auto}.admin-closed-period-facts{grid-column:1/-1}.admin-closed-period-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:720px){.admin-hero{align-items:flex-start;flex-direction:column;gap:20px;padding:24px 20px}.admin-hero h1{font-size:27px}.admin-tabs .admin-refresh{margin-left:0}.admin-stats,.admin-post-grid{grid-template-columns:1fr}.admin-panel-head{align-items:flex-start;flex-direction:column}.admin-search{width:100%}.admin-audit-row{grid-template-columns:30px 1fr}.admin-audit-row time{grid-column:2}.admin-stat{min-height:100px}.admin-period-selection{align-items:flex-start;flex-wrap:wrap}.admin-period-selection strong{margin-left:0}.admin-period-selection button{width:100%}.admin-closed-period-main{grid-template-columns:auto 1fr}.admin-closed-period-facts,.admin-closed-period-actions{grid-template-columns:1fr}.admin-closed-period-main>.admin-tag{grid-column:2;justify-self:start}.admin-date-delete-overlay{padding:8px}.admin-date-delete-fields{grid-template-columns:1fr}.admin-date-delete-actions{display:grid;grid-template-columns:1fr}.admin-date-delete-actions button{width:100%}}
+@media(max-width:720px){.admin-hero{align-items:flex-start;flex-direction:column;gap:20px;padding:24px 20px}.admin-hero h1{font-size:27px}.admin-tabs .admin-refresh{margin-left:0}.admin-stats,.admin-post-grid{grid-template-columns:1fr}.admin-panel-head{align-items:flex-start;flex-direction:column}.admin-search{width:100%}.admin-audit-row{grid-template-columns:30px 1fr}.admin-audit-row time{grid-column:2}.admin-stat{min-height:100px}.admin-period-selection{align-items:flex-start;flex-wrap:wrap}.admin-period-selection strong{margin-left:0}.admin-period-selection button{width:100%}.admin-closed-period-main{grid-template-columns:auto 1fr}.admin-closed-period-facts,.admin-closed-period-actions{grid-template-columns:1fr}.admin-closed-period-main>.admin-tag{grid-column:2;justify-self:start}.admin-date-delete-overlay{padding:8px}.admin-date-delete-fields,.admin-access-fields{grid-template-columns:1fr}.admin-access-fields label{grid-column:1}.admin-date-delete-actions{display:grid;grid-template-columns:1fr}.admin-date-delete-actions button{width:100%}}
 @media(prefers-reduced-motion:reduce){.admin-loading span{animation:none}}
+
 
