@@ -26,13 +26,13 @@ export default function MissionControlPage({uid,reloadProfiles}:{uid:string;relo
   setBusy(true);setNotice('');const missionData={name:cleanName,description:description.trim(),multiplier:cleanMultiplier,reward:cleanReward,submission_limit:cleanSubmissionLimit,color,...(sheetsEnabled?{is_special:isSpecial}:{})};
   const query=editing?supabase.from('mission_profiles').update(missionData).eq('id',editing.id).eq('user_id',uid):supabase.from('mission_profiles').insert({user_id:uid,network:'X',active:true,...missionData});
   const{error}=await query;if(error){setNotice(editing?'Não foi possível salvar as alterações.':'Não foi possível criar a missão.');setBusy(false);return}
-  setNotice(editing?'Missão atualizada com sucesso.':'Missão criada com sucesso.');resetForm();await load();await reloadProfiles();setBusy(false);
+  setNotice(editing?'Missão atualizada com sucesso.':'Missão criada com sucesso.');resetForm();await load();await reloadProfiles();window.dispatchEvent(new Event('aoh:mission-profiles-changed'));setBusy(false);
  }
 
  async function confirmDelete(){
   if(!deleting||busy)return;setBusy(true);setNotice('');const{error}=await supabase.from('mission_profiles').delete().eq('id',deleting.id).eq('user_id',uid);
   if(error){setNotice('Não foi possível excluir a missão. Verifique se ela está sendo usada por alguma publicação.');setBusy(false);return}
-  setNotice('Missão excluída com sucesso.');setDeleting(null);if(editing?.id===deleting.id)resetForm();await load();await reloadProfiles();setBusy(false);
+  setNotice('Missão excluída com sucesso.');setDeleting(null);if(editing?.id===deleting.id)resetForm();await load();await reloadProfiles();window.dispatchEvent(new Event('aoh:mission-profiles-changed'));setBusy(false);
  }
 
  async function saveSheetMonth(){
@@ -72,3 +72,4 @@ export default function MissionControlPage({uid,reloadProfiles}:{uid:string;relo
   </section></div>}
  </section>
 }
+
