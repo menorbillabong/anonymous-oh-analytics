@@ -40,7 +40,11 @@ Deno.serve(async(req:Request)=>{
    if(targetError||!target.user)return reply(origin,{error:"Conta não encontrada."},404);
    const{data:oldCredential,error:credentialError}=await admin.from("username_credentials").select("username_normalized,username_display,user_id,auth_email").eq("user_id",String(targetUserId)).maybeSingle();
    if(credentialError)return reply(origin,{error:"Não foi possível consultar o acesso atual."},500);
-   const usernameChanged=changeUsername&&username!==String(oldCredential?.username_normalized??"");
+   const usernameChanged=changeUsername&&(
+    username!==String(oldCredential?.username_normalized??"")||
+    usernameDisplay!==String(oldCredential?.username_display??"")
+   );
+   if(!usernameChanged&&!changePassword)return reply(origin,{error:"Altere o nome de acesso ou informe uma nova senha."},400);
 
    if(usernameChanged){
     const{data:taken,error:takenError}=await admin.from("username_credentials").select("user_id").eq("username_normalized",username).maybeSingle();
