@@ -9,12 +9,13 @@ type ClosePeriodModalProps={
  posts:any[];
  crystalginLimit:number;
  onClose:()=>void;
- onSuccess:()=>void;
+ onSuccess:()=>void|Promise<void>;
 };
 
 function archiveErrorMessage(error:any){
  const message=String(error?.message||'');
  if(message.includes('ARCHIVED_PERIOD_DUPLICATE'))return'Este mesmo período já foi fechado.';
+ if(message.includes('ARCHIVED_PERIOD_ALREADY_CLOSED'))return'Este intervalo cruza um período que ainda está fechado. Reabra o período anterior antes de fechar novamente.';
  if(message.includes('ARCHIVED_PERIOD_EMPTY'))return'Não há publicações nesse período.';
  if(message.includes('ARCHIVED_PERIOD_INVALID_DATES'))return'Confira as datas escolhidas. A data final não pode ser futura.';
  return'Não foi possível fechar o período agora.';
@@ -41,7 +42,7 @@ export default function ClosePeriodModal({posts,crystalginLimit,onClose,onSucces
   const{error}=await supabase.rpc('close_period',{p_period_start:start,p_period_end:end});
   setSaving(false);
   if(error){setMessage(archiveErrorMessage(error));return}
-  onSuccess();
+  await onSuccess();
  }
 
  return <div className="modal-backdrop archive-period-backdrop" onMouseDown={event=>{if(event.target===event.currentTarget&&!saving)onClose()}}>
@@ -64,7 +65,7 @@ export default function ClosePeriodModal({posts,crystalginLimit,onClose,onSucces
     </div>
     {!start||!end?<p className="archive-helper">Selecione as duas datas para visualizar o resumo.</p>:!valid?<p className="archive-error">A data final deve ser igual ou posterior à inicial e não pode ser futura.</p>:!selectedPosts.length?<p className="archive-error">Nenhuma publicação do X foi encontrada nesse intervalo.</p>:null}
     {message&&<p className="archive-error">{message}</p>}
-    <p className="archive-warning">Após confirmar, as datas não poderão ser alteradas. O registro histórico permanece protegido por 40 dias. Se o administrador configurar a exclusão das publicações, o prazo começará somente neste fechamento.</p>
+    <p className="archive-warning">Após confirmar, as datas não poderão ser alteradas. O registro será excluído automaticamente 40 dias depois, sem apagar as publicações originais.</p>
    </div>
    <div className="modal-actions">
     <button type="button" className="btn" disabled={saving} onClick={onClose}>Cancelar</button>

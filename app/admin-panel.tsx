@@ -72,6 +72,11 @@ type ClosedPeriodCleanup = {
   delete_source?: 'manual' | 'automatic';
   last_error?: string;
   remaining_posts?: number;
+  counting_active?: boolean;
+  counting_reopened_at?: string;
+  counting_reopened_by?: string;
+  counting_reopened_posts?: number;
+  counting_excluded_posts?: number;
 };
 
 type AdminDashboard = {
@@ -102,12 +107,14 @@ export default function AdminPanel() {
   const [selectedClosedPeriods, setSelectedClosedPeriods] = useState<number[]>([]);
   const [dateDeleteUser, setDateDeleteUser] = useState<AdminUser | null>(null);
   const [accessUser, setAccessUser] = useState<AdminUser | null>(null);
+  const [reopenPeriod, setReopenPeriod] = useState<ClosedPeriodCleanup | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: sheetsData }] = await Promise.all([
+    const [{ data, error }, { data: sheetsData }, { data: countingData }] = await Promise.all([
       supabase.rpc('admin_dashboard'),
       supabase.rpc('admin_google_sheets_users'),
+      supabase.rpc('admin_closed_period_counting_status'),
     ]);
     if (error) {
       setMessage('Não foi possível carregar o painel administrativo.');
@@ -120,6 +127,8 @@ export default function AdminPanel() {
       const config:any = sheetsByUser.get(user.id) || {};
       return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status};
     });
+    const countingByPeriod = new Map((Array.isArray(countingData) ? countingData : []).map((status:any) => [Number(status.id), status]));
+    next.closed_periods = (next.closed_periods || []).map(period => ({...period,...(countingByPeriod.get(Number(period.id)) || {})}));
     setDashboard(next);
     setCleanupEnabled(Boolean(next.cleanup?.auto_delete_enabled));
     setInactivityDays(Number(next.cleanup?.inactivity_days || 90));
@@ -157,14 +166,14 @@ export default function AdminPanel() {
     ].some(value => String(value || '').toLowerCase().includes(normalizedSearch))
   ), [closedPeriods, normalizedSearch]);
   const selectableClosedPeriods = useMemo(() => filteredClosedPeriods.filter(period =>
-    !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0
+    period.counting_active !== false && !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0
   ), [filteredClosedPeriods]);
   const allVisibleClosedPeriodsSelected = selectableClosedPeriods.length > 0
     && selectableClosedPeriods.every(period => selectedClosedPeriods.includes(period.id));
 
   useEffect(() => {
     const available = new Set(closedPeriods
-      .filter(period => !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0)
+      .filter(period => period.counting_active !== false && !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0)
       .map(period => period.id));
     setSelectedClosedPeriods(current => current.filter(id => available.has(id)));
   }, [closedPeriods]);
@@ -284,6 +293,7 @@ export default function AdminPanel() {
   }
 
   async function deleteClosedPeriodPosts(period: ClosedPeriodCleanup) {
+    if (period.counting_active === false) return;
     const remaining = Number(period.remaining_posts || 0);
     if (!remaining || period.posts_deleted_at) return;
     const profile = closedPeriodName(period);
@@ -309,7 +319,7 @@ export default function AdminPanel() {
   }
 
   async function deleteSelectedClosedPeriodPosts() {
-    const periods = closedPeriods.filter(period => selectedClosedPeriods.includes(period.id) && !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0);
+    const periods = closedPeriods.filter(period => selectedClosedPeriods.includes(period.id) && period.counting_active !== false && !period.posts_deleted_at && Number(period.remaining_posts || 0) > 0);
     if (!periods.length) return;
     const totalPosts = periods.reduce((total, period) => total + Number(period.remaining_posts || 0), 0);
     const warning = 'Excluir definitivamente ' + totalPosts.toLocaleString('pt-BR') + ' publicação(ões) de ' + periods.length + ' período(s) fechado(s)? As contas, os outros períodos e o ranking arquivado não serão alterados.';
@@ -339,7 +349,7 @@ export default function AdminPanel() {
   const blockedCount = users.filter(user => user.ranking_blocked).length;
   const reviewedCount = posts.filter(post => post.admin_eligible === false).length;
   const scheduledCount = users.filter(user => user.deletion_scheduled_at).length;
-  const scheduledPeriodCount = closedPeriods.filter(period => period.delete_after && !period.posts_deleted_at).length;
+  const scheduledPeriodCount = closedPeriods.filter(period => period.counting_active !== false && period.delete_after && !period.posts_deleted_at).length;
 
   if (loading) return <div className="admin-loading"><span>↻</span> CARREGANDO CONTROLE ADMINISTRATIVO</div>;
 
@@ -480,10 +490,23 @@ export default function AdminPanel() {
           onSelectedChange={selected => setSelectedClosedPeriods(current => selected ? Array.from(new Set([...current, period.id])) : current.filter(id => id !== period.id))}
           onSave={saveClosedPeriodSchedule}
           onDelete={deleteClosedPeriodPosts}
+          onReopen={setReopenPeriod}
         />)}
         {!filteredClosedPeriods.length && <div className="admin-empty">Nenhum período fechado encontrado.</div>}
       </div>
     </div>}
+
+    {reopenPeriod && <ReopenPeriodModal
+      period={reopenPeriod}
+      onClose={() => setReopenPeriod(null)}
+      onReopened={async count => {
+        setReopenPeriod(null);
+        setMessage(count > 0
+          ? count.toLocaleString('pt-BR') + ' publicação(ões) voltaram a participar das contagens.'
+          : 'Período reaberto. Não havia publicações armazenadas para retornar à contagem.');
+        await load();
+      }}
+    />}
 
     {section === 'Auditoria' && <div className="admin-panel">
       <div className="admin-panel-head"><div><small>REGISTRO DE SEGURANÇA</small><h2>Histórico administrativo</h2></div><span className="admin-counter">{logs.length} REGISTROS</span></div>
@@ -626,13 +649,86 @@ function UserAccessModal({user,onClose,onSaved}:{
   </div>;
 }
 
-function ClosedPeriodRow({period,busy,selected,onSelectedChange,onSave,onDelete}:{
+function ReopenPeriodModal({period,onClose,onReopened}:{
+  period:ClosedPeriodCleanup;
+  onClose:()=>void;
+  onReopened:(count:number)=>Promise<void>;
+}) {
+  const [password,setPassword] = useState('');
+  const [reason,setReason] = useState('');
+  const [working,setWorking] = useState(false);
+  const [notice,setNotice] = useState('');
+  const profile = closedPeriodName(period);
+  const excluded = Number(period.counting_excluded_posts || 0);
+
+  useEffect(() => {
+    const onKeyDown = (event:KeyboardEvent) => {
+      if (event.key === 'Escape' && !working) onClose();
+    };
+    window.addEventListener('keydown',onKeyDown);
+    return () => window.removeEventListener('keydown',onKeyDown);
+  }, [onClose,working]);
+
+  async function reopen() {
+    setNotice('');
+    if (password.length < 6 || password.length > 72) {
+      setNotice('Informe a senha atual do administrador.');
+      return;
+    }
+    if (reason.trim().length < 3) {
+      setNotice('Informe um motivo com pelo menos 3 caracteres.');
+      return;
+    }
+    if (!window.confirm(`Reabrir a contagem de ${profile}? As publicações deste período voltarão a alterar métricas, metas, recompensas e ranking.`)) return;
+    setWorking(true);
+    try {
+      const {data,error} = await supabase.functions.invoke('username-auth',{body:{
+        action:'admin-reopen-period',
+        cleanupId:period.id,
+        password,
+        reason:reason.trim(),
+      }});
+      if (error) {
+        let message = 'Não foi possível reabrir a contagem.';
+        try {
+          const payload = await (error as any).context?.json();
+          if (payload?.error) message = payload.error;
+        } catch {}
+        throw new Error(message);
+      }
+      if (data?.error) throw new Error(data.error);
+      await onReopened(Number(data?.reopenedPosts || 0));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Não foi possível reabrir a contagem.');
+      setWorking(false);
+    }
+  }
+
+  return <div className="admin-date-delete-overlay" role="presentation">
+    <section className="admin-date-delete-dialog admin-reopen-dialog" role="dialog" aria-modal="true" aria-labelledby="admin-reopen-title">
+      <div className="admin-date-delete-head"><div><small>AÇÃO PROTEGIDA</small><h2 id="admin-reopen-title">Reabrir contagem</h2><p>{profile} · {formatPeriodDate(period.period_start)} até {formatPeriodDate(period.period_end)}</p></div><button type="button" aria-label="Fechar" disabled={working} onClick={onClose}>×</button></div>
+      <div className="admin-date-delete-body">
+        <p className="admin-date-delete-warning">{excluded.toLocaleString('pt-BR')} publicação(ões) voltarão a participar das métricas, metas, missões, recompensas e ranking.</p>
+        <div className="admin-reopen-fields">
+          <label><span>Senha atual do administrador</span><input autoFocus type="password" autoComplete="current-password" maxLength={72} value={password} disabled={working} onChange={event=>setPassword(event.target.value)}/></label>
+          <label><span>Motivo da reabertura</span><textarea maxLength={500} value={reason} disabled={working} placeholder="Ex.: período reaberto para correção" onChange={event=>setReason(event.target.value)}/></label>
+        </div>
+        {notice && <div className="admin-date-notice">{notice}</div>}
+        <p className="admin-date-delete-note">A senha será validada pelo sistema de autenticação e não será armazenada nem registrada na auditoria.</p>
+      </div>
+      <div className="admin-date-delete-actions"><button type="button" disabled={working} onClick={onClose}>CANCELAR</button><button type="button" className="admin-reopen-confirm" disabled={working} onClick={reopen}>{working?'VALIDANDO...':'CONFIRMAR REABERTURA'}</button></div>
+    </section>
+  </div>;
+}
+
+function ClosedPeriodRow({period,busy,selected,onSelectedChange,onSave,onDelete,onReopen}:{
   period:ClosedPeriodCleanup;
   busy:string;
   selected:boolean;
   onSelectedChange:(selected:boolean)=>void;
   onSave:(period:ClosedPeriodCleanup,enabled:boolean,days:number)=>Promise<void>;
   onDelete:(period:ClosedPeriodCleanup)=>Promise<void>;
+  onReopen:(period:ClosedPeriodCleanup)=>void;
 }) {
   const [enabled,setEnabled] = useState(Boolean(period.delete_after));
   const [days,setDays] = useState(Number(period.retention_days || 40));
@@ -641,30 +737,33 @@ function ClosedPeriodRow({period,busy,selected,onSelectedChange,onSave,onDelete}
     setDays(Number(period.retention_days || 40));
   }, [period.delete_after,period.retention_days]);
   const deleted = Boolean(period.posts_deleted_at);
+  const reopened = period.counting_active === false || Boolean(period.counting_reopened_at);
   const remaining = Number(period.remaining_posts || 0);
-  const statusTone = deleted ? 'neutral' : period.last_error ? 'danger' : period.delete_after ? 'warning' : 'success';
-  const status = deleted ? 'EXCLUÍDAS' : period.last_error ? 'ERRO' : period.delete_after ? 'AGENDADA' : 'MANUAL';
+  const excluded = Number(period.counting_excluded_posts || 0);
+  const statusTone = reopened || deleted ? 'neutral' : period.last_error ? 'danger' : period.delete_after ? 'warning' : 'success';
+  const status = reopened ? 'REABERTO' : deleted ? 'EXCLUÍDAS' : period.last_error ? 'ERRO' : period.delete_after ? 'AGENDADA' : 'FECHADO';
   const scheduleBusy = busy === 'period-schedule-' + period.id;
   const deleteBusy = busy === 'period-delete-' + period.id;
   return <article className="admin-closed-period-card">
     <div className="admin-closed-period-main">
-      <label className="admin-period-select" title={remaining && !deleted ? 'Selecionar este período' : 'Não há publicações para excluir'}><input type="checkbox" checked={selected} disabled={!remaining || deleted || busy === 'period-delete-selected'} onChange={event => onSelectedChange(event.target.checked)}/></label>
+      <label className="admin-period-select" title={remaining && !deleted && !reopened ? 'Selecionar este período' : 'Não há publicações fechadas para excluir'}><input type="checkbox" checked={selected} disabled={!remaining || deleted || reopened || busy === 'period-delete-selected'} onChange={event => onSelectedChange(event.target.checked)}/></label>
       <div className="admin-closed-period-title">
         <i>{closedPeriodName(period).slice(0,1).toUpperCase()}</i>
         <div><strong>{closedPeriodName(period)}</strong><small>{formatPeriodDate(period.period_start)} até {formatPeriodDate(period.period_end)}</small></div>
       </div>
       <div className="admin-closed-period-facts">
         <span><small>FECHADO EM</small><strong>{formatDate(period.closed_at,true)}</strong></span>
-        <span><small>PUBLICAÇÕES ATUAIS</small><strong>{remaining.toLocaleString('pt-BR')}</strong></span>
+        <span><small>FORA DA CONTAGEM</small><strong>{reopened ? 'Nenhuma' : excluded.toLocaleString('pt-BR')}</strong></span>
         <span><small>EXCLUSÃO</small><strong>{period.delete_after ? formatDate(period.delete_after,true) : 'Sem prazo'}</strong></span>
       </div>
       <StatusTag tone={statusTone}>{status}</StatusTag>
     </div>
     {period.last_error && <p className="admin-period-error">Última tentativa: {period.last_error}</p>}
-    {deleted ? <div className="admin-period-deleted">Exclusão {period.delete_source === 'automatic' ? 'automática' : 'manual'} concluída em {formatDate(period.posts_deleted_at,true)} · {Number(period.posts_deleted_count || 0).toLocaleString('pt-BR')} publicação(ões).</div> : <div className="admin-closed-period-actions">
+    {reopened ? <div className="admin-period-deleted">Contagem reaberta em {formatDate(period.counting_reopened_at,true)} · {Number(period.counting_reopened_posts || 0).toLocaleString('pt-BR')} publicação(ões) retornaram às métricas.</div> : deleted ? <div className="admin-period-deleted">Exclusão {period.delete_source === 'automatic' ? 'automática' : 'manual'} concluída em {formatDate(period.posts_deleted_at,true)} · {Number(period.posts_deleted_count || 0).toLocaleString('pt-BR')} publicação(ões).</div> : <div className="admin-closed-period-actions">
       <label className="admin-period-check"><input type="checkbox" checked={enabled} onChange={event => setEnabled(event.target.checked)}/><span>Exclusão automática</span></label>
       <label className="admin-period-days"><span>Dias após o fechamento</span><input type="number" min="1" max="3650" value={days} disabled={!enabled} onChange={event => setDays(Number(event.target.value))}/></label>
       <button type="button" disabled={scheduleBusy} onClick={() => onSave(period,enabled,days)}>{scheduleBusy ? 'SALVANDO...' : 'SALVAR PRAZO'}</button>
+      <button type="button" className="admin-period-reopen" disabled={!excluded || Boolean(busy)} onClick={() => onReopen(period)}>REABRIR CONTAGEM</button>
       <button type="button" className="danger" disabled={!remaining || deleteBusy} onClick={() => onDelete(period)}>{deleteBusy ? 'EXCLUINDO...' : 'EXCLUIR PUBLICAÇÕES AGORA'}</button>
     </div>}
   </article>;
@@ -819,6 +918,7 @@ function actionLabel(action:string) {
     delete_closed_period_posts:'Publicações do período excluídas',
     delete_user_posts_by_date:'Publicações por intervalo excluídas',
     update_account_access:'Acesso da conta atualizado',
+    reopen_closed_period:'Contagem do período reaberta',
   };
   return labels[action] || action.replaceAll('_', ' ');
 }

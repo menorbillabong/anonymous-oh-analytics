@@ -15,7 +15,7 @@ Deno.serve(async(req:Request)=>{
  if(req.method!=="POST")return reply(origin,{error:"Método não permitido."},405);
  if(origin&&!isAllowedOrigin(origin))return reply(origin,{error:"Origem não permitida."},403);
  try{
-  const{action,username:rawUsername,password,email:rawEmail,targetUserId,reason:rawReason}=await req.json();
+  const{action,username:rawUsername,password,email:rawEmail,targetUserId,cleanupId,reason:rawReason}=await req.json();
   const username=normalize(rawUsername);
   const admin=createClient(Deno.env.get("SUPABASE_URL")??"",Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"",{auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false}});
   if(action==="admin-update"){
@@ -86,6 +86,44 @@ Deno.serve(async(req:Request)=>{
    });
    if(auditError)return reply(origin,{error:"O acesso foi alterado, mas o registro de segurança falhou. Atualize o painel antes de tentar novamente.",updated:true},500);
    return reply(origin,{ok:true,username:usernameChanged?usernameDisplay:oldCredential?.username_display,passwordChanged:changePassword});
+  }
+  if(action==="admin-reopen-period"){
+   const authHeader=req.headers.get("authorization")??"";
+   const token=authHeader.startsWith("Bearer ")?authHeader.slice(7).trim():"";
+   if(!token)return reply(origin,{error:"Sessão administrativa inválida."},401);
+   const{data:caller,error:callerError}=await admin.auth.getUser(token);
+   if(callerError||!caller.user)return reply(origin,{error:"Sessão administrativa inválida."},401);
+   const{data:adminRole,error:roleError}=await admin.from("admin_users").select("user_id").eq("user_id",caller.user.id).maybeSingle();
+   if(roleError||!adminRole)return reply(origin,{error:"Acesso permitido somente para administradores."},403);
+   const periodId=Number(cleanupId);
+   if(!Number.isSafeInteger(periodId)||periodId<1)return reply(origin,{error:"Período fechado inválido."},400);
+   const reason=String(rawReason??"").trim();
+   if(reason.length<3||reason.length>500)return reply(origin,{error:"Informe um motivo entre 3 e 500 caracteres."},400);
+   if(typeof password!=="string"||password.length<6||password.length>72)return reply(origin,{error:"Informe a senha atual do administrador."},400);
+   if(!caller.user.email)return reply(origin,{error:"A conta administrativa não possui autenticação por senha."},400);
+
+   const verifier=createClient(
+    Deno.env.get("SUPABASE_URL")??"",
+    Deno.env.get("SUPABASE_ANON_KEY")??"",
+    {auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false}},
+   );
+   const{data:verified,error:verifyError}=await verifier.auth.signInWithPassword({email:caller.user.email,password});
+   if(verifyError||!verified.user||verified.user.id!==caller.user.id){
+    return reply(origin,{error:"Senha do administrador incorreta."},401);
+   }
+
+   const{data:reopened,error:reopenError}=await admin.rpc("admin_reopen_closed_period_verified",{
+    p_actor:caller.user.id,
+    p_cleanup_id:periodId,
+    p_reason:reason,
+   });
+   if(reopenError){
+    const message=String(reopenError.message??"");
+    if(message.includes("CLOSED_PERIOD_ALREADY_REOPENED"))return reply(origin,{error:"Este período já foi reaberto."},409);
+    if(message.includes("CLOSED_PERIOD_NOT_FOUND"))return reply(origin,{error:"Período fechado não encontrado."},404);
+    return reply(origin,{error:"Não foi possível reabrir o período. Nenhuma contagem foi alterada."},500);
+   }
+   return reply(origin,{ok:true,reopenedPosts:Number(reopened??0)});
   }
   if(!/^[a-z0-9._-]{3,24}$/.test(username))return reply(origin,{error:"Use de 3 a 24 caracteres: letras, números, ponto, traço ou sublinhado."},400);
   if(action==="resolve"){

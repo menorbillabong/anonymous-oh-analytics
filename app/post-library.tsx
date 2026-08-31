@@ -39,8 +39,9 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  useEscapeClose(!!edit,()=>setEdit(null));
 
  const effectiveView=view||(typeof window!=='undefined'&&localStorage.getItem('aoh:post-view')==='cards'?'cards':'list');
- const reward=monthlyReward(posts);
- const missionCrystal=posts.reduce((total,post)=>total+postContribution(post),0);
+ const countedPosts=useMemo(()=>posts.filter(post=>!post.counting_excluded),[posts]);
+ const reward=monthlyReward(countedPosts);
+ const missionCrystal=countedPosts.reduce((total,post)=>total+postContribution(post),0);
  const sortedPosts=useMemo(()=>[...posts].sort((a,b)=>(sortAsc?1:-1)*comparePostChronology(a,b)),[posts,sortAsc]);
  const selectableIds=useMemo(()=>posts.map(post=>String(post.id)),[posts]);
  const selectedCount=selectedIds.size;
@@ -140,7 +141,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  }
 
  if(effectiveView==='list')return <>
-  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
+  <SummaryTail posts={countedPosts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
   <div className="ref-list">
    {selectedCount>0&&<div className="ref-selection-bar">
     <strong>{selectedCount} selecionado{selectedCount===1?'':'s'}</strong>
@@ -189,7 +190,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  </>;
 
  return <>
-  <SummaryTail posts={posts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
+  <SummaryTail posts={countedPosts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
   <div className="ref-card-grid">
    {sortedPosts.map(post=>{const missionProfile=findMissionProfile(post,profiles),missionColor=profileColor(missionProfile);return <article className="ref-card" key={post.id} style={{'--post-mission-color':missionColor} as CSSProperties}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
