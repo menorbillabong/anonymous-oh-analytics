@@ -127,13 +127,14 @@
 .admin-closed-period-facts small,.admin-closed-period-facts strong{display:block}
 .admin-closed-period-facts small{color:#959ba5;font-size:7px;font-weight:900}
 .admin-closed-period-facts strong{overflow:hidden;margin-top:5px;color:#e1e2e5;font-size:9px;text-overflow:ellipsis;white-space:nowrap}
-.admin-closed-period-actions{display:grid;grid-template-columns:minmax(155px,.8fr) minmax(170px,1fr) minmax(120px,.7fr) minmax(190px,1fr);align-items:end;gap:10px;padding:13px 16px;border-top:1px solid #292929;background:#171717}
+.admin-closed-period-actions{display:grid;grid-template-columns:minmax(145px,.8fr) minmax(155px,1fr) minmax(110px,.7fr) minmax(145px,.85fr) minmax(180px,1fr);align-items:end;gap:10px;padding:13px 16px;border-top:1px solid #292929;background:#171717}
 .admin-period-check{min-height:40px;display:flex;align-items:center;gap:8px;color:#c4c8cf;font-size:9px;font-weight:900}
 .admin-period-check input{width:17px;height:17px;accent-color:#f4a640}
 .admin-period-days{display:grid;gap:5px;color:#aeb3bd;font-size:8px;font-weight:800}
 .admin-period-days input{height:36px;border:1px solid #343434;border-radius:7px;background:#101010;color:#eee;padding:0 10px;outline:0}
 .admin-period-days input:disabled{opacity:.45}
 .admin-closed-period-actions button{min-height:36px;border:1px solid #3a3a3a;border-radius:7px;background:#202020;color:#c9cdd3;padding:0 10px;font-size:8px;font-weight:900}
+.admin-closed-period-actions button.admin-period-reopen{border-color:#365d82;background:#152337;color:#79baff}
 .admin-closed-period-actions button.danger{border-color:#5d2929;background:#261111;color:#ff7474}
 .admin-closed-period-actions button:disabled{opacity:.48;cursor:not-allowed}
 .admin-period-error,.admin-period-deleted{margin:0;padding:10px 16px;border-top:1px solid #442525;background:#211313;color:#e3a1a1;font-size:9px}
@@ -174,10 +175,18 @@
 .admin-access-fields input:disabled,.admin-access-fields textarea:disabled{opacity:.55}
 .admin-access-fields small{color:#7f8792;font-size:8px;font-weight:700}
 .admin-date-delete-actions button.admin-access-save{border-color:#29496f;background:#17253a;color:#72b6ff}
+.admin-reopen-dialog{width:min(620px,100%);border-left-color:#5ea9f5}
+.admin-reopen-fields{display:grid;gap:13px}
+.admin-reopen-fields label{display:grid;gap:6px;color:#aeb4bd;font-size:9px;font-weight:900}
+.admin-reopen-fields input,.admin-reopen-fields textarea{width:100%;border:1px solid #383838;border-radius:7px;background:#101010;color:#eee;padding:0 11px;outline:0}
+.admin-reopen-fields input{height:42px}
+.admin-reopen-fields textarea{min-height:82px;padding-top:10px;resize:vertical}
+.admin-reopen-fields input:focus,.admin-reopen-fields textarea:focus{border-color:#416a96}
+.admin-reopen-fields input:disabled,.admin-reopen-fields textarea:disabled{opacity:.55}
+.admin-date-delete-actions button.admin-reopen-confirm{border-color:#365d82;background:#152337;color:#79baff}
 .admin-date-delete-actions button:disabled,.admin-date-delete-head>button:disabled,.admin-date-preview:disabled{opacity:.5;cursor:not-allowed}
 @keyframes admin-spin{to{transform:rotate(360deg)}}
 @media(max-width:1000px){.admin-stats{grid-template-columns:repeat(2,1fr)}.admin-overview,.admin-controls-grid{grid-template-columns:1fr}.admin-post-grid{grid-template-columns:repeat(2,1fr)}.admin-closed-period-main{grid-template-columns:auto 1fr auto}.admin-closed-period-facts{grid-column:1/-1}.admin-closed-period-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.admin-hero{align-items:flex-start;flex-direction:column;gap:20px;padding:24px 20px}.admin-hero h1{font-size:27px}.admin-tabs .admin-refresh{margin-left:0}.admin-stats,.admin-post-grid{grid-template-columns:1fr}.admin-panel-head{align-items:flex-start;flex-direction:column}.admin-search{width:100%}.admin-audit-row{grid-template-columns:30px 1fr}.admin-audit-row time{grid-column:2}.admin-stat{min-height:100px}.admin-period-selection{align-items:flex-start;flex-wrap:wrap}.admin-period-selection strong{margin-left:0}.admin-period-selection button{width:100%}.admin-closed-period-main{grid-template-columns:auto 1fr}.admin-closed-period-facts,.admin-closed-period-actions{grid-template-columns:1fr}.admin-closed-period-main>.admin-tag{grid-column:2;justify-self:start}.admin-date-delete-overlay{padding:8px}.admin-date-delete-fields,.admin-access-fields{grid-template-columns:1fr}.admin-access-fields label{grid-column:1}.admin-date-delete-actions{display:grid;grid-template-columns:1fr}.admin-date-delete-actions button{width:100%}}
 @media(prefers-reduced-motion:reduce){.admin-loading span{animation:none}}
-
 
