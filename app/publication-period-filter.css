@@ -1,0 +1,20 @@
+.publication-period-section{--period-current:var(--aoh-accent,#f6ad55)}
+.publication-posts-head{justify-content:space-between!important;height:auto!important;min-height:68px;gap:16px}
+.publication-posts-head>.publication-period-tabs{display:flex;background:#151515;border:1px solid #2d2d2d;border-radius:12px;padding:5px;gap:5px}
+.publication-period-tabs button{width:auto!important;min-width:180px;height:46px!important;display:flex!important;align-items:center;justify-content:space-between;gap:14px;padding:0 13px!important;border-radius:8px!important;color:#989da7!important;font-size:10px!important;letter-spacing:.035em}
+.publication-period-tabs button::before,.publication-period-tabs button::after{content:none!important}
+.publication-period-tabs button span{font-size:10px!important;line-height:1!important}
+.publication-period-tabs button b{min-width:28px;height:25px;padding:0 7px;display:grid;place-items:center;border-radius:999px;background:#272727;color:#d5d7db;font-size:10px}
+.publication-period-tabs button.active{background:var(--period-current)!important;color:#17120b!important;box-shadow:none!important}
+.publication-period-tabs button.active b{background:rgba(0,0,0,.18);color:#17120b}
+.publication-posts-head>.post-display-switch{margin-left:auto}
+.publication-period-context{min-height:42px;display:flex;align-items:center;gap:9px;margin:2px 0 12px;padding:0 13px;border:1px solid #292929;border-radius:8px;background:#141414;color:#858b95}
+.publication-period-context>span{color:var(--period-current);font-size:10px}
+.publication-period-context p{margin:0;font-size:11px;line-height:1.45}
+.publication-period-empty{min-height:170px;display:grid;place-content:center;text-align:center;gap:8px;border:1px dashed #343434;border-radius:10px;background:#141414;color:#8a8f98}
+.publication-period-empty strong{color:#d9dadd;font-size:13px}
+.publication-period-empty span{font-size:11px}
+.ref-period-badge{display:inline-flex;width:max-content;margin-top:7px;padding:4px 7px;border:1px solid #4a3a25;border-radius:999px;background:#251d13;color:#e6a04c;font-size:8px;font-style:normal;font-weight:900;letter-spacing:.055em}
+.ref-card-info>.ref-period-badge{display:flex}
+@media(max-width:760px){.publication-posts-head{align-items:stretch!important;flex-direction:column}.publication-posts-head>.publication-period-tabs{width:100%}.publication-period-tabs button{flex:1;min-width:0}.publication-posts-head>.post-display-switch{align-self:flex-end;margin-left:0}.publication-period-context{padding:9px 12px}}
+@media(max-width:480px){.publication-period-tabs button{padding:0 9px!important;gap:6px}.publication-period-tabs button span{font-size:9px!important}.publication-period-tabs button b{min-width:24px;padding:0 5px}}

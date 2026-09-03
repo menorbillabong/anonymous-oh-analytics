@@ -27,9 +27,11 @@ type PostLibraryProps={
  view?:'list'|'cards';
  profiles?:MissionProfile[];
  crystalginLimit?:number;
+ historical?:boolean;
+ showSummary?:boolean;
 };
 
-export default function PostLibrary({userId,posts,reload,view,profiles=[],crystalginLimit=30000}:PostLibraryProps){
+export default function PostLibrary({userId,posts,reload,view,profiles=[],crystalginLimit=30000,historical=false,showSummary=true}:PostLibraryProps){
  const[expanded,setExpanded]=useState<any>(null);
  const[edit,setEdit]=useState<any>(null);
  const[selectedIds,setSelectedIds]=useState<Set<string>>(new Set());
@@ -141,7 +143,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  }
 
  if(effectiveView==='list')return <>
-  <SummaryTail posts={countedPosts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
+  {showSummary&&<SummaryTail posts={countedPosts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>} 
   <div className="ref-list">
    {selectedCount>0&&<div className="ref-selection-bar">
     <strong>{selectedCount} selecionado{selectedCount===1?'':'s'}</strong>
@@ -169,7 +171,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
      <input className="ref-select-check" type="checkbox" checked={selected} onClick={event=>event.stopPropagation()} onChange={()=>toggleOne(post.id)} aria-label={`Selecionar ${post.title||'publicação'}`}/>
      <div className="ref-post-cell">
       <button type="button" className="ref-edit-square" onClick={event=>{event.stopPropagation();openEditor(post)}} aria-label="Editar publicação">✎</button>
-      <div><strong>𝕏 <span>{displayMissionName(missionProfile?.name||post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatPostDate(postPublishedValue(post))}</small></div>
+      <div><strong>𝕏 <span>{displayMissionName(missionProfile?.name||post.mission_name||post.title||'Publicação')}</span> ↗</strong><small>{formatPostDate(postPublishedValue(post))}</small>{historical&&<em className="ref-period-badge">PERÍODO ANTERIOR</em>}</div>
      </div>
      <b>{engagement.toLocaleString('pt-BR')}</b>
      <span>{Number(post.likes||0).toLocaleString('pt-BR')}</span>
@@ -190,11 +192,11 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  </>;
 
  return <>
-  <SummaryTail posts={countedPosts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>
+  {showSummary&&<SummaryTail posts={countedPosts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>} 
   <div className="ref-card-grid">
    {sortedPosts.map(post=>{const missionProfile=findMissionProfile(post,profiles),missionColor=profileColor(missionProfile);return <article className="ref-card" key={post.id} style={{'--post-mission-color':missionColor} as CSSProperties}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
-    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(missionProfile?.name||post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatPostDate(postPublishedValue(post))}</small><div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
+    <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(missionProfile?.name||post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatPostDate(postPublishedValue(post))}</small>{historical&&<em className="ref-period-badge">PERÍODO ANTERIOR</em>}<div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
     <div className="ref-card-foot"><span>⌁ <b>{Number(post.likes||0).toLocaleString('pt-BR')}</b></span><strong>{postContribution(post).toLocaleString('pt-BR')}</strong><small>Crystgin</small><button type="button" className="ref-pencil" onClick={()=>openEditor(post)} aria-label="Editar publicação">✎</button></div>
    </article>})}
   </div>
@@ -279,4 +281,3 @@ export function PostExpandedDetails({post,reward,missionProfile,crystalginLimit,
   <div className="post-expanded-actions"><button type="button" className="post-delete-button" onClick={onDelete}>🗑 EXCLUIR PUBLICAÇÃO</button></div>
  </section>;
 }
-

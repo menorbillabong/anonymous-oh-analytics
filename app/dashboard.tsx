@@ -14,6 +14,7 @@ import GoogleSheetsSyncButton from './google-sheets-sync';
 import MissionPostReview from './mission-post-review';
 import { refreshStoredPostMetrics } from '@/lib/refresh-post-metrics';
 import { postDateParts, postPublishedDate } from '@/lib/post-date';
+import { isActiveCountingPost, postsForPublicationPeriod } from '@/lib/publication-period';
 import './globals.css';
 import './post-library.css';
 import './tracker-sections.css';
@@ -23,6 +24,7 @@ import './interactions.css';
 import './add-publication.css';
 import './archive-modal.css';
 import './site-legibility.css';
+import './publication-period-filter.css';
 const blank = { post_url: '', title: 'Publicação do X', views: 0, likes: 0, reposts: 0, comments: 0, mission_profile_id: '', image_urls: '', video_url: '', published_date: '', x_published_at: '' };
 const nav = ['Painel', 'Classificação', 'História', 'Centro de Controle da Missão', 'Registro de atividades', 'Configurações'];
 type Deltas = {
@@ -36,7 +38,6 @@ function isCurrentMonthPost(post: any, now = new Date()) {
     return Boolean(postParts && nowParts && postParts.year === nowParts.year && postParts.month === nowParts.month);
 }
 function isMonthlyLimitError(error: any) { return String(error?.message || '').includes('MONTHLY_POST_LIMIT_REACHED'); }
-function isActiveCountingPost(post:any) { return !Boolean(post?.counting_excluded); }
 export default function Dashboard({ session }: {
     session: any;
 }) {
@@ -64,6 +65,7 @@ export default function Dashboard({ session }: {
     const [profileChecked, setProfileChecked] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const [view, setView] = useState<'list' | 'cards'>(() => typeof window !== 'undefined' && localStorage.getItem('aoh:post-view') === 'cards' ? 'cards' : 'list');
+    const [publicationPeriod, setPublicationPeriod] = useState<'current' | 'previous'>('current');
     const refreshLock = useRef(false);
     const chooseTab = (item: string) => { setBulkOpen(false); setTab(item); if (typeof window !== 'undefined')
         localStorage.setItem('aoh:last-tab', item); };
@@ -152,6 +154,8 @@ export default function Dashboard({ session }: {
             setAutoLoading(false);
     } }, 450); return () => { alive = false; clearTimeout(timer); }; }, [addOpen, form.post_url]);
     const countedPosts = useMemo(() => posts.filter(isActiveCountingPost), [posts]);
+    const previousPeriodPosts = useMemo(() => postsForPublicationPeriod(posts, 'previous'), [posts]);
+    const visiblePosts = publicationPeriod === 'current' ? countedPosts : previousPeriodPosts;
     const reward = useMemo(() => monthlyReward(countedPosts), [countedPosts]);
     const minimumProgress = minimumPostProgress(countedPosts.length);
     const viewsProgress = viewGoalProgress(reward.views);
@@ -218,7 +222,17 @@ export default function Dashboard({ session }: {
           <section className="exact-stats"><ExactStat label="TOTAL DE PUBLICAÇÕES" value={monthlyPostCount} goal={monthlyPostGoal} delta={showDeltas ? deltas.posts : 0}/><ExactStat label="VISUALIZAÇÕES TOTAIS" value={reward.views} delta={showDeltas ? deltas.views : 0}/><div className="exact-stat progress-stat"><div className="stat-label-row"><small>PROGRESSO DE<br />CRYSTGIN</small><span>FÓRMULA<br />OFICIAL</span></div><div className="stat-value-line"><AnimatedNumber value={crystalginProgress} suffix={` / ${crystalginLimit.toLocaleString('pt-BR')}`}/>{showDeltas && deltas.crystal > 0 && <DeltaBadge value={deltas.crystal}/>}</div><div className="progress-line"><i style={{ width: `${Math.min(100, crystalginProgress / crystalginLimit * 100)}%` }}/></div></div><ExactStat label="CURTIDAS TOTAIS" hint="Soma de todas as curtidas" value={involvement} delta={showDeltas ? deltas.involvement : 0}/><ExactStat label="CRYSTGIN TOTAL" value={reward.raw} accent delta={showDeltas ? deltas.crystal : 0}/></section>
           <section className="formula-strip reward-progress-formula"><div className="formula-label">FÓRMULA V2</div><div className="formula-caption">DETALHAMENTO DA RECOMPENSA OFICIAL</div><FormulaProgressItem label="MÍNIMO (10 POSTS)" status={minimumProgress.reached ? 'MÍNIMO ATINGIDO' : 'MÍNIMO'} percent={minimumProgress.percent} value={reward.base}/><FormulaProgressItem label="META DE VISUALIZAÇÕES" status="OBJETIVO" percent={viewsProgress.percent} value={reward.viewsReward} highlight/><FormulaItem label="ENGAJAMENTO (CURTIDAS X2)" value={reward.engagementReward}/><FormulaItem label="MISSÕES ESPECIAIS" value={reward.special}/><FormulaItem label="TOTAL SEM CAP" value={reward.raw} total/></section>
           <section className="mission-table mission-summary-card"><div className="mission-head"><h2>DESEMPENHO POR MISSÃO</h2><span>RESUMO POR CATEGORIA</span></div><div className="mission-row mission-columns"><b>MISSÃO</b><b>POSTAGENS</b><b>IMPRESSÕES/VISUALIZAÇÕES TOTAIS</b><b>CURTIDAS</b><b>CRYSTGIN</b></div>{missionRows.map(r => <div className="mission-row" key={r.profileId || r.name}><div className="mission-name"><i style={{ background: r.color, boxShadow: `0 0 10px ${r.color}` }}/>{r.profileId ? <button type="button" className="mission-name-button" onClick={() => setReviewProfileId(r.profileId)} title={`Ver publicações de ${r.name}`}>{r.name}</button> : <strong>{r.name}</strong>}</div><span>{r.posts}</span><span>{r.views.toLocaleString('pt-BR')}</span><span>{r.likes.toLocaleString('pt-BR')}</span><strong className="orange-text">{r.crystalgin.toLocaleString('pt-BR')}</strong></div>)}{!missionRows.length && <div className="mission-empty">Nenhuma missão com publicações.</div>}<div className="mission-row mission-total-row"><strong>TOTAL</strong><strong>{missionTotals.posts.toLocaleString('pt-BR')}</strong><strong>{missionTotals.views.toLocaleString('pt-BR')}</strong><strong>{missionTotals.likes.toLocaleString('pt-BR')}</strong><strong>{missionTotals.crystalgin.toLocaleString('pt-BR')}</strong></div><div className="mission-reward-summary"><div className="mission-reward-line"><span>RECOMPENSA MÍNIMA <small>{minimumProgress.reached ? '(MÍNIMO ATINGIDO · 100%)' : `(${minimumProgress.current.toLocaleString('pt-BR')}/${minimumProgress.goal.toLocaleString('pt-BR')} POSTAGENS · ${minimumProgress.percent}%)`}</small></span><strong>+ {reward.base.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-reward-line"><span>BÔNUS DE VISUALIZAÇÕES <small>{viewsProgress.maximumReached ? `(META MÁXIMA ATINGIDA: ${viewsProgress.current.toLocaleString('pt-BR')} VISUALIZAÇÕES)` : `(META ATUAL: ${viewsProgress.current.toLocaleString('pt-BR')} / ${viewsProgress.goal.toLocaleString('pt-BR')} VISUALIZAÇÕES)`}</small></span><strong>+ {reward.viewsReward.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-official-divider"/><div className="mission-official-total"><span>PROGRESSO OFICIAL <small>(COM LIMITE)</small></span><strong>{crystalginProgress.toLocaleString('pt-BR')} <em>CG</em></strong></div></div></section>
-          {posts.length > 0 && <section className="exact-posts"><div className="posts-head"><h2>PUBLICAÇÕES</h2><div className="post-display-switch"><button type="button" className={view === 'list' ? 'active' : ''} aria-label="Exibir publicações em lista" data-tooltip="LISTA" onClick={() => chooseView('list')}><span aria-hidden="true">☰</span></button><button type="button" className={view === 'cards' ? 'active' : ''} aria-label="Exibir publicações em cartões" data-tooltip="CARTÕES" onClick={() => chooseView('cards')}><span aria-hidden="true">▦</span></button></div></div><div className={`post-view ${view}`}><PostLibrary userId={uid} posts={posts} reload={load} view={view} profiles={profiles} crystalginLimit={crystalginLimit}/></div></section>}
+          {posts.length > 0 && <section className="exact-posts publication-period-section">
+            <div className="posts-head publication-posts-head">
+              <div className="publication-period-tabs" role="tablist" aria-label="Período das publicações">
+                <button type="button" role="tab" aria-selected={publicationPeriod === 'current'} className={publicationPeriod === 'current' ? 'active' : ''} onClick={() => setPublicationPeriod('current')}><span>PERÍODO ATUAL</span><b>{countedPosts.length.toLocaleString('pt-BR')}</b></button>
+                <button type="button" role="tab" aria-selected={publicationPeriod === 'previous'} className={publicationPeriod === 'previous' ? 'active' : ''} onClick={() => setPublicationPeriod('previous')}><span>PERÍODO ANTERIOR</span><b>{previousPeriodPosts.length.toLocaleString('pt-BR')}</b></button>
+              </div>
+              <div className="post-display-switch"><button type="button" className={view === 'list' ? 'active' : ''} aria-label="Exibir publicações em lista" data-tooltip="LISTA" onClick={() => chooseView('list')}><span aria-hidden="true">☰</span></button><button type="button" className={view === 'cards' ? 'active' : ''} aria-label="Exibir publicações em cartões" data-tooltip="CARTÕES" onClick={() => chooseView('cards')}><span aria-hidden="true">▦</span></button></div>
+            </div>
+            <div className="publication-period-context" role="status"><span aria-hidden="true">{publicationPeriod === 'current' ? '●' : '◷'}</span><p>{publicationPeriod === 'current' ? 'Publicações que participam das métricas, metas, missões e classificação atuais.' : 'Publicações de períodos fechados. Elas ficam disponíveis para consulta e não entram nas contagens atuais.'}</p></div>
+            {visiblePosts.length > 0 ? <div className={`post-view ${view}`}><PostLibrary key={publicationPeriod} userId={uid} posts={visiblePosts} reload={load} view={view} profiles={profiles} crystalginLimit={crystalginLimit} historical={publicationPeriod === 'previous'} showSummary={publicationPeriod === 'current'}/></div> : <div className="publication-period-empty"><strong>{publicationPeriod === 'current' ? 'Nenhuma publicação no período atual.' : 'Nenhuma publicação no período anterior.'}</strong><span>{publicationPeriod === 'current' ? 'As novas publicações aparecerão aqui.' : 'As publicações aparecerão aqui após o fechamento de um período.'}</span></div>}
+          </section>}
         </>}
         {tab === 'Classificação' && <RankingPage />}{tab === 'História' && <HistoryPage uid={uid}/>} {tab === 'Centro de Controle da Missão' && <MissionControlPage uid={uid} reloadProfiles={load}/>} {tab === 'Registro de atividades' && <ActivityPage uid={uid}/>} {tab === 'Configurações' && <FullSettings uid={uid} settings={settings} setSettings={setSettings}/>} {isAdmin && tab === 'Admin' && <AdminPanel />}</>}
     </main>
@@ -287,4 +301,3 @@ function FormulaItem({ label, value, total = false }: {
     value: number;
     total?: boolean;
 }) { return <div className={`formula-item ${total ? 'total' : ''}`}><small>{label}</small><strong>+ {Number(value).toLocaleString('pt-BR')} <em>CG</em></strong></div>; }
-

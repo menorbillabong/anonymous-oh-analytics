@@ -11,6 +11,8 @@ test('keeps Portuguese as the safe default', () => {
 test('translates exact interface phrases in English and Spanish', () => {
   assert.equal(translateUiText('Painel', 'en'), 'Dashboard');
   assert.equal(translateUiText('Painel', 'es'), 'Panel');
+  assert.equal(translateUiText('PERÍODO ATUAL', 'en'), 'CURRENT PERIOD');
+  assert.equal(translateUiText('PERÍODO ANTERIOR', 'es'), 'PERÍODO ANTERIOR');
   assert.equal(translateUiText('  SALVAR ALTERAÇÕES  ', 'en'), '  SAVE CHANGES  ');
 });
 
@@ -28,4 +30,3 @@ test('returns a locale for every supported language', () => {
   assert.equal(localeForLanguage('en'), 'en-US');
   assert.equal(localeForLanguage('es'), 'es-ES');
 });
-
