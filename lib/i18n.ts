@@ -116,6 +116,15 @@ const dictionary: Record<string, Translation> = {
   'CARTÕES': { en: 'CARDS', es: 'TARJETAS' },
   'Exibir publicações em lista': { en: 'Show posts as a list', es: 'Mostrar publicaciones en lista' },
   'Exibir publicações em cartões': { en: 'Show posts as cards', es: 'Mostrar publicaciones en tarjetas' },
+  'Período das publicações': { en: 'Post period', es: 'Período de las publicaciones' },
+  'PERÍODO ATUAL': { en: 'CURRENT PERIOD', es: 'PERÍODO ACTUAL' },
+  'PERÍODO ANTERIOR': { en: 'PREVIOUS PERIOD', es: 'PERÍODO ANTERIOR' },
+  'Publicações que participam das métricas, metas, missões e classificação atuais.': { en: 'Posts included in the current metrics, goals, missions, and ranking.', es: 'Publicaciones incluidas en las métricas, metas, misiones y clasificación actuales.' },
+  'Publicações de períodos fechados. Elas ficam disponíveis para consulta e não entram nas contagens atuais.': { en: 'Posts from closed periods. They remain available for reference and are not included in current totals.', es: 'Publicaciones de períodos cerrados. Permanecen disponibles para consulta y no se incluyen en los totales actuales.' },
+  'Nenhuma publicação no período atual.': { en: 'No posts in the current period.', es: 'No hay publicaciones en el período actual.' },
+  'Nenhuma publicação no período anterior.': { en: 'No posts in the previous period.', es: 'No hay publicaciones en el período anterior.' },
+  'As novas publicações aparecerão aqui.': { en: 'New posts will appear here.', es: 'Las nuevas publicaciones aparecerán aquí.' },
+  'As publicações aparecerão aqui após o fechamento de um período.': { en: 'Posts will appear here after a period is closed.', es: 'Las publicaciones aparecerán aquí después de cerrar un período.' },
 
   'Enviar nova publicação': { en: 'Submit new post', es: 'Enviar nueva publicación' },
   'Cole o link do X e os dados serão preenchidos automaticamente.': { en: 'Paste the X link and the data will be filled in automatically.', es: 'Pega el enlace de X y los datos se completarán automáticamente.' },
@@ -234,4 +243,3 @@ export function translateUiText(value: string, language: SiteLanguage) {
   const exact = dictionary[core]?.[language];
   return `${leading}${exact ?? translateDynamic(core, language)}${trailing}`;
 }
-
