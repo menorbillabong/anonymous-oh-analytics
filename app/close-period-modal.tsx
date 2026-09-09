@@ -14,6 +14,12 @@ type ClosePeriodModalProps={
 
 function archiveErrorMessage(error:any){
  const message=String(error?.message||'');
+ const cooldown=message.match(/ARCHIVED_PERIOD_COOLDOWN:(\d+)/);
+ if(cooldown){
+  const releaseAt=new Date(Number(cooldown[1])*1000);
+  const releaseLabel=Number.isNaN(releaseAt.getTime())?'após o prazo de 7 dias':releaseAt.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'});
+  return `Você já fechou um período nos últimos 7 dias. Um novo fechamento será liberado em ${releaseLabel}.`;
+ }
  if(message.includes('ARCHIVED_PERIOD_DUPLICATE'))return'Este mesmo período já foi fechado.';
  if(message.includes('ARCHIVED_PERIOD_ALREADY_CLOSED'))return'Este intervalo cruza um período que ainda está fechado. Reabra o período anterior antes de fechar novamente.';
  if(message.includes('ARCHIVED_PERIOD_EMPTY'))return'Não há publicações nesse período.';

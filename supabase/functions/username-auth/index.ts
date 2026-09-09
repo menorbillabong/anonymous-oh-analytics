@@ -18,6 +18,34 @@ Deno.serve(async(req:Request)=>{
   const{action,username:rawUsername,password,email:rawEmail,targetUserId,cleanupId,reason:rawReason}=await req.json();
   const username=normalize(rawUsername);
   const admin=createClient(Deno.env.get("SUPABASE_URL")??"",Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")??"",{auth:{autoRefreshToken:false,persistSession:false,detectSessionInUrl:false}});
+  if(action==="admin-period-close-status"||action==="admin-reset-period-close"){
+   const authHeader=req.headers.get("authorization")??"";
+   const token=authHeader.startsWith("Bearer ")?authHeader.slice(7).trim():"";
+   if(!token)return reply(origin,{error:"Sessão administrativa inválida."},401);
+   const{data:caller,error:callerError}=await admin.auth.getUser(token);
+   if(callerError||!caller.user)return reply(origin,{error:"Sessão administrativa inválida."},401);
+   const{data:adminRole,error:roleError}=await admin.from("admin_users").select("user_id").eq("user_id",caller.user.id).maybeSingle();
+   if(roleError||!adminRole)return reply(origin,{error:"Acesso permitido somente para administradores."},403);
+
+   const reset=action==="admin-reset-period-close";
+   const reason=String(rawReason??"").trim();
+   if(reset&&!validUserId(targetUserId))return reply(origin,{error:"Conta de destino inválida."},400);
+   if(reset&&(reason.length<3||reason.length>500))return reply(origin,{error:"Informe um motivo entre 3 e 500 caracteres."},400);
+
+   const{data:result,error:cooldownError}=await admin.rpc("admin_period_close_cooldown_verified",{
+    p_actor:caller.user.id,
+    p_action:reset?"reset":"status",
+    p_target_user:reset?String(targetUserId):null,
+    p_reason:reset?reason:null,
+   });
+   if(cooldownError){
+    const message=String(cooldownError.message??"");
+    if(message.includes("PERIOD_CLOSE_COOLDOWN_NOT_ACTIVE"))return reply(origin,{error:"Este usuário já está liberado para fechar um período."},409);
+    if(message.includes("PERIOD_CLOSE_COOLDOWN_USER_NOT_FOUND"))return reply(origin,{error:"Conta não encontrada."},404);
+    return reply(origin,{error:reset?"Não foi possível liberar o fechamento. Nenhum prazo foi alterado.":"Não foi possível consultar os prazos de fechamento."},500);
+   }
+   return reset?reply(origin,{ok:true,cooldown:result}):reply(origin,{ok:true,cooldowns:Array.isArray(result)?result:[]});
+  }
   if(action==="admin-update"){
    const authHeader=req.headers.get("authorization")??"";
    const token=authHeader.startsWith("Bearer ")?authHeader.slice(7).trim():"";
