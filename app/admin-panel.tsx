@@ -28,6 +28,10 @@ type AdminUser = {
   sheets_tab_name?: string;
   sheets_last_sync_at?: string;
   sheets_last_sync_status?: string;
+  period_close_last_closed_at?: string;
+  period_close_next_allowed_at?: string;
+  period_close_blocked?: boolean;
+  period_close_reset_at?: string;
 };
 
 type AdminPost = {
@@ -111,10 +115,11 @@ export default function AdminPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: sheetsData }, { data: countingData }] = await Promise.all([
+    const [{ data, error }, { data: sheetsData }, { data: countingData }, { data: cooldownData }] = await Promise.all([
       supabase.rpc('admin_dashboard'),
       supabase.rpc('admin_google_sheets_users'),
       supabase.rpc('admin_closed_period_counting_status'),
+      supabase.functions.invoke('username-auth', { body: { action: 'admin-period-close-status' } }),
     ]);
     if (error) {
       setMessage('Não foi possível carregar o painel administrativo.');
@@ -123,9 +128,11 @@ export default function AdminPanel() {
     }
     const next = (data || {}) as AdminDashboard;
     const sheetsByUser = new Map((Array.isArray(sheetsData) ? sheetsData : []).map((config:any) => [String(config.user_id), config]));
+    const cooldownByUser = new Map((Array.isArray(cooldownData?.cooldowns) ? cooldownData.cooldowns : []).map((cooldown:any) => [String(cooldown.user_id), cooldown]));
     next.users = (next.users || []).map(user => {
       const config:any = sheetsByUser.get(user.id) || {};
-      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status};
+      const cooldown:any = cooldownByUser.get(user.id) || {};
+      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at};
     });
     const countingByPeriod = new Map((Array.isArray(countingData) ? countingData : []).map((status:any) => [Number(status.id), status]));
     next.closed_periods = (next.closed_periods || []).map(period => ({...period,...(countingByPeriod.get(Number(period.id)) || {})}));
@@ -212,6 +219,38 @@ export default function AdminPanel() {
       p_reason: reason,
       p_post_id: null,
     }), 'Conta atualizada com sucesso.');
+  }
+
+  async function resetPeriodCloseCooldown(user: AdminUser) {
+    if (!user.period_close_blocked) return;
+    const profile = user.profile_name || user.username || user.display_name || user.x_handle || 'este usuário';
+    if (!window.confirm(`Liberar agora um novo fechamento de período para ${profile}? Nenhuma publicação ou período será alterado.`)) return;
+    const reason = reasonFor('liberar antecipadamente um novo fechamento de período');
+    if (!reason) return;
+    setBusy(`period-close-${user.id}`);
+    setMessage('');
+    try {
+      const { data, error } = await supabase.functions.invoke('username-auth', { body: {
+        action: 'admin-reset-period-close',
+        targetUserId: user.id,
+        reason,
+      }});
+      if (error) {
+        let detail = 'Não foi possível liberar o fechamento.';
+        try {
+          const payload = await (error as any).context?.json();
+          if (payload?.error) detail = payload.error;
+        } catch {}
+        throw new Error(detail);
+      }
+      if (data?.error) throw new Error(data.error);
+      setMessage('Novo fechamento liberado somente para este usuário.');
+      await load();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Não foi possível liberar o fechamento.');
+    } finally {
+      setBusy('');
+    }
   }
 
   async function scheduleDeletion(user: AdminUser) {
@@ -420,6 +459,7 @@ export default function AdminPanel() {
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_control_unlocked ? 'lock_ranking_control' : 'unlock_ranking_control', user.ranking_control_unlocked ? 'bloquear o controle individual do ranking' : 'liberar o controle individual do ranking')}>{user.ranking_control_unlocked ? 'TRAVAR CONTROLE' : 'LIBERAR CONTROLE'}</button>
             </div></div>
             <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button></div></div>
+            <div className="admin-action-group"><small>FECHAMENTO</small><div><button className={user.period_close_blocked ? 'warning' : 'safe'} disabled={!user.period_close_blocked || busy === `period-close-${user.id}`} onClick={() => resetPeriodCloseCooldown(user)}>{busy === `period-close-${user.id}` ? 'LIBERANDO...' : user.period_close_blocked ? 'LIBERAR FECHAMENTO' : 'SEM BLOQUEIO ATIVO'}</button></div>{user.period_close_blocked && <small className="admin-reason">Até {formatDate(user.period_close_next_allowed_at, true)}</small>}</div>
           </div>
         </div>)}
         {!filteredUsers.length && <div className="admin-empty">Nenhum usuário encontrado.</div>}
@@ -919,6 +959,7 @@ function actionLabel(action:string) {
     delete_user_posts_by_date:'Publicações por intervalo excluídas',
     update_account_access:'Acesso da conta atualizado',
     reopen_closed_period:'Contagem do período reaberta',
+    reset_period_close_cooldown:'Prazo de fechamento liberado',
   };
   return labels[action] || action.replaceAll('_', ' ');
 }
