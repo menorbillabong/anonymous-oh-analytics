@@ -10,11 +10,13 @@ import { minimumPostProgress, monthlyReward, viewGoalProgress } from '@/lib/rewa
 import ReportPage from './report-page';
 import ProfileNameGate from './profile-name-gate';
 import ClosePeriodModal from './close-period-modal';
+import OpenPeriodModal from './open-period-modal';
 import GoogleSheetsSyncButton from './google-sheets-sync';
 import MissionPostReview from './mission-post-review';
 import { refreshStoredPostMetrics } from '@/lib/refresh-post-metrics';
 import { postDateParts, postPublishedDate } from '@/lib/post-date';
 import { isActiveCountingPost, postsForPublicationPeriod } from '@/lib/publication-period';
+import type { ActivePeriod } from '@/lib/tracking-period';
 import './globals.css';
 import './post-library.css';
 import './tracker-sections.css';
@@ -25,6 +27,7 @@ import './add-publication.css';
 import './archive-modal.css';
 import './site-legibility.css';
 import './publication-period-filter.css';
+import './panel-period-actions.css';
 const blank = { post_url: '', title: 'Publicação do X', views: 0, likes: 0, reposts: 0, comments: 0, mission_profile_id: '', image_urls: '', video_url: '', published_date: '', x_published_at: '' };
 const nav = ['Painel', 'Classificação', 'História', 'Centro de Controle da Missão', 'Registro de atividades', 'Configurações'];
 type Deltas = {
@@ -49,6 +52,8 @@ export default function Dashboard({ session }: {
     const [reportOpen, setReportOpen] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
     const [periodOpen, setPeriodOpen] = useState(false);
+    const [openPeriodOpen, setOpenPeriodOpen] = useState(false);
+    const [activePeriod, setActivePeriod] = useState<ActivePeriod | null>(null);
     const [bulkOpen, setBulkOpen] = useState(false);
     const [reviewProfileId, setReviewProfileId] = useState('');
     const [bulkMission, setBulkMission] = useState('');
@@ -72,7 +77,10 @@ export default function Dashboard({ session }: {
         localStorage.setItem('aoh:last-tab', item); };
     const chooseView = (mode: 'list' | 'cards') => { setView(mode); if (typeof window !== 'undefined')
         localStorage.setItem('aoh:post-view', mode); };
-    const openAdd = () => { if (monthlyPostRemaining <= 0) {
+    const requireOpenPeriod = () => { if (activePeriod)
+        return true; setRefreshNotice('Abra um período antes de adicionar ou buscar publicações.'); setOpenPeriodOpen(true); return false; };
+    const openAdd = () => { if (!requireOpenPeriod())
+        return; if (monthlyPostRemaining <= 0) {
         setRefreshNotice(`Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.`);
         return;
     } setForm({ ...blank, published_date: new Date().toISOString().slice(0, 10) }); setAddOpen(true); };
@@ -85,8 +93,8 @@ export default function Dashboard({ session }: {
         setRefreshing(true);
         setRefreshStep(1);
         setShowDeltas(false);
-    } const [{ data: p }, { data: s }, { data: m }, { data: xAccess }] = await Promise.all([supabase.from('posts').select('*').eq('user_id', uid).order('created_at', { ascending: false }), supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(), supabase.from('mission_profiles').select('*').eq('user_id', uid).order('name'), supabase.rpc('get_my_x_import_access')]); if (pulse)
-        setRefreshStep(2); const next = p || [], nextSettings = { ...settingsDefaults, ...(s || {}) }; setPosts(next); setSettings(nextSettings); setXImportAccess({ enabled: Boolean(xAccess?.enabled), handle: String(xAccess?.handle || s?.x_handle || '').replace(/^@/, '') }); setProfileChecked(true); setProfiles(m || []); void syncRanking(); if (!bulkMission && m?.length)
+    } const [{ data: p }, { data: s }, { data: m }, { data: xAccess }, { data: period }] = await Promise.all([supabase.from('posts').select('*').eq('user_id', uid).order('created_at', { ascending: false }), supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(), supabase.from('mission_profiles').select('*').eq('user_id', uid).order('name'), supabase.rpc('get_my_x_import_access'), supabase.rpc('get_my_active_period')]); if (pulse)
+        setRefreshStep(2); const next = p || [], nextSettings = { ...settingsDefaults, ...(s || {}) }; setPosts(next); setSettings(nextSettings); setXImportAccess({ enabled: Boolean(xAccess?.enabled), handle: String(xAccess?.handle || s?.x_handle || '').replace(/^@/, '') }); setActivePeriod(period?.id && period?.start_date ? period as ActivePeriod : null); setProfileChecked(true); setProfiles(m || []); void syncRanking(); if (!bulkMission && m?.length)
         setBulkMission(String(m.find((x: any) => x.active)?.id || '')); if (pulse) {
         const after = totalsFor(next), d = { posts: after.posts - before.posts, views: after.views - before.views, involvement: after.involvement - before.involvement, crystal: after.crystal - before.crystal };
         setDeltas(d);
@@ -138,7 +146,8 @@ export default function Dashboard({ session }: {
     useEffect(() => { const close = (e: KeyboardEvent) => { if (e.key !== 'Escape')
         return; if (addOpen)
         setAddOpen(false); if (periodOpen)
-        setPeriodOpen(false); }; window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close); }, [addOpen, periodOpen]);
+        setPeriodOpen(false); if (openPeriodOpen)
+        setOpenPeriodOpen(false); }; window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close); }, [addOpen, periodOpen, openPeriodOpen]);
     useEffect(() => { if (!refreshNotice)
         return; const timer = window.setTimeout(() => setRefreshNotice(''), 6000); return () => window.clearTimeout(timer); }, [refreshNotice]);
     async function fetchPostData(url: string) { const r = await fetch('/api/x-metrics', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url }) }); const data = await r.json(); if (!r.ok || data.error)
@@ -189,7 +198,14 @@ export default function Dashboard({ session }: {
     const selectedMission = profiles.find(x => String(x.id) === String(form.mission_profile_id));
     const reviewProfile = profiles.find(x => String(x.id) === reviewProfileId);
     async function addPost() { if (!form.post_url.trim())
-        return; if (monthlyPostRemaining <= 0) {
+        return; if (!activePeriod) {
+        setAddOpen(false);
+        setOpenPeriodOpen(true);
+        return;
+    } const postDate = String(form.published_date || '').slice(0, 10); if (postDate && postDate < activePeriod.start_date) {
+        setRefreshNotice(`Esta publicação é anterior ao período aberto em ${activePeriod.start_date}.`);
+        return;
+    } if (monthlyPostRemaining <= 0) {
         setRefreshNotice(`Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.`);
         setAddOpen(false);
         return;
@@ -197,7 +213,11 @@ export default function Dashboard({ session }: {
         setRefreshNotice(isMonthlyLimitError(error) ? `Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.` : 'Não foi possível adicionar a publicação.');
         return;
     } setAddOpen(false); setForm(blank); await load(true); }
-    async function processBulk() { const urls = [...new Set((bulkText.match(/https?:\/\/[^\s]+/g) || []).map(x => x.replace(/[),.;]+$/, '')))].filter(x => /https?:\/\/(www\.)?(x\.com|twitter\.com)\//i.test(x)); if (!urls.length) {
+    async function processBulk() { if (!activePeriod) {
+        setBulkOpen(false);
+        setOpenPeriodOpen(true);
+        return;
+    } const urls = [...new Set((bulkText.match(/https?:\/\/[^\s]+/g) || []).map(x => x.replace(/[),.;]+$/, '')))].filter(x => /https?:\/\/(www\.)?(x\.com|twitter\.com)\//i.test(x)); if (!urls.length) {
         setBulkMsg('Nenhum link válido do X foi encontrado.');
         return;
     } if (monthlyPostRemaining <= 0) {
@@ -206,10 +226,12 @@ export default function Dashboard({ session }: {
     } const acceptedUrls = urls.slice(0, monthlyPostRemaining), omitted = urls.length - acceptedUrls.length; setBusy(true); setBulkMsg(`Coletando dados de ${acceptedUrls.length} publicação(ões)...`); const mp = profiles.find(x => String(x.id) === String(bulkMission)); const rows = await Promise.all(acceptedUrls.map(async (url) => { let d: any = {}; try {
         d = await fetchPostData(url);
     }
-    catch { } return { user_id: uid, title: d.title || 'Publicação do X', post_url: url, published_at: String(d.published_date || d.published_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10), x_published_at: d.published_at || null, views: Number(d.views || 0), likes: Number(d.likes || 0), reposts: Number(d.reposts || 0), comments: Number(d.comments || 0), mission_profile_id: mp?.id || null, mission_name: mp?.name || null, special_reward: Number(mp?.reward || 0), network: 'X', author_handle: d.author_handle || settings.x_handle || null, image_urls: Array.isArray(d.image_urls) ? d.image_urls : [], video_url: d.video_url || null, metrics_source: d.source || 'auto', metrics_updated_at: new Date().toISOString() }; })); const { error } = await supabase.from('posts').insert(rows); setBusy(false); if (error) {
+    catch { } return { user_id: uid, title: d.title || 'Publicação do X', post_url: url, published_at: String(d.published_date || d.published_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10), x_published_at: d.published_at || null, views: Number(d.views || 0), likes: Number(d.likes || 0), reposts: Number(d.reposts || 0), comments: Number(d.comments || 0), mission_profile_id: mp?.id || null, mission_name: mp?.name || null, special_reward: Number(mp?.reward || 0), network: 'X', author_handle: d.author_handle || settings.x_handle || null, image_urls: Array.isArray(d.image_urls) ? d.image_urls : [], video_url: d.video_url || null, metrics_source: d.source || 'auto', metrics_updated_at: new Date().toISOString() }; })); const today=postDateParts(new Date())?.key||'',periodRows=rows.filter(row=>row.published_at>=activePeriod.start_date&&row.published_at<=today),outside=rows.length-periodRows.length; if(!periodRows.length){setBusy(false);setBulkMsg('Nenhuma publicação pertence ao período aberto.');return} const { error } = await supabase.from('posts').insert(periodRows); setBusy(false); if (error) {
         setBulkMsg(isMonthlyLimitError(error) ? `Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.` : 'Não foi possível adicionar os links.');
         return;
-    } setBulkMsg(`${acceptedUrls.length} publicação(ões) adicionada(s).${omitted ? ` ${omitted} link(s) não foram adicionados porque a meta mensal foi alcançada.` : ''}`); setBulkText(''); await load(true); }
+    } setBulkMsg(`${periodRows.length} publicação(ões) adicionada(s).${outside ? ` ${outside} link(s) ficaram fora do período aberto.` : ''}${omitted ? ` ${omitted} link(s) não foram adicionados porque a meta mensal foi alcançada.` : ''}`); setBulkText(''); await load(true); }
+    const openBulk = () => { if (!requireOpenPeriod()) return; setBulkOpen(true); };
+    const searchX = () => { if (!requireOpenPeriod()) return; window.dispatchEvent(new CustomEvent('aoh:x-import-request', { detail: { mission: bulkMission } })); };
     async function signOut() { await supabase.auth.signOut(); }
     const username = String(settings.app_name || '').trim().toUpperCase();
     if (reportOpen)
@@ -217,9 +239,9 @@ export default function Dashboard({ session }: {
     return <div className="exact-app">
     <header className="exact-topbar"><div className="exact-brand">AVALIAÇÃO&nbsp;DE&nbsp;MÉTRICAS</div>{refreshing ? <div className="refresh-pill"><span className="refresh-spin">↻</span><span>ATUALIZANDO MÉTRICAS<br /><b>({refreshStep}/2)</b></span></div> : <div className="wait-pill">●&nbsp; ESPERA</div>}<nav className="exact-nav">{[...nav, ...(isAdmin ? ['Admin'] : [])].map(item => <button key={item} className={tab === item ? 'active' : ''} onClick={() => chooseTab(item)}><span className="nav-icon">{iconFor(item)}</span><span>{item === 'História' ? 'Histórico' : item}</span></button>)}</nav><button className="user-pill" onClick={signOut}><span>◉</span>{username}</button></header>
     <main className="exact-main">
-      {bulkOpen ? <BulkPosts profiles={profiles} bulkMission={bulkMission} setBulkMission={setBulkMission} bulkText={bulkText} setBulkText={setBulkText} busy={busy} msg={bulkMsg} remaining={monthlyPostRemaining} goal={monthlyPostGoal} process={processBulk} back={() => setBulkOpen(false)} xImportEnabled={xImportAccess.enabled} xHandle={xImportAccess.handle}/> : <>
+      {bulkOpen ? <BulkPosts profiles={profiles} bulkMission={bulkMission} setBulkMission={setBulkMission} bulkText={bulkText} setBulkText={setBulkText} busy={busy} msg={bulkMsg} remaining={monthlyPostRemaining} goal={monthlyPostGoal} process={processBulk} back={() => setBulkOpen(false)}/> : <>
         {tab === 'Painel' && <>
-          <section className="exact-hero"><div className="hero-title"><h1>PAINEL</h1><span>{countedPosts.length}</span></div><div className="hero-actions"><button>⇩ <b>IMPORTAR</b></button><div className="split-btn"><button>JSON</button><button>CSV</button></div><button className="report-btn">▤ <b>RELATÓRIO</b></button><button disabled={monthlyPostRemaining <= 0} title={monthlyPostRemaining <= 0 ? 'Meta mensal atingida' : `${monthlyPostRemaining} vaga(s) restante(s) neste mês`} onClick={() => setBulkOpen(true)}>▤ <b>ADIÇÃO EM MASSA</b></button><button className="blue-btn" onClick={() => setPeriodOpen(true)}>◴ <b>FECHAR PERÍODO</b></button><button className={`green-btn ${refreshing ? 'is-refreshing' : ''}`} disabled={refreshing} onClick={() => refreshMetrics('manual')}>↻ <b>{refreshing ? 'ATUALIZANDO MÉTRICAS...' : 'ATUALIZAR AGORA (MANUAL)'}</b></button><GoogleSheetsSyncButton userId={uid} beforeSync={() => refreshMetrics('manual')}/><button className="orange-add" disabled={monthlyPostRemaining <= 0} title={monthlyPostRemaining <= 0 ? 'Meta mensal atingida' : `${monthlyPostRemaining} vaga(s) restante(s) neste mês`} onClick={openAdd}>＋ <b>{monthlyPostRemaining <= 0 ? 'META ATINGIDA' : 'ADICIONAR PUBLICAÇÃO'}</b></button></div>{refreshNotice && <p style={{ margin: '10px 0 0', textAlign: 'right', color: '#8fa99e', fontSize: 10, fontWeight: 800 }}>{refreshNotice}</p>}</section>
+          <section className="exact-hero period-panel"><div className="hero-title"><h1>PAINEL</h1><span>{countedPosts.length}</span>{activePeriod ? <em className="period-status open">PERÍODO ABERTO · {activePeriod.start_date}</em> : <em className="period-status">SEM PERÍODO ABERTO</em>}</div><PanelActions organized={settings.panel_action_layout === 'organized'} activePeriod={activePeriod} xImportEnabled={xImportAccess.enabled} xHandle={xImportAccess.handle} refreshing={refreshing} busy={busy} monthlyPostRemaining={monthlyPostRemaining} monthlyPostGoal={monthlyPostGoal} userId={uid} openPeriod={() => setOpenPeriodOpen(true)} closePeriod={() => setPeriodOpen(true)} searchX={searchX} openBulk={openBulk} refreshMetrics={() => refreshMetrics('manual')} openAdd={openAdd}/>{refreshNotice && <p style={{ margin: '10px 0 0', textAlign: 'right', color: '#8fa99e', fontSize: 10, fontWeight: 800 }}>{refreshNotice}</p>}</section>
           <section className="exact-stats"><ExactStat label="TOTAL DE PUBLICAÇÕES" value={monthlyPostCount} goal={monthlyPostGoal} delta={showDeltas ? deltas.posts : 0}/><ExactStat label="VISUALIZAÇÕES TOTAIS" value={reward.views} delta={showDeltas ? deltas.views : 0}/><div className="exact-stat progress-stat"><div className="stat-label-row"><small>PROGRESSO DE<br />CRYSTGIN</small><span>FÓRMULA<br />OFICIAL</span></div><div className="stat-value-line"><AnimatedNumber value={crystalginProgress} suffix={` / ${crystalginLimit.toLocaleString('pt-BR')}`}/>{showDeltas && deltas.crystal > 0 && <DeltaBadge value={deltas.crystal}/>}</div><div className="progress-line"><i style={{ width: `${Math.min(100, crystalginProgress / crystalginLimit * 100)}%` }}/></div></div><ExactStat label="CURTIDAS TOTAIS" hint="Soma de todas as curtidas" value={involvement} delta={showDeltas ? deltas.involvement : 0}/><ExactStat label="CRYSTGIN TOTAL" value={reward.raw} accent delta={showDeltas ? deltas.crystal : 0}/></section>
           <section className="formula-strip reward-progress-formula"><div className="formula-label">FÓRMULA V2</div><div className="formula-caption">DETALHAMENTO DA RECOMPENSA OFICIAL</div><FormulaProgressItem label="MÍNIMO (10 POSTS)" status={minimumProgress.reached ? 'MÍNIMO ATINGIDO' : 'MÍNIMO'} percent={minimumProgress.percent} value={reward.base}/><FormulaProgressItem label="META DE VISUALIZAÇÕES" status="OBJETIVO" percent={viewsProgress.percent} value={reward.viewsReward} highlight/><FormulaItem label="ENGAJAMENTO (CURTIDAS X2)" value={reward.engagementReward}/><FormulaItem label="MISSÕES ESPECIAIS" value={reward.special}/><FormulaItem label="TOTAL SEM CAP" value={reward.raw} total/></section>
           <section className="mission-table mission-summary-card"><div className="mission-head"><h2>DESEMPENHO POR MISSÃO</h2><span>RESUMO POR CATEGORIA</span></div><div className="mission-row mission-columns"><b>MISSÃO</b><b>POSTAGENS</b><b>IMPRESSÕES/VISUALIZAÇÕES TOTAIS</b><b>CURTIDAS</b><b>CRYSTGIN</b></div>{missionRows.map(r => <div className="mission-row" key={r.profileId || r.name}><div className="mission-name"><i style={{ background: r.color, boxShadow: `0 0 10px ${r.color}` }}/>{r.profileId ? <button type="button" className="mission-name-button" onClick={() => setReviewProfileId(r.profileId)} title={`Ver publicações de ${r.name}`}>{r.name}</button> : <strong>{r.name}</strong>}</div><span>{r.posts}</span><span>{r.views.toLocaleString('pt-BR')}</span><span>{r.likes.toLocaleString('pt-BR')}</span><strong className="orange-text">{r.crystalgin.toLocaleString('pt-BR')}</strong></div>)}{!missionRows.length && <div className="mission-empty">Nenhuma missão com publicações.</div>}<div className="mission-row mission-total-row"><strong>TOTAL</strong><strong>{missionTotals.posts.toLocaleString('pt-BR')}</strong><strong>{missionTotals.views.toLocaleString('pt-BR')}</strong><strong>{missionTotals.likes.toLocaleString('pt-BR')}</strong><strong>{missionTotals.crystalgin.toLocaleString('pt-BR')}</strong></div><div className="mission-reward-summary"><div className="mission-reward-line"><span>RECOMPENSA MÍNIMA <small>{minimumProgress.reached ? '(MÍNIMO ATINGIDO · 100%)' : `(${minimumProgress.current.toLocaleString('pt-BR')}/${minimumProgress.goal.toLocaleString('pt-BR')} POSTAGENS · ${minimumProgress.percent}%)`}</small></span><strong>+ {reward.base.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-reward-line"><span>BÔNUS DE VISUALIZAÇÕES <small>{viewsProgress.maximumReached ? `(META MÁXIMA ATINGIDA: ${viewsProgress.current.toLocaleString('pt-BR')} VISUALIZAÇÕES)` : `(META ATUAL: ${viewsProgress.current.toLocaleString('pt-BR')} / ${viewsProgress.goal.toLocaleString('pt-BR')} VISUALIZAÇÕES)`}</small></span><strong>+ {reward.viewsReward.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-official-divider"/><div className="mission-official-total"><span>PROGRESSO OFICIAL <small>(COM LIMITE)</small></span><strong>{crystalginProgress.toLocaleString('pt-BR')} <em>CG</em></strong></div></div></section>
@@ -238,7 +260,29 @@ export default function Dashboard({ session }: {
         {tab === 'Classificação' && <RankingPage />}{tab === 'História' && <HistoryPage uid={uid}/>} {tab === 'Centro de Controle da Missão' && <MissionControlPage uid={uid} reloadProfiles={load}/>} {tab === 'Registro de atividades' && <ActivityPage uid={uid}/>} {tab === 'Configurações' && <FullSettings uid={uid} settings={settings} setSettings={setSettings}/>} {isAdmin && tab === 'Admin' && <AdminPanel />}</>}
     </main>
     <ProfileNameGate userId={uid} open={profileChecked && !settings.profile_name_confirmed} initialName={settings.app_name || ''} onSaved={name => setSettings((current: any) => ({ ...current, app_name: name, profile_name_confirmed: true }))}/>
-    {periodOpen && <ClosePeriodModal posts={countedPosts} crystalginLimit={crystalginLimit} onClose={() => setPeriodOpen(false)} onSuccess={async () => { setPeriodOpen(false); await load(false); setRefreshNotice('Período fechado. As publicações foram retiradas das contagens atuais.'); chooseTab('História'); }}/>} 
+    {openPeriodOpen && (
+    <OpenPeriodModal
+      posts={countedPosts}
+      onClose={() => setOpenPeriodOpen(false)}
+      onSuccess={async () => {
+        setOpenPeriodOpen(false);
+        await load(false);
+        setRefreshNotice('Período aberto. Agora você pode adicionar e buscar publicações.');
+      }}/>
+    )}
+    {periodOpen && activePeriod && (
+    <ClosePeriodModal
+      posts={countedPosts}
+      periodStart={activePeriod.start_date}
+      crystalginLimit={crystalginLimit}
+      onClose={() => setPeriodOpen(false)}
+      onSuccess={async () => {
+        setPeriodOpen(false);
+        await load(false);
+        setRefreshNotice('Período fechado. As publicações foram retiradas das contagens atuais.');
+        chooseTab('História');
+      }}/>
+    )}
     {reviewProfile && <MissionPostReview profile={reviewProfile} posts={posts} profiles={profiles} onClose={() => setReviewProfileId('')} onSaved={async () => { await load(false); }}/>}
     {addOpen && <div className="add-publication-screen"><div className="add-publication-shell"><div className="add-publication-heading"><button type="button" className="add-publication-plus" aria-label="Fechar janela de adicionar publicação" onClick={() => setAddOpen(false)}>×</button><div><h2>Enviar nova publicação</h2><p>{autoLoading ? 'Coletando automaticamente os dados da postagem...' : 'Cole o link do X e os dados serão preenchidos automaticamente.'}</p></div></div><section className="add-publication-card"><label className="add-field">URL da postagem<input autoFocus value={form.post_url} onChange={e => setForm({ ...form, post_url: e.target.value })} placeholder="https://x.com/your-post"/></label><div className="add-group-label">Métricas de engajamento</div><div className="add-metrics-grid"><MetricInput icon="◉" value={form.views} onChange={v => setForm({ ...form, views: v })}/><MetricInput icon="◯" value={form.comments} onChange={v => setForm({ ...form, comments: v })}/><MetricInput icon="↔" value={form.reposts} onChange={v => setForm({ ...form, reposts: v })}/><MetricInput icon="♥" heart value={form.likes} onChange={v => setForm({ ...form, likes: v })}/></div><div className="add-two-column"><label className="add-field">Data da publicação no X<div className="add-input-icon"><span>▣</span><input type="date" value={form.published_date || ''} disabled title="Data obtida automaticamente pelo link da publicação no X"/></div></label><label className="add-field">Missão<div className="add-mission-select"><i style={{ background: selectedMission?.color || '#38d27f' }}/><select value={form.mission_profile_id} onChange={e => setForm({ ...form, mission_profile_id: e.target.value })}><option value="">Sem missão especial</option>{profiles.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></div></label></div><div className="add-group-label add-bonus-title">Bônus</div><div className="add-bonus-row"><label className="locked-bonus"><input type="checkbox" disabled/><span />Imagem em destaque</label><label className="locked-bonus"><input type="checkbox" disabled/><span />Bônus de Reprodução</label></div><button className="add-submit" disabled={busy || autoLoading || !form.post_url.trim()} onClick={addPost}>＋ <b>{autoLoading ? 'COLETANDO...' : busy ? 'ADICIONANDO...' : 'Adicionar publicação'}</b></button></section></div></div>}
   </div>;
@@ -249,7 +293,15 @@ function MetricInput({ icon, value, onChange, heart = false }: {
     onChange: (v: number) => void;
     heart?: boolean;
 }) { return <div className="add-metric-input"><span className={heart ? 'heart' : ''}>{icon}</span><input type="number" min="0" value={value} onChange={e => onChange(Number(e.target.value))}/></div>; }
-function BulkPosts({ profiles, bulkMission, setBulkMission, bulkText, setBulkText, busy, msg, remaining, goal, process, back, xImportEnabled, xHandle }: {
+function PanelActions({organized,activePeriod,xImportEnabled,xHandle,refreshing,busy,monthlyPostRemaining,monthlyPostGoal,userId,openPeriod,closePeriod,searchX,openBulk,refreshMetrics,openAdd}:{organized:boolean;activePeriod:ActivePeriod|null;xImportEnabled:boolean;xHandle:string;refreshing:boolean;busy:boolean;monthlyPostRemaining:number;monthlyPostGoal:number;userId:string;openPeriod:()=>void;closePeriod:()=>void;searchX:()=>void;openBulk:()=>void;refreshMetrics:()=>Promise<boolean>;openAdd:()=>void}) {
+    const period = <div className="period-action-pair"><button className="blue-btn" disabled={Boolean(activePeriod)} title={activePeriod ? `Período aberto em ${activePeriod.start_date}` : 'Definir a data inicial do período'} onClick={openPeriod}>▶ <b>ABRIR PERÍODO</b></button><button className="blue-btn" disabled={!activePeriod} title={activePeriod ? `Fechar período iniciado em ${activePeriod.start_date}` : 'Abra um período primeiro'} onClick={closePeriod}>◴ <b>FECHAR PERÍODO</b></button></div>;
+    const publications = <><button className="x-panel-search" hidden={!xImportEnabled} disabled={busy || monthlyPostRemaining <= 0 || !xHandle} title={!xHandle ? 'Cadastre seu @ do X em Configurações' : activePeriod ? `Buscar desde ${activePeriod.start_date}` : 'Abra um período para iniciar a busca'} onClick={searchX}>𝕏 <b>BUSCAR NO X</b></button><button disabled={monthlyPostRemaining <= 0} title={monthlyPostRemaining <= 0 ? 'Meta mensal atingida' : `${monthlyPostRemaining} vaga(s) restante(s) neste mês`} onClick={openBulk}>▤ <b>ADIÇÃO EM MASSA</b></button><button className="orange-add" disabled={monthlyPostRemaining <= 0} title={monthlyPostRemaining <= 0 ? 'Meta mensal atingida' : `${monthlyPostRemaining} vaga(s) restante(s) neste mês`} onClick={openAdd}>＋ <b>{monthlyPostRemaining <= 0 ? 'META ATINGIDA' : 'ADICIONAR PUBLICAÇÃO'}</b></button></>;
+    const files = <><div className="split-btn"><button>JSON</button><button>CSV</button></div><button className="report-btn">▤ <b>RELATÓRIO</b></button></>;
+    const updates = <><button className={`green-btn ${refreshing ? 'is-refreshing' : ''}`} disabled={refreshing} onClick={() => void refreshMetrics()}>↻ <b>{refreshing ? 'ATUALIZANDO MÉTRICAS...' : 'ATUALIZAR AGORA (MANUAL)'}</b></button><GoogleSheetsSyncButton userId={userId} beforeSync={refreshMetrics}/></>;
+    if (!organized) return <div className="hero-actions">{period}{files}{publications}{updates}</div>;
+    return <div className="hero-actions organized-actions"><div className="action-group"><small>PUBLICAÇÕES</small><div>{publications}</div></div><div className="action-group"><small>ATUALIZAÇÃO E PLANILHA</small><div>{updates}</div></div><div className="action-group"><small>RELATÓRIOS E ARQUIVOS</small><div>{files}</div></div><div className="action-group period-group"><small>PERÍODO</small><div>{period}</div></div></div>;
+}
+function BulkPosts({ profiles, bulkMission, setBulkMission, bulkText, setBulkText, busy, msg, remaining, goal, process, back }: {
     profiles: any[];
     bulkMission: string;
     setBulkMission: (v: string) => void;
@@ -261,9 +313,7 @@ function BulkPosts({ profiles, bulkMission, setBulkMission, bulkText, setBulkTex
     goal: number;
     process: () => void;
     back: () => void;
-    xImportEnabled: boolean;
-    xHandle: string;
-}) { const fetchRecent=()=>window.dispatchEvent(new CustomEvent('aoh:x-import-request',{detail:{mission:bulkMission}})); return <section className="bulk-page" style={{ maxWidth: 760, margin: '16px auto' }}><div className="bulk-title"><button onClick={back}>▤</button><div><h1>Postagens em Massa</h1><p>Cole uma lista de URLs de postagens abaixo, uma por linha. As métricas e mídias serão coletadas automaticamente.</p></div></div><div className="bulk-card" style={{ background: '#1c1c1c', border: '1px solid #2b2b2b', borderRadius: 8, padding: 30 }}><label>Missão Padrão para Novos Posts<select value={bulkMission} onChange={e => setBulkMission(e.target.value)}><option value="">Sem missão especial</option>{profiles.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>{xImportEnabled&&<div className="x-import-box"><div><strong>Buscar minhas postagens do X</strong><small>{xHandle?`Perfil configurado: @${xHandle}`:'Configure seu @ do X antes de buscar.'} Somente posts originais entrarão na revisão.</small></div><button type="button" className="x-import-button" disabled={busy||remaining<=0||!xHandle} onClick={fetchRecent}>𝕏 BUSCAR POSTAGENS</button></div>}<label>URLs dos Posts<textarea style={{ width: '100%', minHeight: 240 }} value={bulkText} onChange={e => setBulkText(e.target.value)} placeholder="Cole o texto contendo os links aqui..."/></label><em>{remaining > 0 ? `${remaining} vaga(s) restante(s) da meta mensal de ${goal}.` : `Meta mensal de ${goal} publicações atingida.`}</em>{msg && <p className="bulk-msg">{msg}</p>}<button className="bulk-process" disabled={busy || remaining <= 0} onClick={process}>{busy ? 'PROCESSANDO E COLETANDO...' : remaining <= 0 ? 'META MENSAL ATINGIDA' : 'Links do processador'}</button></div></section>; }
+}) { return <section className="bulk-page" style={{ maxWidth: 760, margin: '16px auto' }}><div className="bulk-title"><button onClick={back}>▤</button><div><h1>Postagens em Massa</h1><p>Cole uma lista de URLs de postagens abaixo, uma por linha. As métricas e mídias serão coletadas automaticamente.</p></div></div><div className="bulk-card" style={{ background: '#1c1c1c', border: '1px solid #2b2b2b', borderRadius: 8, padding: 30 }}><label>Missão Padrão para Novos Posts<select value={bulkMission} onChange={e => setBulkMission(e.target.value)}><option value="">Sem missão especial</option>{profiles.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label><label>URLs dos Posts<textarea style={{ width: '100%', minHeight: 240 }} value={bulkText} onChange={e => setBulkText(e.target.value)} placeholder="Cole o texto contendo os links aqui..."/></label><em>{remaining > 0 ? `${remaining} vaga(s) restante(s) da meta mensal de ${goal}.` : `Meta mensal de ${goal} publicações atingida.`}</em>{msg && <p className="bulk-msg">{msg}</p>}<button className="bulk-process" disabled={busy || remaining <= 0} onClick={process}>{busy ? 'PROCESSANDO E COLETANDO...' : remaining <= 0 ? 'META MENSAL ATINGIDA' : 'Links do processador'}</button></div></section>; }
 function iconFor(x: string) { return x === 'Painel' ? '◉' : x === 'Classificação' ? '♛' : x === 'História' ? '◷' : x === 'Centro de Controle da Missão' ? '▤' : x === 'Registro de atividades' ? '≡' : x === 'Admin' ? '◆' : '⚙'; }
 function DeltaBadge({ value }: {
     value: number;

@@ -7,6 +7,7 @@ import {postDateKey,postPublishedDate} from '@/lib/post-date';
 
 type ClosePeriodModalProps={
  posts:any[];
+ periodStart:string;
  crystalginLimit:number;
  onClose:()=>void;
  onSuccess:()=>void|Promise<void>;
@@ -27,17 +28,16 @@ function archiveErrorMessage(error:any){
  return'Não foi possível fechar o período agora.';
 }
 
-export default function ClosePeriodModal({posts,crystalginLimit,onClose,onSuccess}:ClosePeriodModalProps){
- const[start,setStart]=useState('');
- const[end,setEnd]=useState('');
+export default function ClosePeriodModal({posts,periodStart,crystalginLimit,onClose,onSuccess}:ClosePeriodModalProps){
+ const[end,setEnd]=useState(()=>postDateKey(new Date()));
  const[saving,setSaving]=useState(false);
  const[message,setMessage]=useState('');
  const today=postDateKey(new Date());
- const valid=Boolean(start&&end&&start<=end&&end<=today);
+ const valid=Boolean(periodStart&&end&&periodStart<=end&&end<=today);
  const selectedPosts=useMemo(()=>valid?posts.filter(post=>{
   const date=postDateKey(postPublishedDate(post));
-  return Boolean(date&&date>=start&&date<=end);
- }):[],[posts,start,end,valid]);
+   return Boolean(date&&date>=periodStart&&date<=end);
+  }):[],[posts,periodStart,end,valid]);
  const reward=useMemo(()=>monthlyReward(selectedPosts),[selectedPosts]);
  const total=Math.min(reward.raw,crystalginLimit);
 
@@ -45,7 +45,7 @@ export default function ClosePeriodModal({posts,crystalginLimit,onClose,onSucces
   if(!valid||!selectedPosts.length)return;
   setSaving(true);
   setMessage('');
-  const{error}=await supabase.rpc('close_period',{p_period_start:start,p_period_end:end});
+  const{error}=await supabase.rpc('close_my_active_period',{p_period_end:end});
   setSaving(false);
   if(error){setMessage(archiveErrorMessage(error));return}
   await onSuccess();
@@ -58,10 +58,10 @@ export default function ClosePeriodModal({posts,crystalginLimit,onClose,onSucces
     <button type="button" className="close-btn" aria-label="Fechar" disabled={saving} onClick={onClose}>×</button>
    </div>
    <div className="modal-body">
-    <p className="archive-intro">Escolha o início e o final da missão. Serão consideradas somente as publicações feitas no X dentro dessas datas.</p>
+    <p className="archive-intro">Escolha a data final. O início foi definido quando este período foi aberto.</p>
     <div className="archive-date-grid">
-     <label>Data de início<input autoFocus type="date" value={start} max={end||today} onChange={event=>{setStart(event.target.value);setMessage('')}}/></label>
-     <label>Data final<input type="date" value={end} min={start||undefined} max={today} onChange={event=>{setEnd(event.target.value);setMessage('')}}/></label>
+     <label>Data de início<input type="date" value={periodStart} disabled/></label>
+     <label>Data final<input autoFocus type="date" value={end} min={periodStart} max={today} onChange={event=>{setEnd(event.target.value);setMessage('')}}/></label>
     </div>
     <div className="archive-summary" aria-live="polite">
      <div><small>PUBLICAÇÕES</small><strong>{selectedPosts.length.toLocaleString('pt-BR')}</strong></div>
@@ -69,7 +69,7 @@ export default function ClosePeriodModal({posts,crystalginLimit,onClose,onSucces
      <div><small>CURTIDAS</small><strong>{reward.likes.toLocaleString('pt-BR')}</strong></div>
      <div><small>RECOMPENSA</small><strong>{total.toLocaleString('pt-BR')} CG</strong></div>
     </div>
-    {!start||!end?<p className="archive-helper">Selecione as duas datas para visualizar o resumo.</p>:!valid?<p className="archive-error">A data final deve ser igual ou posterior à inicial e não pode ser futura.</p>:!selectedPosts.length?<p className="archive-error">Nenhuma publicação do X foi encontrada nesse intervalo.</p>:null}
+    {!end?<p className="archive-helper">Selecione a data final para visualizar o resumo.</p>:!valid?<p className="archive-error">A data final deve ser igual ou posterior à inicial e não pode ser futura.</p>:!selectedPosts.length?<p className="archive-error">Nenhuma publicação do X foi encontrada nesse intervalo.</p>:null}
     {message&&<p className="archive-error">{message}</p>}
     <p className="archive-warning">Após confirmar, as datas não poderão ser alteradas. O registro será excluído automaticamente 40 dias depois, sem apagar as publicações originais.</p>
    </div>

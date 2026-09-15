@@ -87,7 +87,7 @@ export function timelinePostsFromFxData(data: unknown, expectedHandle: string, l
   const results = asRecord(data).results;
   if (!Array.isArray(results)) return [];
   const normalizedHandle = expectedHandle.replace(/^@/, '').toLowerCase();
-  const maximum = Math.max(1, Math.min(20, limit));
+  const maximum = Math.max(1, Math.min(100, limit));
   const seen = new Set<string>();
   const posts: XTimelinePost[] = [];
 
@@ -128,5 +128,28 @@ export function timelinePostsFromFxData(data: unknown, expectedHandle: string, l
     if (posts.length >= maximum) break;
   }
   return posts;
+}
+
+export function timelineCursorFromFxData(data: unknown) {
+  const cursor = asRecord(asRecord(data).cursor);
+  return typeof cursor.bottom === 'string' && cursor.bottom ? cursor.bottom : null;
+}
+
+export function xPostDateKey(value: string | null | undefined) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find(part => part.type === type)?.value || '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+export function postsWithinDateRange(posts: XTimelinePost[], start: string, end: string) {
+  return posts.filter(post => {
+    const date = xPostDateKey(post.published_at);
+    return Boolean(date && date >= start && date <= end);
+  });
 }
 
