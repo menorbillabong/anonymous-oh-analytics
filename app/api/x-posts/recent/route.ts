@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { extractTimelineData, timelinePostsFromData, timelinePostsFromFxData, type XTimelinePost } from '@/lib/x-timeline';
+import { extractTimelineData, postsWithinDateRange, timelineCursorFromFxData, timelinePostsFromData, timelinePostsFromFxData, xPostDateKey, type XTimelinePost } from '@/lib/x-timeline';
 
 const X_TIMELINE_HOSTS = ['https://syndication.x.com', 'https://syndication.twitter.com'];
 const FX_TIMELINE_URL = 'https://api.fxtwitter.com/2/profile';
@@ -28,32 +28,49 @@ async function claimImport(token: string) {
     const message = String(payload?.message || payload?.error || 'X_IMPORT_NOT_ALLOWED');
     if (message.includes('X_IMPORT_RATE_LIMIT')) throw new Error('X_IMPORT_RATE_LIMIT');
     if (message.includes('X_IMPORT_HANDLE_REQUIRED')) throw new Error('X_IMPORT_HANDLE_REQUIRED');
+    if (message.includes('X_IMPORT_PERIOD_REQUIRED')) throw new Error('X_IMPORT_PERIOD_REQUIRED');
     throw new Error('X_IMPORT_NOT_ALLOWED');
   }
-  return payload as { handle?: string; limit?: number };
+  return payload as { handle?: string; limit?: number; start_date?: string };
 }
 
-async function fetchTimeline(handle: string, limit: number) {
-  const fxController = new AbortController();
-  const fxTimeout = setTimeout(() => fxController.abort(), 9_000);
+async function fetchTimeline(handle: string, limit: number, startDate: string, endDate: string) {
+  const collected = new Map<string, XTimelinePost>();
+  const since = Math.floor(new Date(`${startDate}T00:00:00-03:00`).getTime() / 1000) - 1;
+  let cursor: string | null = null;
   try {
-    const response = await fetch(`${FX_TIMELINE_URL}/${encodeURIComponent(handle)}/statuses?count=20`, {
-      cache: 'no-store',
-      signal: fxController.signal,
-      headers: {
-        accept: 'application/json',
-        'user-agent': 'AnonymousOHAnalytics/2.0 (public X post importer)',
-      },
-    });
-    if (response.ok) {
-      const body = await response.text();
-      if (body.length > 5_000_000) throw new Error('X_TIMELINE_UNAVAILABLE');
-      return timelinePostsFromFxData(JSON.parse(body), handle, limit);
+    for (let page = 0; page < 5 && collected.size < limit; page++) {
+      const fxController = new AbortController();
+      const fxTimeout = setTimeout(() => fxController.abort(), 9_000);
+      try {
+        const query = cursor
+          ? `count=100&cursor=${encodeURIComponent(cursor)}`
+          : `count=100&since=${since}`;
+        const response = await fetch(`${FX_TIMELINE_URL}/${encodeURIComponent(handle)}/statuses?${query}`, {
+          cache: 'no-store',
+          signal: fxController.signal,
+          headers: {
+            accept: 'application/json',
+            'user-agent': 'AnonymousOHAnalytics/2.0 (public X post importer)',
+          },
+        });
+        if (response.status === 204) break;
+        if (!response.ok) throw new Error('X_TIMELINE_FALLBACK');
+        const body = await response.text();
+        if (body.length > 5_000_000) throw new Error('X_TIMELINE_UNAVAILABLE');
+        const payload = JSON.parse(body);
+        for (const post of timelinePostsFromFxData(payload, handle, 100)) collected.set(post.id, post);
+        cursor = timelineCursorFromFxData(payload);
+        if (!cursor) break;
+      } finally {
+        clearTimeout(fxTimeout);
+      }
+    }
+    if (collected.size || !cursor) {
+      return postsWithinDateRange([...collected.values()], startDate, endDate).slice(0, limit);
     }
   } catch (error) {
     if (error instanceof Error && error.message === 'X_TIMELINE_UNAVAILABLE') throw error;
-  } finally {
-    clearTimeout(fxTimeout);
   }
 
   let rateLimited = false;
@@ -76,7 +93,7 @@ async function fetchTimeline(handle: string, limit: number) {
       if (!response.ok) continue;
       const html = await response.text();
       if (html.length > 5_000_000) throw new Error('X_TIMELINE_UNAVAILABLE');
-      const posts = timelinePostsFromData(extractTimelineData(html), handle, limit);
+      const posts = postsWithinDateRange(timelinePostsFromData(extractTimelineData(html), handle, limit), startDate, endDate);
       if (posts.length) return posts;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') continue;
@@ -137,14 +154,18 @@ export async function POST(request: Request) {
   try {
     const access = await claimImport(token);
     const handle = String(access.handle || '').replace(/^@/, '');
-    const limit = Math.max(1, Math.min(12, Number(access.limit || 12)));
-    const timeline = await fetchTimeline(handle, limit);
-    const posts = await Promise.all(timeline.map(enrichPost));
-    return NextResponse.json({ handle, posts }, { headers: { 'cache-control': 'no-store' } });
+    const limit = Math.max(1, Math.min(100, Number(access.limit || 100)));
+    const startDate = String(access.start_date || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new Error('X_IMPORT_PERIOD_REQUIRED');
+    const endDate = xPostDateKey(new Date().toISOString());
+    const timeline = await fetchTimeline(handle, limit, startDate, endDate);
+    const posts = await Promise.all(timeline.map(post => post.views === undefined ? enrichPost(post) : post));
+    return NextResponse.json({ handle, period_start: startDate, period_end: endDate, posts }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'X_TIMELINE_UNAVAILABLE';
     if (code === 'X_IMPORT_RATE_LIMIT') return NextResponse.json({ error: 'Aguarde alguns segundos antes de buscar novamente.' }, { status: 429 });
     if (code === 'X_IMPORT_HANDLE_REQUIRED') return NextResponse.json({ error: 'Cadastre seu @ do X nas Configurações antes de buscar.' }, { status: 400 });
+    if (code === 'X_IMPORT_PERIOD_REQUIRED') return NextResponse.json({ error: 'Abra um período no Painel antes de buscar publicações no X.' }, { status: 409 });
     if (code === 'X_IMPORT_NOT_ALLOWED') return NextResponse.json({ error: 'A busca automática não está liberada para esta conta.' }, { status: 403 });
     if (code === 'CONFIGURATION_ERROR') return NextResponse.json({ error: 'A busca automática não está configurada.' }, { status: 500 });
     return NextResponse.json({ error: 'O X não liberou a lista pública agora. Tente novamente depois ou use a adição manual.' }, { status: 503 });

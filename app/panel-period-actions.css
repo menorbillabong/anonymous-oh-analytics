@@ -1,0 +1,20 @@
+.exact-hero.period-panel{height:auto}
+.period-status{margin-left:auto;border:1px solid #3b3b3b;border-radius:999px;padding:7px 11px;color:#8b9098;background:#171717;font-size:8px;font-style:normal;font-weight:900;letter-spacing:.05em}
+.period-status.open{color:#52dba9;border-color:#245d49;background:#10271f}
+.period-action-pair{display:inline-flex;gap:0}
+.period-action-pair>button{border-radius:0!important}
+.period-action-pair>button:first-child{border-radius:9px 0 0 9px!important}
+.period-action-pair>button:last-child{border-radius:0 9px 9px 0!important;border-left-width:0!important}
+.hero-actions .x-panel-search{background:#171717;border-color:#454545;color:#f0f0f0}
+.organized-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;justify-content:stretch}
+.organized-actions .action-group{border:1px solid #2d2d2d;border-radius:11px;background:#171717;padding:10px;min-width:0}
+.organized-actions .action-group>small{display:block;margin:0 0 8px;color:#686d76;font-size:7px;font-weight:900;letter-spacing:.08em}
+.organized-actions .action-group>div{display:flex;gap:7px;align-items:stretch;flex-wrap:wrap}
+.organized-actions .action-group>div>button,.organized-actions .action-group>div>.sheets-sync-button,.organized-actions .action-group>div>.split-btn{flex:1 1 auto;min-width:0}
+.organized-actions .period-action-pair{display:flex;width:100%}
+.organized-actions .period-action-pair>button{flex:1 1 50%;min-width:0}
+.archive-date-grid.single-date{grid-template-columns:minmax(0,1fr)}
+.x-handle-field{display:flex;align-items:center;border:1px solid #343434;border-radius:7px;background:#151515;overflow:hidden}
+.x-handle-field>span{padding:0 0 0 12px;color:#8a8f98;font-weight:900}
+.x-handle-field>input{border:0!important;background:transparent!important;flex:1;min-width:0}
+@media(max-width:760px){.period-status{width:100%;margin:10px 0 0;text-align:center}.organized-actions{grid-template-columns:1fr}.period-action-pair{display:flex;width:100%}.period-action-pair>button{flex:1 1 50%;min-width:0}}
