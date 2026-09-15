@@ -64,7 +64,7 @@
 .admin-action-group>small{display:block;margin-bottom:6px;color:#8f96a1;font-size:7px!important;font-weight:900;letter-spacing:.08em}
 .admin-action-group>div{display:grid;grid-template-columns:1fr;gap:5px}
 .admin-action-posts{grid-column:1/-1}
-.admin-action-posts>div{grid-template-columns:1fr}
+.admin-action-posts>div{grid-template-columns:1fr 1fr}
 .admin-row-actions button,.admin-post-card>button{min-width:0;min-height:30px;border:1px solid #353535;border-radius:6px;background:#1d1d1d;color:#c5c9d0;padding:0 8px;font-size:8px;font-weight:900;line-height:1.15;white-space:normal}
 .admin-row-actions button{width:100%}
 .admin-row-actions button:hover,.admin-post-card>button:hover{border-color:#805427;color:#ffb45f}
@@ -189,4 +189,5 @@
 @media(max-width:1000px){.admin-stats{grid-template-columns:repeat(2,1fr)}.admin-overview,.admin-controls-grid{grid-template-columns:1fr}.admin-post-grid{grid-template-columns:repeat(2,1fr)}.admin-closed-period-main{grid-template-columns:auto 1fr auto}.admin-closed-period-facts{grid-column:1/-1}.admin-closed-period-actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:720px){.admin-hero{align-items:flex-start;flex-direction:column;gap:20px;padding:24px 20px}.admin-hero h1{font-size:27px}.admin-tabs .admin-refresh{margin-left:0}.admin-stats,.admin-post-grid{grid-template-columns:1fr}.admin-panel-head{align-items:flex-start;flex-direction:column}.admin-search{width:100%}.admin-audit-row{grid-template-columns:30px 1fr}.admin-audit-row time{grid-column:2}.admin-stat{min-height:100px}.admin-period-selection{align-items:flex-start;flex-wrap:wrap}.admin-period-selection strong{margin-left:0}.admin-period-selection button{width:100%}.admin-closed-period-main{grid-template-columns:auto 1fr}.admin-closed-period-facts,.admin-closed-period-actions{grid-template-columns:1fr}.admin-closed-period-main>.admin-tag{grid-column:2;justify-self:start}.admin-date-delete-overlay{padding:8px}.admin-date-delete-fields,.admin-access-fields{grid-template-columns:1fr}.admin-access-fields label{grid-column:1}.admin-date-delete-actions{display:grid;grid-template-columns:1fr}.admin-date-delete-actions button{width:100%}}
 @media(prefers-reduced-motion:reduce){.admin-loading span{animation:none}}
+
 
