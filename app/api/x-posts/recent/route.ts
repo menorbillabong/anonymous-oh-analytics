@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
-import { extractTimelineData, postsWithinDateRange, timelineCursorFromFxData, timelinePostsFromData, timelinePostsFromFxData, xPostDateKey, type XTimelinePost } from '@/lib/x-timeline';
+import { extractTimelineData, pinnedStatusIdFromProfileHtml, postsWithinDateRange, timelineCursorFromFxData, timelinePostsFromData, timelinePostsFromFxData, xPostDateKey, type XTimelinePost } from '@/lib/x-timeline';
 
 const X_TIMELINE_HOSTS = ['https://syndication.x.com', 'https://syndication.twitter.com'];
 const FX_TIMELINE_URL = 'https://api.fxtwitter.com/2/profile';
+const FX_STATUS_URL = 'https://api.fxtwitter.com/2/status';
+const X_PROFILE_URL = 'https://x.com';
 
 function bearerToken(request: Request) {
   const match = request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i);
@@ -104,6 +106,59 @@ async function fetchTimeline(handle: string, limit: number, startDate: string, e
   throw new Error(rateLimited ? 'X_TIMELINE_RATE_LIMITED' : 'X_TIMELINE_UNAVAILABLE');
 }
 
+async function fetchPinnedPost(handle: string) {
+  const profileController = new AbortController();
+  const profileTimeout = setTimeout(() => profileController.abort(), 9_000);
+  try {
+    const profileResponse = await fetch(`${X_PROFILE_URL}/${encodeURIComponent(handle)}`, {
+      cache: 'no-store',
+      signal: profileController.signal,
+      headers: {
+        accept: 'text/html,application/xhtml+xml',
+        'accept-language': 'en-US,en;q=0.9',
+        'user-agent': 'Mozilla/5.0 (compatible; AnonymousOHAnalytics/2.0)',
+      },
+    });
+    if (!profileResponse.ok) return null;
+    const html = await profileResponse.text();
+    if (html.length > 5_000_000) return null;
+    const pinnedId = pinnedStatusIdFromProfileHtml(html, handle);
+    if (!pinnedId) return null;
+
+    const statusController = new AbortController();
+    const statusTimeout = setTimeout(() => statusController.abort(), 9_000);
+    try {
+      const statusResponse = await fetch(`${FX_STATUS_URL}/${pinnedId}`, {
+        cache: 'no-store',
+        signal: statusController.signal,
+        headers: {
+          accept: 'application/json',
+          'user-agent': 'AnonymousOHAnalytics/2.0 (public X post importer)',
+        },
+      });
+      if (!statusResponse.ok) return null;
+      const body = await statusResponse.text();
+      if (body.length > 5_000_000) return null;
+      const payload = JSON.parse(body);
+      return timelinePostsFromFxData({ results: [payload?.status] }, handle, 1)[0] || null;
+    } finally {
+      clearTimeout(statusTimeout);
+    }
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(profileTimeout);
+  }
+}
+
+function mergeTimelineWithPinnedPost(timeline: XTimelinePost[], pinned: XTimelinePost | null, startDate: string, endDate: string, limit: number) {
+  const collected = new Map(timeline.map(post => [post.id, post]));
+  if (pinned) collected.set(pinned.id, pinned);
+  return postsWithinDateRange([...collected.values()], startDate, endDate)
+    .sort((left, right) => String(right.published_at || '').localeCompare(String(left.published_at || '')))
+    .slice(0, limit);
+}
+
 function mediaUrl(value: any) {
   return typeof value === 'string' ? value : typeof value?.url === 'string' ? value.url : null;
 }
@@ -158,8 +213,12 @@ export async function POST(request: Request) {
     const startDate = String(access.start_date || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new Error('X_IMPORT_PERIOD_REQUIRED');
     const endDate = xPostDateKey(new Date().toISOString());
-    const timeline = await fetchTimeline(handle, limit, startDate, endDate);
-    const posts = await Promise.all(timeline.map(post => post.views === undefined ? enrichPost(post) : post));
+    const [timeline, pinned] = await Promise.all([
+      fetchTimeline(handle, limit, startDate, endDate),
+      fetchPinnedPost(handle),
+    ]);
+    const mergedTimeline = mergeTimelineWithPinnedPost(timeline, pinned, startDate, endDate, limit);
+    const posts = await Promise.all(mergedTimeline.map(post => post.views === undefined ? enrichPost(post) : post));
     return NextResponse.json({ handle, period_start: startDate, period_end: endDate, posts }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'X_TIMELINE_UNAVAILABLE';

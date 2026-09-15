@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractTimelineData, postsWithinDateRange, timelineCursorFromFxData, timelinePostsFromData, timelinePostsFromFxData, xPostDateKey } from '../lib/x-timeline.ts';
+import { extractTimelineData, pinnedStatusIdFromProfileHtml, postsWithinDateRange, timelineCursorFromFxData, timelinePostsFromData, timelinePostsFromFxData, xPostDateKey } from '../lib/x-timeline.ts';
 
 const entries = [
   { content: { tweet: { id_str: '101', conversation_id_str: '101', full_text: 'Post original', created_at: '2026-09-14T12:00:00Z', favorite_count: 4, retweet_count: 2, reply_count: 1, user: { screen_name: 'Creator', name: 'Criadora', profile_image_url_https: 'https://img.test/avatar.jpg' } } } },
@@ -12,6 +12,13 @@ const entries = [
 test('extracts the embedded timeline JSON', () => {
   const html = `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({ props: { pageProps: { timeline: { entries } } } })}</script></html>`;
   assert.equal(extractTimelineData(html).props.pageProps.timeline.entries.length, 4);
+});
+
+test('extracts the pinned post id only for the requested profile', () => {
+  const html = '<li><div data-href="/Creator/status/2099330850978484604/photo/1"><span><svg data-icon="icon-pin-fill"></svg></span><span>Pinned</span></div></li>';
+  assert.equal(pinnedStatusIdFromProfileHtml(html, '@creator'), '2099330850978484604');
+  assert.equal(pinnedStatusIdFromProfileHtml(html, '@other'), null);
+  assert.equal(pinnedStatusIdFromProfileHtml(html.replace('icon-pin-fill', 'icon-heart'), '@creator'), null);
 });
 
 test('keeps only original posts from the requested handle', () => {

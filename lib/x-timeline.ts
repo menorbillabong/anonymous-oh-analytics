@@ -29,6 +29,22 @@ export function extractTimelineData(html: string) {
   return JSON.parse(html.slice(jsonStart, end));
 }
 
+export function pinnedStatusIdFromProfileHtml(html: string, expectedHandle: string) {
+  const pinMarker = 'data-icon="icon-pin-fill"';
+  const markerIndex = html.indexOf(pinMarker);
+  if (markerIndex < 0) return null;
+
+  const nearbyMarkup = html.slice(Math.max(0, markerIndex - 2_000), markerIndex);
+  const links = [...nearbyMarkup.matchAll(/data-href=["']\/([^\/"']+)\/status\/(\d+)(?:[^"']*)["']/gi)];
+  const match = links.at(-1);
+  if (!match) return null;
+
+  let handle = match[1];
+  try { handle = decodeURIComponent(handle); } catch { /* Keep the original value. */ }
+  if (handle.replace(/^@/, '').toLowerCase() !== expectedHandle.replace(/^@/, '').toLowerCase()) return null;
+  return match[2];
+}
+
 export function timelinePostsFromData(data: unknown, expectedHandle: string, limit = 12): XTimelinePost[] {
   const root = asRecord(data);
   const entries = root?.props?.pageProps?.timeline?.entries;
