@@ -32,6 +32,7 @@ type AdminUser = {
   period_close_next_allowed_at?: string;
   period_close_blocked?: boolean;
   period_close_reset_at?: string;
+  x_import_enabled?: boolean;
 };
 
 type AdminPost = {
@@ -115,11 +116,12 @@ export default function AdminPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: sheetsData }, { data: countingData }, { data: cooldownData }] = await Promise.all([
+    const [{ data, error }, { data: sheetsData }, { data: countingData }, { data: cooldownData }, { data: xImportData }] = await Promise.all([
       supabase.rpc('admin_dashboard'),
       supabase.rpc('admin_google_sheets_users'),
       supabase.rpc('admin_closed_period_counting_status'),
       supabase.functions.invoke('username-auth', { body: { action: 'admin-period-close-status' } }),
+      supabase.rpc('admin_x_import_users'),
     ]);
     if (error) {
       setMessage('Não foi possível carregar o painel administrativo.');
@@ -129,10 +131,11 @@ export default function AdminPanel() {
     const next = (data || {}) as AdminDashboard;
     const sheetsByUser = new Map((Array.isArray(sheetsData) ? sheetsData : []).map((config:any) => [String(config.user_id), config]));
     const cooldownByUser = new Map((Array.isArray(cooldownData?.cooldowns) ? cooldownData.cooldowns : []).map((cooldown:any) => [String(cooldown.user_id), cooldown]));
+    const xImportByUser = new Map((Array.isArray(xImportData) ? xImportData : []).map((access:any) => [String(access.user_id), Boolean(access.enabled)]));
     next.users = (next.users || []).map(user => {
       const config:any = sheetsByUser.get(user.id) || {};
       const cooldown:any = cooldownByUser.get(user.id) || {};
-      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at};
+      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at, x_import_enabled:Boolean(xImportByUser.get(user.id))};
     });
     const countingByPeriod = new Map((Array.isArray(countingData) ? countingData : []).map((status:any) => [Number(status.id), status]));
     next.closed_periods = (next.closed_periods || []).map(period => ({...period,...(countingByPeriod.get(Number(period.id)) || {})}));
@@ -251,6 +254,19 @@ export default function AdminPanel() {
     } finally {
       setBusy('');
     }
+  }
+
+  async function toggleXImport(user: AdminUser) {
+    const enabled = !user.x_import_enabled;
+    const profile = user.profile_name || user.username || user.display_name || user.x_handle || 'este usuário';
+    if (!window.confirm(`${enabled ? 'Liberar' : 'Bloquear'} a busca de postagens do X para ${profile}? Isso não altera as publicações já salvas.`)) return;
+    const reason = reasonFor(enabled ? 'liberar a busca de postagens do X' : 'bloquear a busca de postagens do X');
+    if (!reason) return;
+    await run(`x-import-${user.id}`, () => supabase.rpc('admin_set_x_import_access', {
+      p_target_user: user.id,
+      p_enabled: enabled,
+      p_reason: reason,
+    }), enabled ? 'Busca do X liberada somente para este usuário.' : 'Busca do X bloqueada para este usuário.');
   }
 
   async function scheduleDeletion(user: AdminUser) {
@@ -458,7 +474,7 @@ export default function AdminPanel() {
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking', user.ranking_blocked ? 'liberar esta conta no ranking' : 'bloquear esta conta no ranking')}>{user.ranking_blocked ? 'LIBERAR RANKING' : 'BLOQUEAR RANKING'}</button>
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_control_unlocked ? 'lock_ranking_control' : 'unlock_ranking_control', user.ranking_control_unlocked ? 'bloquear o controle individual do ranking' : 'liberar o controle individual do ranking')}>{user.ranking_control_unlocked ? 'TRAVAR CONTROLE' : 'LIBERAR CONTROLE'}</button>
             </div></div>
-            <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button></div></div>
+            <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button><button className={user.x_import_enabled ? 'safe' : 'access'} disabled={busy === `x-import-${user.id}`} onClick={() => toggleXImport(user)}>{busy === `x-import-${user.id}` ? 'SALVANDO...' : user.x_import_enabled ? 'BUSCA DO X LIBERADA' : 'LIBERAR BUSCA DO X'}</button></div></div>
             <div className="admin-action-group"><small>FECHAMENTO</small><div><button className={user.period_close_blocked ? 'warning' : 'safe'} disabled={!user.period_close_blocked || busy === `period-close-${user.id}`} onClick={() => resetPeriodCloseCooldown(user)}>{busy === `period-close-${user.id}` ? 'LIBERANDO...' : user.period_close_blocked ? 'LIBERAR FECHAMENTO' : 'SEM BLOQUEIO ATIVO'}</button></div>{user.period_close_blocked && <small className="admin-reason">Até {formatDate(user.period_close_next_allowed_at, true)}</small>}</div>
           </div>
         </div>)}
