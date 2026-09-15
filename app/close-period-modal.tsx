@@ -8,6 +8,9 @@ import {postDateKey,postPublishedDate} from '@/lib/post-date';
 type ClosePeriodModalProps={
  posts:any[];
  periodStart:string;
+ closeAvailableOn?:string|null;
+ canClose?:boolean;
+ earlyReleaseSource?:'individual'|'global'|null;
  crystalginLimit:number;
  onClose:()=>void;
  onSuccess:()=>void|Promise<void>;
@@ -15,12 +18,8 @@ type ClosePeriodModalProps={
 
 function archiveErrorMessage(error:any){
  const message=String(error?.message||'');
- const cooldown=message.match(/ARCHIVED_PERIOD_COOLDOWN:(\d+)/);
- if(cooldown){
-  const releaseAt=new Date(Number(cooldown[1])*1000);
-  const releaseLabel=Number.isNaN(releaseAt.getTime())?'após o prazo de 7 dias':releaseAt.toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'});
-  return `Você já fechou um período nos últimos 7 dias. Um novo fechamento será liberado em ${releaseLabel}.`;
- }
+ const monthly=message.match(/TRACKING_PERIOD_CLOSE_MONTHLY:(\d{4}-\d{2}-\d{2})/);
+ if(monthly)return`Este período poderá ser fechado a partir de ${new Date(`${monthly[1]}T12:00:00-03:00`).toLocaleDateString('pt-BR')}, ou antes se um administrador liberar.`;
  if(message.includes('ARCHIVED_PERIOD_DUPLICATE'))return'Este mesmo período já foi fechado.';
  if(message.includes('ARCHIVED_PERIOD_ALREADY_CLOSED'))return'Este intervalo cruza um período que ainda está fechado. Reabra o período anterior antes de fechar novamente.';
  if(message.includes('ARCHIVED_PERIOD_EMPTY'))return'Não há publicações nesse período.';
@@ -28,7 +27,7 @@ function archiveErrorMessage(error:any){
  return'Não foi possível fechar o período agora.';
 }
 
-export default function ClosePeriodModal({posts,periodStart,crystalginLimit,onClose,onSuccess}:ClosePeriodModalProps){
+export default function ClosePeriodModal({posts,periodStart,closeAvailableOn,canClose=true,earlyReleaseSource,crystalginLimit,onClose,onSuccess}:ClosePeriodModalProps){
  const[end,setEnd]=useState(()=>postDateKey(new Date()));
  const[saving,setSaving]=useState(false);
  const[message,setMessage]=useState('');
@@ -59,6 +58,8 @@ export default function ClosePeriodModal({posts,periodStart,crystalginLimit,onCl
    </div>
    <div className="modal-body">
     <p className="archive-intro">Escolha a data final. O início foi definido quando este período foi aberto.</p>
+    {!canClose&&closeAvailableOn&&<p className="archive-error">O fechamento mensal será liberado em <strong>{new Date(`${closeAvailableOn}T12:00:00-03:00`).toLocaleDateString('pt-BR')}</strong>. Para fechar antes, peça uma liberação ao administrador.</p>}
+    {canClose&&earlyReleaseSource&&<p className="archive-helper">Fechamento antecipado liberado {earlyReleaseSource==='global'?'para todos':'para sua conta'}. A liberação será usada somente nesta confirmação.</p>}
     <div className="archive-date-grid">
      <label>Data de início<input type="date" value={periodStart} disabled/></label>
      <label>Data final<input autoFocus type="date" value={end} min={periodStart} max={today} onChange={event=>{setEnd(event.target.value);setMessage('')}}/></label>
@@ -71,11 +72,11 @@ export default function ClosePeriodModal({posts,periodStart,crystalginLimit,onCl
     </div>
     {!end?<p className="archive-helper">Selecione a data final para visualizar o resumo.</p>:!valid?<p className="archive-error">A data final deve ser igual ou posterior à inicial e não pode ser futura.</p>:!selectedPosts.length?<p className="archive-error">Nenhuma publicação do X foi encontrada nesse intervalo.</p>:null}
     {message&&<p className="archive-error">{message}</p>}
-    <p className="archive-warning">Após confirmar, as datas não poderão ser alteradas. O registro será excluído automaticamente 40 dias depois, sem apagar as publicações originais.</p>
+    <p className="archive-warning">Se houver erro, as datas poderão ser corrigidas com segurança no Histórico. O registro será excluído automaticamente 40 dias depois, sem apagar as publicações originais.</p>
    </div>
    <div className="modal-actions">
     <button type="button" className="btn" disabled={saving} onClick={onClose}>Cancelar</button>
-    <button type="button" className="btn btn-primary archive-confirm" disabled={saving||!valid||!selectedPosts.length} onClick={confirmPeriod}>{saving?'FECHANDO...':'CONFIRMAR FECHAMENTO'}</button>
+    <button type="button" className="btn btn-primary archive-confirm" disabled={saving||!canClose||!valid||!selectedPosts.length} onClick={confirmPeriod}>{saving?'FECHANDO...':canClose?'CONFIRMAR FECHAMENTO':'AGUARDANDO LIBERAÇÃO'}</button>
    </div>
   </section>
  </div>

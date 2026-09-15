@@ -5,7 +5,6 @@
 .period-action-pair>button{border-radius:0!important}
 .period-action-pair>button:first-child{border-radius:9px 0 0 9px!important}
 .period-action-pair>button:last-child{border-radius:0 9px 9px 0!important;border-left-width:0!important}
-.hero-actions .x-panel-search{background:#171717;border-color:#454545;color:#f0f0f0}
 .organized-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:stretch;justify-content:stretch}
 .organized-actions .action-group{border:1px solid #2d2d2d;border-radius:11px;background:#171717;padding:10px;min-width:0}
 .organized-actions .action-group>small{display:block;margin:0 0 8px;color:#686d76;font-size:7px;font-weight:900;letter-spacing:.08em}

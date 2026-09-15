@@ -1,0 +1,3 @@
+-- This migration version was applied directly to the production database.
+-- The reproducible migration is intentionally deferred to 20260915120100,
+-- after 20260915120000 creates public.tracking_periods on a fresh database.
