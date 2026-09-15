@@ -32,6 +32,7 @@ type AdminUser = {
   period_close_next_allowed_at?: string;
   period_close_blocked?: boolean;
   period_close_reset_at?: string;
+  period_close_release_source?: 'individual' | 'global';
   x_import_enabled?: boolean;
 };
 
@@ -135,7 +136,7 @@ export default function AdminPanel() {
     next.users = (next.users || []).map(user => {
       const config:any = sheetsByUser.get(user.id) || {};
       const cooldown:any = cooldownByUser.get(user.id) || {};
-      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at, x_import_enabled:Boolean(xImportByUser.get(user.id))};
+      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at, period_close_release_source:cooldown.release_source, x_import_enabled:Boolean(xImportByUser.get(user.id))};
     });
     const countingByPeriod = new Map((Array.isArray(countingData) ? countingData : []).map((status:any) => [Number(status.id), status]));
     next.closed_periods = (next.closed_periods || []).map(period => ({...period,...(countingByPeriod.get(Number(period.id)) || {})}));
@@ -153,6 +154,7 @@ export default function AdminPanel() {
   }, [load]);
 
   const users = dashboard.users || [];
+  const earlyCloseBlockedCount = users.filter(user => user.period_close_blocked).length;
   const posts = useMemo(()=>[...(dashboard.posts || [])].sort((a,b)=>(postPublishedDate(b)?.getTime()||0)-(postPublishedDate(a)?.getTime()||0)),[dashboard.posts]);
   const logs = dashboard.logs || [];
   const closedPeriods = dashboard.closed_periods || [];
@@ -254,6 +256,29 @@ export default function AdminPanel() {
     } finally {
       setBusy('');
     }
+  }
+
+  async function releaseAllPeriodClosures() {
+    if (!earlyCloseBlockedCount) return;
+    if (!window.confirm(`Liberar um fechamento antecipado para ${earlyCloseBlockedCount} usuário(s) com período aberto? A liberação será usada uma única vez por pessoa.`)) return;
+    const reason = reasonFor('liberar antecipadamente o fechamento para todos');
+    if (!reason) return;
+    setBusy('period-close-all');
+    setMessage('');
+    try {
+      const {data,error} = await supabase.functions.invoke('username-auth', {body:{action:'admin-release-all-period-close',reason}});
+      if (error) {
+        let detail='Não foi possível fazer a liberação geral.';
+        try { const payload=await (error as any).context?.json(); if(payload?.error)detail=payload.error; } catch {}
+        throw new Error(detail);
+      }
+      if(data?.error)throw new Error(data.error);
+      const affected=Number(data?.release?.affected_users||earlyCloseBlockedCount);
+      setMessage(`Fechamento antecipado liberado uma vez para ${affected} usuário(s).`);
+      await load();
+    } catch(error) {
+      setMessage(error instanceof Error?error.message:'Não foi possível fazer a liberação geral.');
+    } finally { setBusy(''); }
   }
 
   async function toggleXImport(user: AdminUser) {
@@ -475,7 +500,7 @@ export default function AdminPanel() {
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_control_unlocked ? 'lock_ranking_control' : 'unlock_ranking_control', user.ranking_control_unlocked ? 'bloquear o controle individual do ranking' : 'liberar o controle individual do ranking')}>{user.ranking_control_unlocked ? 'TRAVAR CONTROLE' : 'LIBERAR CONTROLE'}</button>
             </div></div>
             <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button><button className={user.x_import_enabled ? 'safe' : 'access'} disabled={busy === `x-import-${user.id}`} onClick={() => toggleXImport(user)}>{busy === `x-import-${user.id}` ? 'SALVANDO...' : user.x_import_enabled ? 'BUSCA DO X LIBERADA' : 'LIBERAR BUSCA DO X'}</button></div></div>
-            <div className="admin-action-group"><small>FECHAMENTO</small><div><button className={user.period_close_blocked ? 'warning' : 'safe'} disabled={!user.period_close_blocked || busy === `period-close-${user.id}`} onClick={() => resetPeriodCloseCooldown(user)}>{busy === `period-close-${user.id}` ? 'LIBERANDO...' : user.period_close_blocked ? 'LIBERAR FECHAMENTO' : 'SEM BLOQUEIO ATIVO'}</button></div>{user.period_close_blocked && <small className="admin-reason">Até {formatDate(user.period_close_next_allowed_at, true)}</small>}</div>
+            <div className="admin-action-group"><small>FECHAMENTO</small><div><button className={user.period_close_blocked ? 'warning' : 'safe'} disabled={!user.period_close_blocked || busy === `period-close-${user.id}`} onClick={() => resetPeriodCloseCooldown(user)}>{busy === `period-close-${user.id}` ? 'LIBERANDO...' : user.period_close_blocked ? 'LIBERAR FECHAMENTO' : user.period_close_release_source ? 'FECHAMENTO LIBERADO' : 'SEM BLOQUEIO ATIVO'}</button></div>{user.period_close_blocked && <small className="admin-reason">Liberação normal em {formatDate(user.period_close_next_allowed_at, true)}</small>}{user.period_close_release_source&&<small className="admin-reason">Liberação {user.period_close_release_source==='global'?'geral':'individual'} disponível uma vez</small>}</div>
           </div>
         </div>)}
         {!filteredUsers.length && <div className="admin-empty">Nenhum usuário encontrado.</div>}
@@ -570,6 +595,11 @@ export default function AdminPanel() {
     </div>}
 
     {section === 'Controles' && <div className="admin-controls-grid">
+      <div className="admin-panel">
+        <div className="admin-panel-head"><div><small>FECHAMENTO MENSAL</small><h2>Liberação geral antecipada</h2></div><StatusTag tone={earlyCloseBlockedCount ? 'warning' : 'success'}>{earlyCloseBlockedCount ? `${earlyCloseBlockedCount} BLOQUEADO(S)` : 'TODOS LIBERADOS'}</StatusTag></div>
+        <p className="admin-panel-copy">Libera uma única antecipação para cada usuário que já está com um período aberto. Períodos abertos depois da liberação continuam seguindo a regra mensal.</p>
+        <button className="admin-primary" disabled={!earlyCloseBlockedCount||busy==='period-close-all'} onClick={releaseAllPeriodClosures}>{busy==='period-close-all'?'LIBERANDO...':'LIBERAR FECHAMENTO PARA TODOS'}</button>
+      </div>
       <div className="admin-panel">
         <div className="admin-panel-head"><div><small>RANKING</small><h2>Controle global</h2></div><StatusTag tone={dashboard.controls?.ranking_self_service_enabled ? 'success' : 'neutral'}>{dashboard.controls?.ranking_self_service_enabled ? 'ATIVO' : 'DESATIVADO'}</StatusTag></div>
         <p className="admin-panel-copy">Defina se os usuários podem escolher livremente sua participação no ranking mensal.</p>
@@ -976,6 +1006,8 @@ function actionLabel(action:string) {
     update_account_access:'Acesso da conta atualizado',
     reopen_closed_period:'Contagem do período reaberta',
     reset_period_close_cooldown:'Prazo de fechamento liberado',
+    grant_period_close_individual:'Fechamento antecipado individual liberado',
+    grant_period_close_global:'Fechamento antecipado geral liberado',
   };
   return labels[action] || action.replaceAll('_', ' ');
 }

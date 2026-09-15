@@ -5,6 +5,9 @@ export type ActivePeriod = {
   start_date: string;
   opened_at: string;
   oldest_current_post?: string | null;
+  close_available_on?: string | null;
+  early_release_source?: 'individual' | 'global' | null;
+  can_close?: boolean;
 };
 
 export function defaultPeriodStart(todayKey: string) {

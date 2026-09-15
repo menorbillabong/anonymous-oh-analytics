@@ -31,6 +31,9 @@
 .history-card-metrics{margin:7px 0 0;color:#c1c5cc;font-size:12px}
 .history-expiration{margin:12px 0 0;color:#aeb4be;font-size:11px}
 .history-grid article button{margin-top:14px;border:1px solid #673030;border-radius:5px;background:#261313;color:#ff9696;padding:8px 11px;font-size:10px;font-weight:900}
+.history-card-actions{display:flex;gap:8px;flex-wrap:wrap}
+.history-grid article .history-card-actions button{margin-top:14px}
+.history-grid article .history-correct{border-color:#76501f;background:#2b1d0e;color:#ffb45f}
 .history-grid .empty-row{padding:32px 18px;border:1px dashed #343434;border-radius:8px;color:#aeb4be;text-align:center}
 @media(max-width:650px){.archive-date-grid{grid-template-columns:1fr}.archive-summary{grid-template-columns:1fr 1fr}.history-card-head{display:grid}}
 
