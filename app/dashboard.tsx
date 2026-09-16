@@ -14,6 +14,7 @@ import OpenPeriodModal from './open-period-modal';
 import GoogleSheetsSyncButton from './google-sheets-sync';
 import MissionPostReview from './mission-post-review';
 import MissionSelectionPage from './mission-selection-page';
+import { firstNormalMissionId } from '@/lib/mission-default';
 import { refreshStoredPostMetrics } from '@/lib/refresh-post-metrics';
 import { postDateParts, postPublishedDate } from '@/lib/post-date';
 import { isActiveCountingPost, postsForPublicationPeriod } from '@/lib/publication-period';
@@ -85,7 +86,7 @@ export default function Dashboard({ session }: {
         return; if (monthlyPostRemaining <= 0) {
         setRefreshNotice(`Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.`);
         return;
-    } setForm({ ...blank, published_date: new Date().toISOString().slice(0, 10) }); setAddOpen(true); };
+    } setForm({ ...blank, mission_profile_id: firstNormalMissionId(profiles), published_date: new Date().toISOString().slice(0, 10) }); setAddOpen(true); };
     const totalsFor = (rows: any[]) => { const counted = rows.filter(isActiveCountingPost), views = counted.reduce((a, p) => a + Number(p.views || 0), 0), likes = counted.reduce((a, p) => a + Number(p.likes || 0), 0), special = counted.reduce((a, p) => a + Number(p.special_reward || 0), 0); return { posts: counted.length, views, involvement: likes, crystal: likes * 2 + special }; };
     const syncRanking = useCallback(async () => { const { error } = await supabase.rpc('sync_my_monthly_ranking'); if (error) {
         setRefreshNotice('Não foi possível sincronizar a classificação agora.');
@@ -96,8 +97,7 @@ export default function Dashboard({ session }: {
         setRefreshStep(1);
         setShowDeltas(false);
     } const [{ data: p }, { data: s }, { data: m }, { data: xAccess }, { data: period }] = await Promise.all([supabase.from('posts').select('*').eq('user_id', uid).order('created_at', { ascending: false }), supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(), supabase.from('mission_profiles').select('*').eq('user_id', uid).order('name'), supabase.rpc('get_my_x_import_access'), supabase.rpc('get_my_active_period')]); if (pulse)
-        setRefreshStep(2); const next = p || [], nextSettings = { ...settingsDefaults, ...(s || {}) }; setPosts(next); setSettings(nextSettings); setXImportAccess({ enabled: Boolean(xAccess?.enabled), handle: String(xAccess?.handle || s?.x_handle || '').replace(/^@/, '') }); setActivePeriod(period?.id && period?.start_date ? period as ActivePeriod : null); setProfileChecked(true); setProfiles(m || []); void syncRanking(); if (!bulkMission && m?.length)
-        setBulkMission(String(m.find((x: any) => x.active)?.id || '')); if (pulse) {
+        setRefreshStep(2); const next = p || [], nextSettings = { ...settingsDefaults, ...(s || {}) }; setPosts(next); setSettings(nextSettings); setXImportAccess({ enabled: Boolean(xAccess?.enabled), handle: String(xAccess?.handle || s?.x_handle || '').replace(/^@/, '') }); setActivePeriod(period?.id && period?.start_date ? period as ActivePeriod : null); setProfileChecked(true); setProfiles(m || []); void syncRanking(); if (pulse) {
         const after = totalsFor(next), d = { posts: after.posts - before.posts, views: after.views - before.views, involvement: after.involvement - before.involvement, crystal: after.crystal - before.crystal };
         setDeltas(d);
         setRefreshing(false);
@@ -233,8 +233,8 @@ export default function Dashboard({ session }: {
         setBulkMsg(isMonthlyLimitError(error) ? `Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.` : 'Não foi possível adicionar os links.');
         return;
     } setBulkMsg(`${periodRows.length} publicação(ões) adicionada(s).${outside ? ` ${outside} link(s) ficaram fora do período aberto.` : ''}${omitted ? ` ${omitted} link(s) não foram adicionados porque a meta mensal foi alcançada.` : ''}`); setBulkText(''); await load(true); }
-    const openBulk = () => { if (!requireOpenPeriod()) return; setBulkOpen(true); };
-    const searchX = () => { if (!requireOpenPeriod()) return; window.dispatchEvent(new CustomEvent('aoh:x-import-request', { detail: { mission: bulkMission } })); };
+    const openBulk = () => { if (!requireOpenPeriod()) return; setBulkMission(firstNormalMissionId(profiles)); setBulkOpen(true); };
+    const searchX = () => { if (!requireOpenPeriod()) return; window.dispatchEvent(new CustomEvent('aoh:x-import-request')); };
     async function signOut() { await supabase.auth.signOut(); }
     const username = String(settings.app_name || '').trim().toUpperCase();
     if (missionPeriodsOpen)

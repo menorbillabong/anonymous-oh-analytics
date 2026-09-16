@@ -4,6 +4,7 @@ import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
 import {formatPostDate,postDateParts,postPublishedDate} from '@/lib/post-date';
 import {withoutExistingXPosts,xStatusId} from '@/lib/x-post-dedupe';
+import {firstNormalMissionId} from '@/lib/mission-default';
 import './bulk-review-reference.css';
 
 type ReviewPost={url:string;title:string;views:number;comments:number;reposts:number;likes:number;image_urls:string[];video_url:string|null;author_handle:string;author_name:string;author_avatar:string;published_date:string;x_published_at:string;mission_profile_id:string;duplicate:boolean;existing_url:string};
@@ -23,9 +24,10 @@ export default function BulkReviewInjector(){
  const validPosts=useMemo(()=>posts.filter(p=>!p.duplicate),[posts]);
  const closeReview=()=>{setOpen(false);setPosts([]);setMsg('')};
  const refreshProfiles=useCallback(async(userId?:string)=>{let resolvedUserId=userId;if(!resolvedUserId){const{data}=await supabase.auth.getUser();resolvedUserId=data.user?.id}if(!resolvedUserId)return[];const{data,error}=await supabase.from('mission_profiles').select('*').eq('user_id',resolvedUserId).order('name');if(error)return null;const next=data||[];setProfiles(next);return next},[]);
- const prepareReview=useCallback(async(items:FetchedPost[],mission:string)=>{
+ const prepareReview=useCallback(async(items:FetchedPost[],mission?:string)=>{
   const{data:{user}}=await supabase.auth.getUser();let existing:any[]=[],goal=60,periodStart='';
-  if(user){const[{data:found},{data:settings},{data:period}]=await Promise.all([supabase.from('posts').select('id,post_url,x_published_at,published_at,created_at').eq('user_id',user.id),supabase.from('user_settings').select('monthly_post_goal').eq('user_id',user.id).maybeSingle(),supabase.rpc('get_my_active_period'),refreshProfiles(user.id)]);existing=found||[];goal=Math.max(1,Number(settings?.monthly_post_goal||60));periodStart=String(period?.start_date||'')}
+  if(user){const[{data:found},{data:settings},{data:period},freshProfiles]=await Promise.all([supabase.from('posts').select('id,post_url,x_published_at,published_at,created_at').eq('user_id',user.id),supabase.from('user_settings').select('monthly_post_goal').eq('user_id',user.id).maybeSingle(),supabase.rpc('get_my_active_period'),refreshProfiles(user.id)]);if(freshProfiles===null)throw new Error('Não foi possível carregar os perfis de missão. Tente novamente.');if(mission===undefined)mission=firstNormalMissionId(freshProfiles);existing=found||[];goal=Math.max(1,Number(settings?.monthly_post_goal||60));periodStart=String(period?.start_date||'')}
+  mission=mission??'';
   if(!periodStart)throw new Error('Abra um período no Painel antes de adicionar publicações.');
   const filtered=withoutExistingXPosts(items,existing.map(post=>post.post_url),item=>item.url);
   const rows=await Promise.all(filtered.accepted.map(async item=>{const url=item.url;let data:any=item;if(!item.title&&!item.x_published_at){try{const response=await fetch('/api/x-metrics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});data={...item,...await response.json()}}catch{}}return{url,title:String(data.title||data.text||'Publicação do X'),views:Number(data.views||0),comments:Number(data.comments||0),reposts:Number(data.reposts||0),likes:Number(data.likes||0),image_urls:Array.isArray(data.image_urls)?data.image_urls:[],video_url:data.video_url||null,author_handle:String(data.author_handle||''),author_name:String(data.author_name||data.author_handle||'X'),author_avatar:String(data.author_avatar||''),published_date:String(data.published_date||data.published_at||'').slice(0,10)||new Date().toISOString().slice(0,10),x_published_at:String(data.x_published_at||data.published_at||''),mission_profile_id:mission,duplicate:false,existing_url:''}}));
@@ -45,12 +47,12 @@ export default function BulkReviewInjector(){
   try{await prepareReview(urls.map(url=>({url})),mission)}catch(error){setMsg(error instanceof Error?error.message:'Não foi possível preparar a revisão.')}finally{setLoading(false);btn.textContent=old}
  };document.addEventListener('click',capture,true);return()=>document.removeEventListener('click',capture,true)},[open,loading,prepareReview]);
  useEffect(()=>{const fetchRecent=async(event:Event)=>{
-  if(open||loading)return;const mission=String((event as CustomEvent<{mission?:string}>).detail?.mission||'');setLoading(true);setMsg('Buscando publicações recentes do X...');
+  if(open||loading)return;setLoading(true);setMsg('Buscando publicações recentes do X...');
   try{
    const{data:{session}}=await supabase.auth.getSession();if(!session)throw new Error('Entre novamente para continuar.');
    const response=await fetch('/api/x-posts/recent',{method:'POST',headers:{authorization:`Bearer ${session.access_token}`}});const payload=await response.json().catch(()=>({}));if(!response.ok)throw new Error(payload?.error||'Não foi possível buscar as publicações.');
    const fetched=Array.isArray(payload?.posts)?payload.posts:[];if(!fetched.length)throw new Error('Nenhuma publicação original recente foi encontrada.');
-   setMsg('');await prepareReview(fetched.map((post:any)=>({url:String(post.url||''),title:String(post.text||post.title||''),views:Number(post.views||0),comments:Number(post.comments||0),reposts:Number(post.reposts||0),likes:Number(post.likes||0),image_urls:Array.isArray(post.image_urls)?post.image_urls:[],video_url:post.video_url||null,author_handle:String(post.author_handle||payload.handle||''),author_name:String(post.author_name||post.author_handle||payload.handle||'X'),author_avatar:String(post.author_avatar||''),published_date:String(post.published_at||'').slice(0,10),x_published_at:String(post.published_at||'')})),mission);
+   setMsg('');await prepareReview(fetched.map((post:any)=>({url:String(post.url||''),title:String(post.text||post.title||''),views:Number(post.views||0),comments:Number(post.comments||0),reposts:Number(post.reposts||0),likes:Number(post.likes||0),image_urls:Array.isArray(post.image_urls)?post.image_urls:[],video_url:post.video_url||null,author_handle:String(post.author_handle||payload.handle||''),author_name:String(post.author_name||post.author_handle||payload.handle||'X'),author_avatar:String(post.author_avatar||''),published_date:String(post.published_at||'').slice(0,10),x_published_at:String(post.published_at||'')})));
   }catch(error){setMsg(error instanceof Error?error.message:'Não foi possível buscar as publicações.')}finally{setLoading(false)}
  };window.addEventListener('aoh:x-import-request',fetchRecent);return()=>window.removeEventListener('aoh:x-import-request',fetchRecent)},[loading,open,prepareReview]);
  const update=(i:number,p:Partial<ReviewPost>)=>setPosts(rows=>rows.map((x,n)=>n===i?{...x,...p}:x));

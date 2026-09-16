@@ -10,3 +10,6 @@ body:has(.mission-selection-page) [data-pix-donation]{display:none!important}
 .mission-period-floating small{font-size:12px;line-height:1.4;color:#b8bdc6}
 @media(max-width:1799px){.mission-period-floating{top:auto;bottom:max(12px,env(safe-area-inset-bottom));right:50%;transform:translateX(50%);width:440px;padding:12px;gap:6px}.mission-review-shell.mission-selection-page{padding-bottom:170px}html:has(.mission-selection-page){scroll-padding-bottom:170px}}
 @media print{.mission-period-floating{display:none}}
+.mission-period-definition{padding:16px;border:1px solid #444;border-radius:8px;flex:1;min-width:240px}
+.mission-period-admin-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+.mission-period-delete-confirm{padding:18px;border:1px solid #b76b5b;border-radius:10px;background:#291d19;margin:16px 0}

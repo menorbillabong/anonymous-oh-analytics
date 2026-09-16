@@ -1,15 +1,21 @@
-export type MissionSelectionPeriod = {id:string;start_date:string;end_date:string;per_user_limit:number|null};
+export type MissionSelectionPeriod = {id:string;start_date:string;end_date:string;per_user_limit:number|null;revision?:number};
 export type MissionSelection = {post_id:number;period_id:string;mission_profile_id:number};
 
 // Dates are normalized by the existing post-date helper before this predicate.
 export function eligibleForMissionPeriod(post:{id:string|number;counting_excluded?:boolean;special_reward?:number}, date:string, period:MissionSelectionPeriod, selections:MissionSelection[], profileReward=0){
  const assignment=selections.find(row=>String(row.post_id)===String(post.id));
  if(assignment)return assignment.period_id===period.id;
- return !post.counting_excluded&&!!date&&date>=period.start_date&&date<=period.end_date&&Number(post.special_reward||0)<=0&&profileReward<=0;
+ // Pending bonus posts remain visible for manual linkage; no extra bonus is added.
+ return (!post.counting_excluded||profileReward>0)&&!!date&&date>=period.start_date&&date<=period.end_date;
 }
 
 export function missionSelectionError(error:{message?:string}){
  const message=error.message||'';
+ if(message.includes('MISSION_PERIOD_LINKED_OUTSIDE_DATES'))return 'As novas datas deixariam publicações vinculadas fora do período. Corrija as seleções antes de reduzir as datas.';
+ if(message.includes('MISSION_PERIOD_ADMIN_REQUIRED'))return 'Somente o administrador pode gerenciar períodos de missão.';
+ if(message.includes('MISSION_PERIOD_INVALID'))return 'Informe datas válidas e uma quantidade inteira maior que zero.';
+ if(message.includes('MISSION_PERIOD_NOT_FOUND'))return 'Este período não está mais disponível. Atualize a página.';
+ if(message.includes('duplicate key')||message.includes('unique constraint'))return 'Já existe um período com essas datas.';
  if(message.includes('MISSION_PERIOD_LIMIT'))return 'Você atingiu o limite deste período. Desmarque uma publicação para selecionar outra.';
  if(message.includes('MISSION_PERIOD_ALREADY_ASSIGNED'))return 'Esta publicação já está selecionada em outro período. Atualize a lista.';
  if(message.includes('MISSION_PERIOD_HAS_BONUS'))return 'Esta publicação já está vinculada a uma missão com bônus.';

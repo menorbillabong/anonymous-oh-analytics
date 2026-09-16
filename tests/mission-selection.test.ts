@@ -13,10 +13,11 @@ test('selected publication stays in its own window but not an overlapping one',(
  assert.equal(eligibleForMissionPeriod({id:1},'2026-09-15',{...period,id:'second',start_date:'2026-09-15',end_date:'2026-09-20'},rows),false);
  assert.equal(eligibleForMissionPeriod({id:1},'2026-09-15',{...period,id:'second'},[]),true);
 });
-test('legacy bonus and closed publications cannot receive another selection',()=>{
- assert.equal(eligibleForMissionPeriod({id:1,special_reward:1},'2026-09-12',period,[]),false);
- assert.equal(eligibleForMissionPeriod({id:1},'2026-09-12',period,[],100),false);
+test('unlinked bonus publications stay visible for manual linkage; closed normal posts do not',()=>{
+ assert.equal(eligibleForMissionPeriod({id:1,special_reward:1},'2026-09-12',period,[]),true);
+ assert.equal(eligibleForMissionPeriod({id:1},'2026-09-12',period,[],100),true);
  assert.equal(eligibleForMissionPeriod({id:1,counting_excluded:true},'2026-09-12',period,[]),false);
+ assert.equal(eligibleForMissionPeriod({id:1,counting_excluded:true},'2026-09-12',period,[],100),true);
 });
 test('closed selected publication remains visible for reference',()=>{
  assert.equal(eligibleForMissionPeriod({id:1,counting_excluded:true},'2026-09-12',period,[{post_id:1,period_id:'first',mission_profile_id:3}]),true);

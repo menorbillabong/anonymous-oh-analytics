@@ -1,4 +1,6 @@
 -- Run inside a transaction and ALWAYS roll back. All fixture rows are synthetic.
+-- Historical baseline for migration 20260916003201 ONLY. After the v2 migration,
+-- run mission_period_management.sql instead (manual selection no longer has a cap).
 -- Negative IDs avoid consuming the application's identity sequences.
 create temporary table mission_test_context(admin_id uuid,user_a uuid,user_b uuid,period_a uuid,period_b uuid,unlimited uuid);
 insert into mission_test_context(admin_id,user_a,user_b)
