@@ -3,9 +3,10 @@
 import {useCallback,useEffect,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
+import ManualLikeControls from './manual-like-controls';
 import './google-sheets-sync.css';
 
-type SyncResult={success?:boolean;normalCount?:number;specialCount?:number;total?:number;cooldownSeconds?:number;retryAfterSeconds?:number;error?:string};
+type SyncResult={success?:boolean;normalCount?:number;specialCount?:number;total?:number;manualLikes?:number;cooldownSeconds?:number;retryAfterSeconds?:number;error?:string};
 
 export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:string;beforeSync?:()=>Promise<unknown>}){
   const[enabled,setEnabled]=useState(false);
@@ -31,7 +32,7 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
     if(running||remaining>0)return;
     setRunning(true);setResult(null);
     try{
-      if(beforeSync)await beforeSync();
+      if(beforeSync&&await beforeSync()===false)throw new Error('Atualize as métricas antes de sincronizar a planilha.');
       const{data:{session}}=await supabase.auth.getSession();
       if(!session)throw new Error('Sua sessão expirou. Entre novamente.');
       const response=await fetch('/api/google-sheets/sync',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`}});
@@ -50,9 +51,12 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
   }
 
   return <>
+    <div className="sheets-sync-control">
     <button className="sheets-sync-button" type="button" disabled={running||remaining>0} onClick={sync} title={remaining>0?`Disponível novamente em ${Math.ceil(remaining/60)} minuto(s)`:'Atualizar a aba vinculada no Google Sheets'}>
       ▦ <b>{running?'ATUALIZANDO PLANILHA...':remaining>0?`PLANILHA · ${Math.ceil(remaining/60)} MIN`:'ATUALIZAR MINHA PLANILHA'}</b>
     </button>
+    <ManualLikeControls userId={userId} disabled={running}/>
+    </div>
     {result&&typeof document!=='undefined'&&createPortal(<div className="sheets-result-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setResult(null)}}>
       <section className={`sheets-result-dialog ${result.error?'error':'success'}`} role="dialog" aria-modal="true" aria-labelledby="sheets-result-title">
         <div className="sheets-result-icon">{result.error?'!':'✓'}</div>
@@ -60,6 +64,7 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
         {result.error?<p>{result.error}</p>:<>
           <div className="sheets-result-counts"><span><small>NORMAL</small><strong>{Number(result.normalCount||0)}</strong></span><span><small>ESPECIAL</small><strong>{Number(result.specialCount||0)}</strong></span><span><small>TOTAL</small><strong>{Number(result.total||0)}</strong></span></div>
           <p>As colunas disponíveis foram atualizadas. Colunas ausentes ou sem título foram ignoradas com segurança; em missões especiais, Reward e Theme são preenchidos somente quando existem.</p>
+          {Number(result.manualLikes)>0&&<p>Ajuste manual aplicado: +{Number(result.manualLikes).toLocaleString('pt-BR')} curtidas no total. A planilha identifica o acréscimo nas notas das células e no cabeçalho.</p>}
         </>}
         <button type="button" onClick={()=>setResult(null)}>FECHAR</button>
       </section>

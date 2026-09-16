@@ -21,6 +21,8 @@ import { refreshStoredPostMetrics } from '@/lib/refresh-post-metrics';
 import { postDateParts, postPublishedDate } from '@/lib/post-date';
 import { isActiveCountingPost, postsForPublicationPeriod } from '@/lib/publication-period';
 import type { ActivePeriod } from '@/lib/tracking-period';
+import {applyManualLikes,distributeManualLikes,emptyManualAdjustment,parseManualAdjustment} from '@/lib/manual-like-adjustment';
+import {loadDashboardPosts} from '@/lib/load-dashboard-posts';
 import './globals.css';
 import './post-library.css';
 import './tracker-sections.css';
@@ -59,6 +61,18 @@ export default function Dashboard({ session }: {
     const [periodOpen, setPeriodOpen] = useState(false);
     const [openPeriodOpen, setOpenPeriodOpen] = useState(false);
     const [activePeriod, setActivePeriod] = useState<ActivePeriod | null>(null);
+    const [manualAdjustment, setManualAdjustment] = useState(emptyManualAdjustment);
+    useEffect(() => {
+        let alive = true;
+        const refresh = async () => {
+            const {data,error} = await supabase.rpc('get_my_manual_like_adjustment');
+            if (alive) setManualAdjustment(error ? emptyManualAdjustment : parseManualAdjustment(data));
+        };
+        void refresh();
+        window.addEventListener('aoh:manual-adjustment-changed', refresh);
+        window.addEventListener('focus', refresh);
+        return () => { alive = false; window.removeEventListener('aoh:manual-adjustment-changed', refresh); window.removeEventListener('focus', refresh); };
+    }, [uid, activePeriod?.id, activePeriod?.start_date]);
     const [bulkOpen, setBulkOpen] = useState(false);
     const [reviewProfileId, setReviewProfileId] = useState('');
     const [bulkMission, setBulkMission] = useState('');
@@ -98,7 +112,7 @@ export default function Dashboard({ session }: {
         setRefreshing(true);
         setRefreshStep(1);
         setShowDeltas(false);
-    } const [{ data: p }, { data: s }, { data: m }, { data: xAccess }, { data: period }] = await Promise.all([supabase.from('posts').select('*').eq('user_id', uid).order('created_at', { ascending: false }), supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(), supabase.from('mission_profiles').select('*').eq('user_id', uid).order('name'), supabase.rpc('get_my_x_import_access'), supabase.rpc('get_my_active_period')]); if (pulse)
+    } const [{ data: p }, { data: s }, { data: m }, { data: xAccess }, { data: period }] = await Promise.all([loadDashboardPosts(supabase, uid), supabase.from('user_settings').select('*').eq('user_id', uid).maybeSingle(), supabase.from('mission_profiles').select('*').eq('user_id', uid).order('name'), supabase.rpc('get_my_x_import_access'), supabase.rpc('get_my_active_period')]); if (pulse)
         setRefreshStep(2); const next = p || [], nextSettings = { ...settingsDefaults, ...(s || {}) }; setPosts(next); setSettings(nextSettings); setXImportAccess({ enabled: Boolean(xAccess?.enabled), handle: String(xAccess?.handle || s?.x_handle || '').replace(/^@/, '') }); setActivePeriod(period?.id && period?.start_date ? period as ActivePeriod : null); setProfileChecked(true); setProfiles(m || []); void syncRanking(); if (pulse) {
         const after = totalsFor(next), d = { posts: after.posts - before.posts, views: after.views - before.views, involvement: after.involvement - before.involvement, crystal: after.crystal - before.crystal };
         setDeltas(d);
@@ -112,7 +126,7 @@ export default function Dashboard({ session }: {
         return false; refreshLock.current = true; setRefreshing(true); setRefreshStep(1); setRefreshNotice(''); setShowDeltas(false); const before = totalsFor(posts); try {
         const result = await refreshStoredPostMetrics(posts, uid);
         setRefreshStep(2);
-        const { data: freshPosts, error: freshError } = await supabase.from('posts').select('*').eq('user_id', uid).order('created_at', { ascending: false });
+        const { data: freshPosts, error: freshError } = await loadDashboardPosts(supabase, uid);
         if (freshError)
             throw freshError;
         const next = freshPosts || [];
@@ -171,7 +185,11 @@ export default function Dashboard({ session }: {
     const countedPosts = useMemo(() => posts.filter(isActiveCountingPost), [posts]);
     const previousPeriodPosts = useMemo(() => postsForPublicationPeriod(posts, 'previous'), [posts]);
     const visiblePosts = publicationPeriod === 'current' ? countedPosts : previousPeriodPosts;
-    const reward = useMemo(() => monthlyReward(countedPosts), [countedPosts]);
+    const manualAllocation = useMemo(() => distributeManualLikes(countedPosts, manualAdjustment), [countedPosts, manualAdjustment]);
+    const calculatedPosts = useMemo(() => applyManualLikes(countedPosts, manualAllocation), [countedPosts, manualAllocation]);
+    const manualTotal = [...manualAllocation.values()].reduce((sum, value) => sum + value, 0);
+    const rawLikes = countedPosts.reduce((sum, post) => sum + Number(post.likes || 0), 0);
+    const reward = useMemo(() => monthlyReward(calculatedPosts), [calculatedPosts]);
     const minimumProgress = minimumPostProgress(countedPosts.length);
     const viewsProgress = viewGoalProgress(reward.views);
     const crystalginLimit = Math.max(1, Number(settings.cap_unlocked ? settings.crystalgin_limit : 30000) || 30000);
@@ -188,7 +206,7 @@ export default function Dashboard({ session }: {
         views: number;
         likes: number;
         crystalgin: number;
-    }>(); for (const p of countedPosts) {
+    }>(); for (const p of calculatedPosts) {
         const profile = profiles.find(x => String(x.id) === String(p.mission_profile_id));
         const historicalName = p.mission_name || 'SEM MISSÃO', name = (profile?.name || historicalName).trim().toLowerCase() === 'hight quality' ? 'High Quality' : profile?.name || historicalName;
         const profileId = profile ? String(profile.id) : '', key = profileId ? `profile:${profileId}` : `historical:${name}`;
@@ -198,7 +216,7 @@ export default function Dashboard({ session }: {
         r.likes += Number(p.likes || 0);
         r.crystalgin += Number(p.special_reward || 0) + Number(p.likes || 0) * 2;
         map.set(key, r);
-    } return [...map.values()]; }, [countedPosts, profiles]);
+    } return [...map.values()]; }, [calculatedPosts, profiles]);
     const missionTotals = useMemo(() => missionRows.reduce((a, r) => ({ posts: a.posts + r.posts, views: a.views + r.views, likes: a.likes + r.likes, crystalgin: a.crystalgin + r.crystalgin }), { posts: 0, views: 0, likes: 0, crystalgin: 0 }), [missionRows]);
     const selectedMission = profiles.find(x => String(x.id) === String(form.mission_profile_id));
     const reviewProfile = profiles.find(x => String(x.id) === reviewProfileId);
@@ -249,9 +267,10 @@ export default function Dashboard({ session }: {
       {bulkOpen ? <BulkPosts profiles={profiles} bulkMission={bulkMission} setBulkMission={setBulkMission} bulkText={bulkText} setBulkText={setBulkText} busy={busy} msg={bulkMsg} remaining={monthlyPostRemaining} goal={monthlyPostGoal} process={processBulk} back={() => setBulkOpen(false)}/> : <>
         {tab === 'Painel' && <>
           <section className="exact-hero period-panel"><div className="hero-title"><h1>PAINEL</h1><span>{countedPosts.length}</span>{activePeriod ? <em className="period-status open">PERÍODO ABERTO · {activePeriod.start_date}{activePeriod.can_close === false && activePeriod.close_available_on ? ` · FECHA EM ${activePeriod.close_available_on}` : activePeriod.early_release_source ? ' · FECHAMENTO LIBERADO' : ''}</em> : <em className="period-status">SEM PERÍODO ABERTO</em>}</div><PanelActions organized={settings.panel_action_layout === 'organized'} activePeriod={activePeriod} xImportEnabled={xImportAccess.enabled} xHandle={xImportAccess.handle} refreshing={refreshing} busy={busy} monthlyPostRemaining={monthlyPostRemaining} monthlyPostGoal={monthlyPostGoal} userId={uid} openPeriod={() => setOpenPeriodOpen(true)} closePeriod={() => setPeriodOpen(true)} searchX={searchX} onXHandleSaved={handle => { setXImportAccess(current => ({ ...current, handle })); setSettings((current: any) => ({ ...current, x_handle: handle })); }} openBulk={openBulk} refreshMetrics={() => refreshMetrics('manual')} openAdd={openAdd}/>{refreshNotice && <p style={{ margin: '10px 0 0', textAlign: 'right', color: '#8fa99e', fontSize: 10, fontWeight: 800 }}>{refreshNotice}</p>}</section>
-          <section className="exact-stats"><ExactStat label="TOTAL DE PUBLICAÇÕES" value={monthlyPostCount} goal={monthlyPostGoal} delta={showDeltas ? deltas.posts : 0}/><ExactStat label="VISUALIZAÇÕES TOTAIS" value={reward.views} delta={showDeltas ? deltas.views : 0}/><div className="exact-stat progress-stat"><div className="stat-label-row"><small>PROGRESSO DE<br />CRYSTGIN</small><span>FÓRMULA<br />OFICIAL</span></div><div className="stat-value-line"><AnimatedNumber value={crystalginProgress} suffix={` / ${crystalginLimit.toLocaleString('pt-BR')}`}/>{showDeltas && deltas.crystal > 0 && <DeltaBadge value={deltas.crystal}/>}</div><div className="progress-line"><i style={{ width: `${Math.min(100, crystalginProgress / crystalginLimit * 100)}%` }}/></div></div><ExactStat label="CURTIDAS TOTAIS" hint="Soma de todas as curtidas" value={involvement} delta={showDeltas ? deltas.involvement : 0}/><ExactStat label="CRYSTGIN TOTAL" value={reward.raw} accent delta={showDeltas ? deltas.crystal : 0}/></section>
-          <section className="formula-strip reward-progress-formula"><div className="formula-label">FÓRMULA V2</div><div className="formula-caption">DETALHAMENTO DA RECOMPENSA OFICIAL</div><FormulaProgressItem label="MÍNIMO (10 POSTS)" status={minimumProgress.reached ? 'MÍNIMO ATINGIDO' : 'MÍNIMO'} percent={minimumProgress.percent} value={reward.base}/><FormulaProgressItem label="META DE VISUALIZAÇÕES" status="OBJETIVO" percent={viewsProgress.percent} value={reward.viewsReward} highlight/><FormulaItem label="ENGAJAMENTO (CURTIDAS X2)" value={reward.engagementReward}/><FormulaItem label="MISSÕES ESPECIAIS" value={reward.special}/><FormulaItem label="TOTAL SEM CAP" value={reward.raw} total/></section>
-          <section className="mission-table mission-summary-card"><div className="mission-head"><h2>DESEMPENHO POR MISSÃO</h2><span>RESUMO POR CATEGORIA</span></div><div className="mission-row mission-columns"><b>MISSÃO</b><b>POSTAGENS</b><b>IMPRESSÕES/VISUALIZAÇÕES TOTAIS</b><b>CURTIDAS</b><b>CRYSTGIN</b></div>{missionRows.map(r => <div className="mission-row" key={r.profileId || r.name}><div className="mission-name"><i style={{ background: r.color, boxShadow: `0 0 10px ${r.color}` }}/>{r.profileId ? <button type="button" className="mission-name-button" onClick={() => setReviewProfileId(r.profileId)} title={`Ver publicações de ${r.name}`}>{r.name}</button> : <strong>{r.name}</strong>}</div><span>{r.posts}</span><span>{r.views.toLocaleString('pt-BR')}</span><span>{r.likes.toLocaleString('pt-BR')}</span><strong className="orange-text">{r.crystalgin.toLocaleString('pt-BR')}</strong></div>)}{!missionRows.length && <div className="mission-empty">Nenhuma missão com publicações.</div>}<div className="mission-row mission-total-row"><strong>TOTAL</strong><strong>{missionTotals.posts.toLocaleString('pt-BR')}</strong><strong>{missionTotals.views.toLocaleString('pt-BR')}</strong><strong>{missionTotals.likes.toLocaleString('pt-BR')}</strong><strong>{missionTotals.crystalgin.toLocaleString('pt-BR')}</strong></div><div className="mission-reward-summary"><div className="mission-reward-line"><span>RECOMPENSA MÍNIMA <small>{minimumProgress.reached ? '(MÍNIMO ATINGIDO · 100%)' : `(${minimumProgress.current.toLocaleString('pt-BR')}/${minimumProgress.goal.toLocaleString('pt-BR')} POSTAGENS · ${minimumProgress.percent}%)`}</small></span><strong>+ {reward.base.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-reward-line"><span>BÔNUS DE VISUALIZAÇÕES <small>{viewsProgress.maximumReached ? `(META MÁXIMA ATINGIDA: ${viewsProgress.current.toLocaleString('pt-BR')} VISUALIZAÇÕES)` : `(META ATUAL: ${viewsProgress.current.toLocaleString('pt-BR')} / ${viewsProgress.goal.toLocaleString('pt-BR')} VISUALIZAÇÕES)`}</small></span><strong>+ {reward.viewsReward.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-official-divider"/><div className="mission-official-total"><span>PROGRESSO OFICIAL <small>(COM LIMITE)</small></span><strong>{crystalginProgress.toLocaleString('pt-BR')} <em>CG</em></strong></div></div></section>
+          {manualTotal > 0 && <section className="manual-adjustment-summary" aria-label="Composição das curtidas"><strong>Curtidas do X: {rawLikes.toLocaleString('pt-BR')} · Ajuste manual: +{manualTotal.toLocaleString('pt-BR')} · Total: {(rawLikes + manualTotal).toLocaleString('pt-BR')}</strong><p>Os totais e o cálculo de CG abaixo incluem o ajuste manual (+{(manualTotal * 2).toLocaleString('pt-BR')} CG). As publicações, relatórios, classificação e histórico preservam as métricas reais.</p></section>}
+          <section className="exact-stats"><ExactStat label="TOTAL DE PUBLICAÇÕES" value={monthlyPostCount} goal={monthlyPostGoal} delta={showDeltas ? deltas.posts : 0}/><ExactStat label="VISUALIZAÇÕES TOTAIS" value={reward.views} delta={showDeltas ? deltas.views : 0}/><div className="exact-stat progress-stat"><div className="stat-label-row"><small>PROGRESSO DE<br />CRYSTGIN</small><span>{manualTotal ? <>CÁLCULO<br />AJUSTADO</> : <>FÓRMULA<br />OFICIAL</>}</span></div><div className="stat-value-line"><AnimatedNumber value={crystalginProgress} suffix={` / ${crystalginLimit.toLocaleString('pt-BR')}`}/>{showDeltas && deltas.crystal > 0 && <DeltaBadge value={deltas.crystal}/>}</div><div className="progress-line"><i style={{ width: `${Math.min(100, crystalginProgress / crystalginLimit * 100)}%` }}/></div></div><ExactStat label="CURTIDAS TOTAIS" hint="Soma de todas as curtidas" value={involvement} delta={showDeltas ? deltas.involvement : 0}/><ExactStat label="CRYSTGIN TOTAL" value={reward.raw} accent delta={showDeltas ? deltas.crystal : 0}/></section>
+          <section className="formula-strip reward-progress-formula"><div className="formula-label">FÓRMULA V2</div><div className="formula-caption">{manualTotal ? 'CÁLCULO COM AJUSTE MANUAL' : 'DETALHAMENTO DA RECOMPENSA OFICIAL'}</div><FormulaProgressItem label="MÍNIMO (10 POSTS)" status={minimumProgress.reached ? 'MÍNIMO ATINGIDO' : 'MÍNIMO'} percent={minimumProgress.percent} value={reward.base}/><FormulaProgressItem label="META DE VISUALIZAÇÕES" status="OBJETIVO" percent={viewsProgress.percent} value={reward.viewsReward} highlight/><FormulaItem label="ENGAJAMENTO (CURTIDAS X2)" value={reward.engagementReward}/><FormulaItem label="MISSÕES ESPECIAIS" value={reward.special}/><FormulaItem label="TOTAL SEM CAP" value={reward.raw} total/></section>
+          <section className="mission-table mission-summary-card"><div className="mission-head"><h2>DESEMPENHO POR MISSÃO</h2><span>RESUMO POR CATEGORIA</span></div><div className="mission-row mission-columns"><b>MISSÃO</b><b>POSTAGENS</b><b>IMPRESSÕES/VISUALIZAÇÕES TOTAIS</b><b>CURTIDAS</b><b>CRYSTGIN</b></div>{missionRows.map(r => <div className="mission-row" key={r.profileId || r.name}><div className="mission-name"><i style={{ background: r.color, boxShadow: `0 0 10px ${r.color}` }}/>{r.profileId ? <button type="button" className="mission-name-button" onClick={() => setReviewProfileId(r.profileId)} title={`Ver publicações de ${r.name}`}>{r.name}</button> : <strong>{r.name}</strong>}</div><span>{r.posts}</span><span>{r.views.toLocaleString('pt-BR')}</span><span>{r.likes.toLocaleString('pt-BR')}</span><strong className="orange-text">{r.crystalgin.toLocaleString('pt-BR')}</strong></div>)}{!missionRows.length && <div className="mission-empty">Nenhuma missão com publicações.</div>}<div className="mission-row mission-total-row"><strong>TOTAL</strong><strong>{missionTotals.posts.toLocaleString('pt-BR')}</strong><strong>{missionTotals.views.toLocaleString('pt-BR')}</strong><strong>{missionTotals.likes.toLocaleString('pt-BR')}</strong><strong>{missionTotals.crystalgin.toLocaleString('pt-BR')}</strong></div><div className="mission-reward-summary"><div className="mission-reward-line"><span>RECOMPENSA MÍNIMA <small>{minimumProgress.reached ? '(MÍNIMO ATINGIDO · 100%)' : `(${minimumProgress.current.toLocaleString('pt-BR')}/${minimumProgress.goal.toLocaleString('pt-BR')} POSTAGENS · ${minimumProgress.percent}%)`}</small></span><strong>+ {reward.base.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-reward-line"><span>BÔNUS DE VISUALIZAÇÕES <small>{viewsProgress.maximumReached ? `(META MÁXIMA ATINGIDA: ${viewsProgress.current.toLocaleString('pt-BR')} VISUALIZAÇÕES)` : `(META ATUAL: ${viewsProgress.current.toLocaleString('pt-BR')} / ${viewsProgress.goal.toLocaleString('pt-BR')} VISUALIZAÇÕES)`}</small></span><strong>+ {reward.viewsReward.toLocaleString('pt-BR')} <em>CG</em></strong></div><div className="mission-official-divider"/><div className="mission-official-total"><span>{manualTotal ? 'PROGRESSO AJUSTADO' : 'PROGRESSO OFICIAL'} <small>(COM LIMITE)</small></span><strong>{crystalginProgress.toLocaleString('pt-BR')} <em>CG</em></strong></div></div></section>
           {posts.length > 0 && <section className="exact-posts publication-period-section">
             <div className="posts-head publication-posts-head">
               <div className="publication-period-tabs" role="tablist" aria-label="Período das publicações">

@@ -1,11 +1,15 @@
 import {createClient} from '@supabase/supabase-js';
 import {NextResponse} from 'next/server';
 import {syncGoogleSheet} from '@/lib/google-sheets';
+import {parseManualAdjustment} from '@/lib/manual-like-adjustment';
+import type {SheetPost} from '@/lib/google-sheets-plan';
 
 export const dynamic='force-dynamic';
 
 function userMessage(error:unknown){
   const message=error instanceof Error?error.message:String(error||'');
+  if(message==='MANUAL_ADJUSTMENT_SHEET_MISMATCH')return{status:422,message:'O mês da planilha ou a coluna Likes não permite incluir todo o ajuste do período aberto. Confira essas configurações; nada foi alterado na planilha.'};
+  if(message==='MANUAL_ADJUSTMENT_CHANGED')return{status:409,message:'O ajuste ou o período mudou durante a sincronização. Tente novamente; nada foi alterado na planilha.'};
   if(message.includes('GOOGLE_SHEETS_SERVER_NOT_CONFIGURED'))return{status:503,message:'A conexão com o Google Sheets ainda não foi configurada no servidor.'};
   if(message.includes('GOOGLE_SHEETS_PERMISSION_DENIED'))return{status:403,message:'A planilha ainda não concedeu permissão de edição à conta de serviço.'};
   if(message.includes('GOOGLE_SHEETS_NOT_FOUND'))return{status:404,message:'Não encontrei a planilha ou a aba vinculada a este perfil.'};
@@ -37,17 +41,27 @@ export async function POST(request:Request){
 
   let normalCount=0,specialCount=0;
   try{
-    const{data:posts,error:postsError}=await supabase
+    const{data:adjustmentData,error:adjustmentError}=await supabase.rpc('get_my_manual_like_adjustment');
+    if(adjustmentError)throw adjustmentError;
+    const adjustment=parseManualAdjustment(adjustmentData);
+    const posts:SheetPost[]=[];
+    for(let offset=0;;offset+=500){
+    const{data:page,error:postsError}=await supabase
       .from('posts')
-      .select('post_url,network,published_at,views,likes,special_reward,mission_name,sheets_is_special')
+      .select('id,post_url,network,published_at,x_published_at,counting_excluded,views,likes,special_reward,mission_name,sheets_is_special')
       .eq('user_id',user.id)
-      .order('published_at',{ascending:true});
+      .order('published_at',{ascending:true}).order('id',{ascending:true}).range(offset,offset+499);
     if(postsError)throw postsError;
-    const result=await syncGoogleSheet(String(permission.sheet_tab_name||''),posts||[],String(permission.sheet_month||''));
+    posts.push(...(page||[]));if(!page||page.length<500)break;
+    }
+    const result=await syncGoogleSheet(String(permission.sheet_tab_name||''),posts,String(permission.sheet_month||''),adjustment,async()=>{
+      const{data,error}=await supabase.rpc('get_my_manual_like_adjustment');
+      if(error||JSON.stringify(parseManualAdjustment(data))!==JSON.stringify(adjustment))throw new Error('MANUAL_ADJUSTMENT_CHANGED');
+    });
     normalCount=result.normalCount;
     specialCount=result.specialCount;
     await supabase.rpc('complete_google_sheets_sync',{p_success:true,p_normal_count:normalCount,p_special_count:specialCount,p_error:null});
-    return NextResponse.json({success:true,normalCount,specialCount,total:normalCount+specialCount,skippedOutsideMonth:result.skippedOutsideMonth,cooldownSeconds:300});
+    return NextResponse.json({success:true,normalCount,specialCount,total:normalCount+specialCount,manualLikes:result.manualLikes,skippedOutsideMonth:result.skippedOutsideMonth,cooldownSeconds:300});
   }catch(error){
     const friendly=userMessage(error);
     await supabase.rpc('complete_google_sheets_sync',{p_success:false,p_normal_count:normalCount,p_special_count:specialCount,p_error:friendly.message});

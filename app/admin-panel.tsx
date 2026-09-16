@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatPostDate, postPublishedDate } from '@/lib/post-date';
+import { userMatchesSearch } from '@/lib/admin-user-search';
 import './admin.css';
 
 type AdminSection = 'Visão geral' | 'Usuários' | 'Publicações' | 'Períodos fechados' | 'Auditoria' | 'Controles';
@@ -34,6 +35,7 @@ type AdminUser = {
   period_close_reset_at?: string;
   period_close_release_source?: 'individual' | 'global';
   x_import_enabled?: boolean;
+  manual_adjustment_enabled?: boolean;
 };
 
 type AdminPost = {
@@ -105,6 +107,8 @@ export default function AdminPanel() {
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
+  const [adjustmentAccessLoaded, setAdjustmentAccessLoaded] = useState(false);
   const [cleanupEnabled, setCleanupEnabled] = useState(false);
   const [inactivityDays, setInactivityDays] = useState(90);
   const [graceDays, setGraceDays] = useState(7);
@@ -117,12 +121,13 @@ export default function AdminPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: sheetsData }, { data: countingData }, { data: cooldownData }, { data: xImportData }] = await Promise.all([
+    const [{ data, error }, { data: sheetsData }, { data: countingData }, { data: cooldownData }, { data: xImportData }, adjustmentAccess] = await Promise.all([
       supabase.rpc('admin_dashboard'),
       supabase.rpc('admin_google_sheets_users'),
       supabase.rpc('admin_closed_period_counting_status'),
       supabase.functions.invoke('username-auth', { body: { action: 'admin-period-close-status' } }),
       supabase.rpc('admin_x_import_users'),
+      supabase.rpc('admin_manual_adjustment_users'),
     ]);
     if (error) {
       setMessage('Não foi possível carregar o painel administrativo.');
@@ -133,10 +138,12 @@ export default function AdminPanel() {
     const sheetsByUser = new Map((Array.isArray(sheetsData) ? sheetsData : []).map((config:any) => [String(config.user_id), config]));
     const cooldownByUser = new Map((Array.isArray(cooldownData?.cooldowns) ? cooldownData.cooldowns : []).map((cooldown:any) => [String(cooldown.user_id), cooldown]));
     const xImportByUser = new Map((Array.isArray(xImportData) ? xImportData : []).map((access:any) => [String(access.user_id), Boolean(access.enabled)]));
+    const adjustmentByUser = new Map((Array.isArray(adjustmentAccess.data) ? adjustmentAccess.data : []).map((access:any) => [String(access.user_id), access.enabled === true]));
+    setAdjustmentAccessLoaded(!adjustmentAccess.error && Array.isArray(adjustmentAccess.data));
     next.users = (next.users || []).map(user => {
       const config:any = sheetsByUser.get(user.id) || {};
       const cooldown:any = cooldownByUser.get(user.id) || {};
-      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at, period_close_release_source:cooldown.release_source, x_import_enabled:Boolean(xImportByUser.get(user.id))};
+      return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at, period_close_release_source:cooldown.release_source, x_import_enabled:Boolean(xImportByUser.get(user.id)), manual_adjustment_enabled:adjustmentByUser.get(user.id) === true};
     });
     const countingByPeriod = new Map((Array.isArray(countingData) ? countingData : []).map((status:any) => [Number(status.id), status]));
     next.closed_periods = (next.closed_periods || []).map(period => ({...period,...(countingByPeriod.get(Number(period.id)) || {})}));
@@ -159,10 +166,7 @@ export default function AdminPanel() {
   const logs = dashboard.logs || [];
   const closedPeriods = dashboard.closed_periods || [];
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredUsers = useMemo(() => users.filter(user =>
-    !normalizedSearch || [user.profile_name, user.username, user.display_name, user.email, user.x_handle]
-      .some(value => String(value || '').toLowerCase().includes(normalizedSearch))
-  ), [users, normalizedSearch]);
+  const filteredUsers = useMemo(() => users.filter(user => userMatchesSearch(user, userSearch)), [users, userSearch]);
   const filteredPosts = useMemo(() => posts.filter(post =>
     !normalizedSearch || [post.title, post.author_handle, post.post_url]
       .some(value => String(value || '').toLowerCase().includes(normalizedSearch))
@@ -301,6 +305,18 @@ export default function AdminPanel() {
       p_target_user: user.id,
       p_reason: reason,
     }), 'Exclusão da conta agendada.');
+  }
+
+  async function toggleManualAdjustment(user: AdminUser) {
+    if (busy || !adjustmentAccessLoaded) return;
+    const enabled = !user.manual_adjustment_enabled;
+    const profile = user.profile_name || user.username || user.display_name || 'este usuário';
+    if (!window.confirm(`${enabled ? 'Liberar' : 'Bloquear'} a configuração de ajustes manuais para ${profile}? As curtidas reais não serão alteradas. Ao bloquear, o ajuste deixa de entrar nos próximos cálculos e sincronizações.`)) return;
+    const reason = reasonFor(enabled ? 'liberar ajustes manuais para este usuário' : 'bloquear ajustes manuais para este usuário');
+    if (!reason) return;
+    await run(`manual-adjustment-${user.id}`, () => supabase.rpc('admin_set_manual_adjustment_access', {
+      p_target_user: user.id, p_enabled: enabled, p_reason: reason,
+    }), enabled ? 'Permissão de ajuste manual liberada para este usuário.' : 'Permissão de ajuste manual bloqueada para este usuário.');
   }
 
   async function cancelDeletion(user: AdminUser) {
@@ -480,7 +496,9 @@ export default function AdminPanel() {
     </div>}
 
     {section === 'Usuários' && <div className="admin-panel">
-      <PanelHeading eyebrow="GESTÃO DE CONTAS" title="Usuários" search={search} setSearch={setSearch}/>
+      <PanelHeading eyebrow="GESTÃO DE CONTAS" title="Usuários" search={userSearch} setSearch={setUserSearch} searchLabel="Buscar pelo nome"/>
+      <p className="admin-user-search-summary" role="status">{filteredUsers.length} / {users.length} <span>usuários encontrados</span></p>
+      {!adjustmentAccessLoaded && <p className="admin-adjustment-unavailable" role="status">A permissão de ajustes manuais não pôde ser consultada. Atualize a lista antes de alterá-la.</p>}
       <div className="admin-table-scroll"><div className="admin-user-table">
         <div className="admin-table-head"><span>USUÁRIO</span><span>STATUS</span><span>RANKING</span><span>ATIVIDADE</span><span>GOOGLE SHEETS</span><span>AÇÕES</span></div>
         {filteredUsers.map(user => <div className="admin-user-row" key={user.id}>
@@ -490,6 +508,7 @@ export default function AdminPanel() {
           <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small></div>
           <SheetsAccess user={user} onSaved={load}/>
           <div className="admin-row-actions">
+            <div className="admin-action-group"><small>AJUSTES MANUAIS</small><div><button className={user.manual_adjustment_enabled ? 'safe' : 'access'} disabled={Boolean(busy) || !adjustmentAccessLoaded} onClick={() => toggleManualAdjustment(user)}>{busy === `manual-adjustment-${user.id}` ? 'SALVANDO...' : !adjustmentAccessLoaded ? 'PERMISSÃO INDISPONÍVEL' : user.manual_adjustment_enabled ? 'BLOQUEAR AJUSTE MANUAL' : 'LIBERAR AJUSTE MANUAL'}</button></div><small className="admin-reason">{user.manual_adjustment_enabled ? 'Liberado individualmente' : 'Desabilitado por padrão'}</small></div>
             <div className="admin-action-group"><small>CONTA</small><div>
               <button className="access" onClick={() => setAccessUser(user)}>ALTERAR ACESSO</button>
               <button disabled={busy === `user-${user.id}` || user.is_admin} onClick={() => manageUser(user, user.suspended ? 'reactivate' : 'suspend', user.suspended ? 'reativar esta conta' : 'suspender esta conta')}>{user.suspended ? 'REATIVAR' : 'SUSPENDER'}</button>
@@ -631,8 +650,8 @@ function AdminStat({label, value, detail}:{label:string; value:number; detail:st
   return <div className="admin-stat"><small>{label}</small><strong>{value.toLocaleString('pt-BR')}</strong><span>{detail}</span></div>;
 }
 
-function PanelHeading({eyebrow, title, search, setSearch}:{eyebrow:string; title:string; search:string; setSearch:(value:string)=>void}) {
-  return <div className="admin-panel-head"><div><small>{eyebrow}</small><h2>{title}</h2></div><div className="admin-search"><span>⌕</span><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Buscar..."/></div></div>;
+function PanelHeading({eyebrow, title, search, setSearch, searchLabel='Buscar...'}:{eyebrow:string; title:string; search:string; setSearch:(value:string)=>void; searchLabel?:string}) {
+  return <div className="admin-panel-head"><div><small>{eyebrow}</small><h2>{title}</h2></div><div className="admin-search"><span aria-hidden="true">⌕</span><input type="search" value={search} onChange={event => setSearch(event.target.value)} placeholder={searchLabel} aria-label={searchLabel}/>{search && <button type="button" aria-label="Limpar busca" onClick={() => setSearch('')}>×</button>}</div></div>;
 }
 
 function StatusTag({children, tone}:{children:React.ReactNode; tone:'success'|'danger'|'warning'|'neutral'}) {

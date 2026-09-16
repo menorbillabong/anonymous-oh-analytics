@@ -1,6 +1,11 @@
+import {distributeManualLikes,manualPostKey,type ManualLikeAdjustment} from './manual-like-adjustment.ts';
+import {postDateKey,postPublishedDate} from './post-date.ts';
 const MAX_SHEET_ROWS = 2000;
 
 export type SheetPost = {
+  id?: string | number;
+  x_published_at?: string | null;
+  counting_excluded?: boolean | null;
   post_url?: string | null;
   network?: string | null;
   published_at?: string | null;
@@ -11,13 +16,14 @@ export type SheetPost = {
   sheets_is_special?: boolean | null;
 };
 
-type SheetUpdate = {range:string; values:Array<Array<string|number>>};
+export type SheetUpdate = {range:string; values:Array<Array<string|number>>; manualNote?:string};
 
 export type SheetPlan = {
   updates: SheetUpdate[];
   normalCount: number;
   specialCount: number;
   skippedOutsideMonth: number;
+  manualLikes: number;
 };
 
 type HeaderField = 'month'|'publishDate'|'platform'|'contentLink'|'views'|'likes'|'eligible'|'reward'|'theme';
@@ -49,7 +55,7 @@ function headerField(value:unknown):HeaderField|null{
   if(label==='platform')return'platform';
   if(label.includes('content link'))return'contentLink';
   if(label.includes('impressions')&&label.includes('views'))return'views';
-  if(label==='likes')return'likes';
+  if(label==='likes'||label==='likes (x + manual)')return'likes';
   if(label==='eligible')return'eligible';
   if(label==='reward')return'reward';
   if(label==='theme')return'theme';
@@ -116,14 +122,14 @@ function columnName(columnIndex:number){
 }
 
 function cellRange(tab:string,columnIndex:number,rowIndex:number){return `${a1Tab(tab)}!${columnName(columnIndex)}${rowIndex+1}`}
-function postDate(post:SheetPost){return clean(post.published_at).slice(0,10)}
+function postDate(post:SheetPost){return postDateKey(postPublishedDate(post))}
 function postPlatform(post:SheetPost){
   const network=normalized(post.network);
   if(network==='x'||network==='twitter')return'X';
   return xStatusId(post.post_url)?'X':'';
 }
 
-export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost[],sheetMonth=''):SheetPlan{
+export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost[],sheetMonth='',adjustment?:ManualLikeAdjustment):SheetPlan{
   const layout=findLastHeaderLayout(rows);
   if(!layout)throw new Error('Não encontrei os dois cabeçalhos Content Link de Normal Mission e Special Mission nessa aba.');
 
@@ -146,6 +152,9 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
   let nextNormal=lastNormal+1;
   let nextSpecial=lastSpecial+1;
   const updates:SheetUpdate[]=[];
+  const allocation=adjustment?distributeManualLikes(posts,adjustment):new Map<string,number>();
+  const expectedManual=[...allocation.values()].reduce((sum,value)=>sum+value,0);
+  let manualLikes=0;
   let normalCount=0,specialCount=0,skippedOutsideMonth=0;
   const uniquePosts=new Map<string,SheetPost>();
   for(const post of posts){const key=linkKey(post.post_url);if(key)uniquePosts.set(key,post)}
@@ -176,7 +185,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
       const section=oldCell.special?layout.special:layout.normal;
       for(const field of SITE_MANAGED_FIELDS){
         const column=section[field];
-        if(column!==undefined)updates.push({range:cellRange(tabName,column,oldCell.row),values:[['']]});
+        if(column!==undefined)updates.push({range:cellRange(tabName,column,oldCell.row),values:[['']],...(field==='likes'&&adjustment?{manualNote:''}:{})});
       }
     }
 
@@ -190,7 +199,12 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     add('platform',postPlatform(post));
     add('contentLink',clean(post.post_url));
     add('views',safeNumber(post.views));
-    add('likes',safeNumber(post.likes));
+    const extra=allocation.get(manualPostKey(post))||0;
+    if(section.likes!==undefined){
+      const actual=safeNumber(post.likes);
+      updates.push({range:cellRange(tabName,section.likes,row),values:[[actual+extra]],...(adjustment?{manualNote:extra?`X likes: ${actual}\nManual adjustment: +${extra}\nTotal: ${actual+extra}`:''}:{})});
+      manualLikes+=extra;
+    }
     if(special){
       add('reward',safeNumber(post.special_reward));
       add('theme',clean(post.mission_name));
@@ -200,7 +214,13 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     }
   }
 
-  return{updates,normalCount,specialCount,skippedOutsideMonth};
+  if(manualLikes!==expectedManual)throw new Error('MANUAL_ADJUSTMENT_SHEET_MISMATCH');
+  if(manualLikes){
+    for(const section of [layout.normal,layout.special])if(section.likes!==undefined){
+      updates.push({range:cellRange(tabName,section.likes,layout.row),values:[['Likes (X + manual)']],manualNote:'Values include explicitly declared manual adjustments. See each cell note for real X likes and the manual addition.'});
+    }
+  }
+  return{updates,normalCount,specialCount,skippedOutsideMonth,manualLikes};
 }
 
 export const GOOGLE_SHEETS_MAX_ROWS=MAX_SHEET_ROWS;
