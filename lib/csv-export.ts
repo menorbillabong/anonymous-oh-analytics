@@ -21,6 +21,20 @@ function metric(value:unknown){
 }
 
 export function buildPostsCsv(posts:CsvPost[]){
+ return buildDelimitedPosts(posts,',',csvCell);
+}
+
+function txtCell(value:unknown){
+ // Embedded tabs/newlines must not create extra cells when pasted into Sheets.
+ const text=String(value??'').replace(/[\t\r\n]+/g,' ');
+ return /^[\s]*[=+@\-"]/.test(text)?`'${text}`:text;
+}
+
+export function buildPostsTxt(posts:CsvPost[]){
+ return buildDelimitedPosts(posts,'\t',txtCell);
+}
+
+function buildDelimitedPosts(posts:CsvPost[],separator:string,cell:(value:unknown)=>string){
  const groups=new Map<string,CsvPost[]>();
  posts.forEach(post=>{
   const mission=String(post.mission_name||'Sem missão').trim()||'Sem missão';
@@ -30,8 +44,8 @@ export function buildPostsCsv(posts:CsvPost[]){
  const lines:string[]=[];
  [...groups.entries()].forEach(([mission,rows],index)=>{
   if(index)lines.push('');
-  lines.push(csvCell(`MISSÃO: ${mission}`));
-  lines.push(['Data','Rede','Link','Visualizações','Curtidas'].map(csvCell).join(','));
+  lines.push(cell(`MISSÃO: ${mission}`));
+  lines.push(['Data','Rede','Link','Visualizações','Curtidas'].map(cell).join(separator));
   [...rows]
    .sort((a,b)=>{
     const aTime=postPublishedDate(a)?.getTime()??Number.POSITIVE_INFINITY;
@@ -45,7 +59,7 @@ export function buildPostsCsv(posts:CsvPost[]){
      post.post_url,
      metric(post.views),
      metric(post.likes),
-    ].map(csvCell).join(','));
+    ].map(cell).join(separator));
    });
  });
 

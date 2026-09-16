@@ -21,6 +21,13 @@ type Translation = { en: string; es: string };
 // Only interface phrases belong here. Names and descriptions created by users are
 // deliberately not translated by the language layer.
 const dictionary: Record<string, Translation> = {
+  'Exportar período atual em TXT com tabulações para o Google Sheets': { en: 'Export current period as tab-separated TXT for Google Sheets', es: 'Exportar período actual en TXT con tabulaciones para Google Sheets' },
+  'Exportar período atual em CSV': { en: 'Export current period as CSV', es: 'Exportar período actual en CSV' },
+  'Sua sessão expirou. Entre novamente para exportar.': { en: 'Your session expired. Sign in again to export.', es: 'Tu sesión expiró. Inicia sesión de nuevo para exportar.' },
+  'Abra um período antes de exportar as publicações.': { en: 'Open a period before exporting posts.', es: 'Abre un período antes de exportar las publicaciones.' },
+  'O período mudou durante a exportação. Tente novamente.': { en: 'The period changed during export. Try again.', es: 'El período cambió durante la exportación. Inténtalo de nuevo.' },
+  'Nenhuma publicação encontrada no período atual para exportar.': { en: 'No posts found in the current period to export.', es: 'No hay publicaciones en el período actual para exportar.' },
+  'Não foi possível preparar o arquivo. Tente novamente.': { en: 'Could not prepare the file. Try again.', es: 'No se pudo preparar el archivo. Inténtalo de nuevo.' },
   'BUSCAR NO X': { en: 'SEARCH X', es: 'BUSCAR EN X' },
   'Perfil do X': { en: 'X profile', es: 'Perfil de X' },
   'Cadastrar ou alterar perfil do X': { en: 'Set or change X profile', es: 'Registrar o cambiar perfil de X' },
