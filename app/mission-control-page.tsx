@@ -3,6 +3,7 @@
 import {useCallback,useEffect,useState} from 'react';
 import {supabase} from '@/lib/supabase';
 import {Icon} from './ui-icons';
+import MissionPeriodAdmin from './mission-period-admin';
 import './mission-control-v2.css';
 import './mission-actions.css';
 
@@ -11,7 +12,7 @@ type NumericInputValue=number|'';
 const defaults={name:'',description:'',multiplier:2,reward:0,submissionLimit:0,color:'#54c27a'};
 const numericValue=(value:NumericInputValue)=>value===''?0:value;
 
-export default function MissionControlPage({uid,reloadProfiles}:{uid:string;reloadProfiles:()=>Promise<void>}){
+export default function MissionControlPage({uid,reloadProfiles,isAdmin=false}:{uid:string;reloadProfiles:()=>Promise<void>;isAdmin?:boolean}){
  const[rows,setRows]=useState<Mission[]>([]),[name,setName]=useState(defaults.name),[description,setDescription]=useState(defaults.description),[multiplier,setMultiplier]=useState<NumericInputValue>(defaults.multiplier),[reward,setReward]=useState<NumericInputValue>(defaults.reward),[submissionLimit,setSubmissionLimit]=useState<NumericInputValue>(defaults.submissionLimit),[color,setColor]=useState(defaults.color),[isSpecial,setIsSpecial]=useState(false),[sheetsEnabled,setSheetsEnabled]=useState(false);
  const[editing,setEditing]=useState<Mission|null>(null),[deleting,setDeleting]=useState<Mission|null>(null),[busy,setBusy]=useState(false),[notice,setNotice]=useState('');
  const[sheetMonth,setSheetMonth]=useState(''),[monthSaving,setMonthSaving]=useState(false),[monthNotice,setMonthNotice]=useState('');
@@ -46,6 +47,7 @@ export default function MissionControlPage({uid,reloadProfiles}:{uid:string;relo
  }
 
  return <section className="mission-control-reference">
+  {isAdmin&&<MissionPeriodAdmin/>}
   {sheetsEnabled&&<section className="mission-sheets-month" aria-labelledby="mission-sheets-month-title">
    <div><small>GOOGLE SHEETS</small><h2 id="mission-sheets-month-title">Mês da planilha</h2><p>Escolha manualmente o mês usado na coluna Month. Ele permanecerá salvo até você alterá-lo.</p></div>
    <div className="mission-sheets-month-actions"><label htmlFor="mission-sheet-month">Mês<input id="mission-sheet-month" type="month" value={sheetMonth} onChange={event=>{setSheetMonth(event.target.value);setMonthNotice('')}}/></label><button type="button" disabled={monthSaving} onClick={saveSheetMonth}>{monthSaving?'SALVANDO...':'SALVAR MÊS'}</button></div>

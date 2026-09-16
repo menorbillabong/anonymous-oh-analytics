@@ -13,6 +13,7 @@ import ClosePeriodModal from './close-period-modal';
 import OpenPeriodModal from './open-period-modal';
 import GoogleSheetsSyncButton from './google-sheets-sync';
 import MissionPostReview from './mission-post-review';
+import MissionSelectionPage from './mission-selection-page';
 import { refreshStoredPostMetrics } from '@/lib/refresh-post-metrics';
 import { postDateParts, postPublishedDate } from '@/lib/post-date';
 import { isActiveCountingPost, postsForPublicationPeriod } from '@/lib/publication-period';
@@ -50,6 +51,7 @@ export default function Dashboard({ session }: {
     const [settings, setSettings] = useState<any>(settingsDefaults);
     const [profiles, setProfiles] = useState<any[]>([]);
     const [reportOpen, setReportOpen] = useState(false);
+    const [missionPeriodsOpen, setMissionPeriodsOpen] = useState(false);
     const [addOpen, setAddOpen] = useState(false);
     const [periodOpen, setPeriodOpen] = useState(false);
     const [openPeriodOpen, setOpenPeriodOpen] = useState(false);
@@ -142,6 +144,7 @@ export default function Dashboard({ session }: {
     useEffect(() => { let active = true; supabase.from('admin_users').select('user_id').eq('user_id', uid).maybeSingle().then(({ data }) => { if (active)
         setIsAdmin(Boolean(data)); }); return () => { active = false; }; }, [uid]);
     useEffect(() => { const open = () => setReportOpen(true); window.addEventListener('aoh:open-report', open); return () => window.removeEventListener('aoh:open-report', open); }, []);
+    useEffect(() => { const open = () => setMissionPeriodsOpen(true); window.addEventListener('aoh:open-mission-periods', open); return () => window.removeEventListener('aoh:open-mission-periods', open); }, []);
     useEffect(() => { const refreshed = () => void load(true); window.addEventListener('aoh:server-refresh-complete', refreshed); return () => window.removeEventListener('aoh:server-refresh-complete', refreshed); }, [load]);
     useEffect(() => { const close = (e: KeyboardEvent) => { if (e.key !== 'Escape')
         return; if (addOpen)
@@ -234,6 +237,8 @@ export default function Dashboard({ session }: {
     const searchX = () => { if (!requireOpenPeriod()) return; window.dispatchEvent(new CustomEvent('aoh:x-import-request', { detail: { mission: bulkMission } })); };
     async function signOut() { await supabase.auth.signOut(); }
     const username = String(settings.app_name || '').trim().toUpperCase();
+    if (missionPeriodsOpen)
+        return <div className="exact-app"><main className="exact-main"><MissionSelectionPage uid={uid} onClose={() => setMissionPeriodsOpen(false)} onSaved={() => load(false)}/></main></div>;
     if (reportOpen)
         return <ReportPage posts={countedPosts} profiles={profiles} settings={settings} onCancel={() => setReportOpen(false)}/>;
     return <div className="exact-app">
@@ -257,7 +262,7 @@ export default function Dashboard({ session }: {
             {visiblePosts.length > 0 ? <div className={`post-view ${view}`}><PostLibrary key={publicationPeriod} userId={uid} posts={visiblePosts} reload={load} view={view} profiles={profiles} crystalginLimit={crystalginLimit} historical={publicationPeriod === 'previous'} showSummary={publicationPeriod === 'current'}/></div> : <div className="publication-period-empty"><strong>{publicationPeriod === 'current' ? 'Nenhuma publicação no período atual.' : 'Nenhuma publicação no período anterior.'}</strong><span>{publicationPeriod === 'current' ? 'As novas publicações aparecerão aqui.' : 'As publicações aparecerão aqui após o fechamento de um período.'}</span></div>}
           </section>}
         </>}
-        {tab === 'Classificação' && <RankingPage />}{tab === 'História' && <HistoryPage uid={uid} onChanged={() => load(false)}/>} {tab === 'Centro de Controle da Missão' && <MissionControlPage uid={uid} reloadProfiles={load}/>} {tab === 'Registro de atividades' && <ActivityPage uid={uid}/>} {tab === 'Configurações' && <FullSettings uid={uid} settings={settings} setSettings={setSettings}/>} {isAdmin && tab === 'Admin' && <AdminPanel />}</>}
+        {tab === 'Classificação' && <RankingPage />}{tab === 'História' && <HistoryPage uid={uid} onChanged={() => load(false)}/>} {tab === 'Centro de Controle da Missão' && <MissionControlPage uid={uid} reloadProfiles={load} isAdmin={isAdmin}/>} {tab === 'Registro de atividades' && <ActivityPage uid={uid}/>} {tab === 'Configurações' && <FullSettings uid={uid} settings={settings} setSettings={setSettings}/>} {isAdmin && tab === 'Admin' && <AdminPanel />}</>}
     </main>
     <ProfileNameGate userId={uid} open={profileChecked && !settings.profile_name_confirmed} initialName={settings.app_name || ''} onSaved={name => setSettings((current: any) => ({ ...current, app_name: name, profile_name_confirmed: true }))}/>
     {openPeriodOpen && (
@@ -300,7 +305,7 @@ function MetricInput({ icon, value, onChange, heart = false }: {
 function PanelActions({organized,activePeriod,xImportEnabled,xHandle,refreshing,busy,monthlyPostRemaining,monthlyPostGoal,userId,openPeriod,closePeriod,searchX,openBulk,refreshMetrics,openAdd}:{organized:boolean;activePeriod:ActivePeriod|null;xImportEnabled:boolean;xHandle:string;refreshing:boolean;busy:boolean;monthlyPostRemaining:number;monthlyPostGoal:number;userId:string;openPeriod:()=>void;closePeriod:()=>void;searchX:()=>void;openBulk:()=>void;refreshMetrics:()=>Promise<boolean>;openAdd:()=>void}) {
     const period = <div className="period-action-pair"><button className="blue-btn" title={activePeriod ? `Corrigir o início definido em ${activePeriod.start_date}` : 'Definir a data inicial do período'} onClick={openPeriod}>{activePeriod ? '✎' : '▶'} <b>{activePeriod ? 'CORRIGIR INÍCIO' : 'ABRIR PERÍODO'}</b></button><button className="blue-btn" disabled={!activePeriod} title={!activePeriod ? 'Abra um período primeiro' : activePeriod.can_close === false && activePeriod.close_available_on ? `Fechamento normal a partir de ${activePeriod.close_available_on}` : `Fechar período iniciado em ${activePeriod.start_date}`} onClick={closePeriod}>◴ <b>FECHAR PERÍODO</b></button></div>;
     const publications = <><button className="orange-add" hidden={!xImportEnabled} disabled={busy || monthlyPostRemaining <= 0 || !xHandle} title={!xHandle ? 'Cadastre seu @ do X em Configurações' : activePeriod ? `Buscar desde ${activePeriod.start_date}` : 'Abra um período para iniciar a busca'} onClick={searchX}>𝕏 <b>BUSCAR NO X</b></button><button className="orange-add" disabled={monthlyPostRemaining <= 0} title={monthlyPostRemaining <= 0 ? 'Meta mensal atingida' : `${monthlyPostRemaining} vaga(s) restante(s) neste mês`} onClick={openBulk}>▤ <b>ADIÇÃO EM MASSA</b></button><button className="orange-add" disabled={monthlyPostRemaining <= 0} title={monthlyPostRemaining <= 0 ? 'Meta mensal atingida' : `${monthlyPostRemaining} vaga(s) restante(s) neste mês`} onClick={openAdd}>＋ <b>{monthlyPostRemaining <= 0 ? 'META ATINGIDA' : 'ADICIONAR PUBLICAÇÃO'}</b></button></>;
-    const files = <><div className="split-btn"><button>JSON</button><button>CSV</button></div><button className="report-btn">▤ <b>RELATÓRIO</b></button></>;
+    const files = <><div className="split-btn"><button>JSON</button><button>CSV</button></div><button type="button" className="blue-btn mission-period-button" onClick={() => window.dispatchEvent(new Event('aoh:open-mission-periods'))}>▦ <b>PERÍODOS DE MISSÃO</b></button><button className="report-btn">▤ <b>RELATÓRIO</b></button></>;
     const updates = <><button className={`green-btn ${refreshing ? 'is-refreshing' : ''}`} disabled={refreshing} onClick={() => void refreshMetrics()}>↻ <b>{refreshing ? 'ATUALIZANDO MÉTRICAS...' : 'ATUALIZAR AGORA (MANUAL)'}</b></button><GoogleSheetsSyncButton userId={userId} beforeSync={refreshMetrics}/></>;
     if (!organized) return <div className="hero-actions">{period}{files}{publications}{updates}</div>;
     return <div className="hero-actions organized-actions"><div className="action-group"><small>PUBLICAÇÕES</small><div>{publications}</div></div><div className="action-group"><small>ATUALIZAÇÃO E PLANILHA</small><div>{updates}</div></div><div className="action-group"><small>RELATÓRIOS E ARQUIVOS</small><div>{files}</div></div><div className="action-group period-group"><small>PERÍODO</small><div>{period}</div></div></div>;
