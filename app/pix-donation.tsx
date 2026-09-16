@@ -69,7 +69,7 @@ export default function PixDonation(){
 
  if(!sessionActive)return null;
 
- return <div className={styles.root}>
+ return <div className={styles.root} data-pix-donation>
   <button ref={triggerRef} type="button" className={styles.trigger} onClick={()=>{setCopyStatus('');setOpen(true)}} aria-haspopup="dialog">
    <span aria-hidden="true">♥</span><b>Apoiar</b>
   </button>
