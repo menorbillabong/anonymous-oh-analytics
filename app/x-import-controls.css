@@ -1,0 +1,19 @@
+.x-import-control{display:flex;flex-direction:column;min-width:0}
+.organized-actions .action-group>div>.x-import-control{flex:1 1 auto;min-width:0}
+.x-import-button-pair{display:flex;align-items:stretch;width:100%}
+.hero-actions .x-import-button-pair>.x-import-search{flex:1 1 auto;min-width:0;border-radius:9px 0 0 9px!important}
+.hero-actions .x-import-button-pair>.x-import-gear{flex:0 0 42px;min-width:42px;padding:0 10px;border-radius:0 9px 9px 0!important;border-left:1px solid #a76c23!important;font-size:20px}
+.x-import-feedback{font-size:12px;line-height:1.5;color:#ffbe9b;margin:8px 0 0;overflow-wrap:anywhere}
+.x-handle-dialog{box-sizing:border-box;width:min(460px,calc(100vw - 32px));max-height:calc(100dvh - 32px);margin:auto;padding:24px;overflow:auto;border:1px solid #414141;border-radius:14px;background:var(--aoh-surface,#1e1e1e);color:#eee;box-shadow:0 18px 65px #0009}
+.x-handle-dialog::backdrop{background:#000b}
+.x-handle-dialog header,.x-handle-dialog footer{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.x-handle-dialog h2{font-size:21px;margin:0}
+.x-handle-dialog p{font-size:13px;line-height:1.6}
+.x-handle-dialog label{display:block;font-weight:700;font-size:14px;margin:18px 0 8px}
+.x-handle-dialog input{box-sizing:border-box;width:100%;border:1px solid #555;border-radius:8px;background:#121212;color:#fff;padding:12px;font:inherit}
+.x-handle-dialog #x-handle-help{color:#aaa;font-size:12px}
+.x-handle-dialog button{border:1px solid #555;border-radius:8px;padding:10px 15px;background:#292929;color:#eee;cursor:pointer;font:inherit;font-size:13px}
+.x-handle-dialog .x-handle-save{background:var(--aoh-accent,#f6ad55);color:#151515;border-color:transparent;font-weight:800}
+.x-handle-dialog footer{justify-content:flex-end;margin-top:20px;flex-wrap:wrap}
+.x-handle-dialog button:disabled{opacity:.5;cursor:not-allowed}
+.x-handle-dialog :focus-visible,.x-import-button-pair :focus-visible{outline:2px solid #fff;outline-offset:3px}

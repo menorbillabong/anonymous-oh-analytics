@@ -21,6 +21,22 @@ type Translation = { en: string; es: string };
 // Only interface phrases belong here. Names and descriptions created by users are
 // deliberately not translated by the language layer.
 const dictionary: Record<string, Translation> = {
+  'BUSCAR NO X': { en: 'SEARCH X', es: 'BUSCAR EN X' },
+  'Perfil do X': { en: 'X profile', es: 'Perfil de X' },
+  'Cadastrar ou alterar perfil do X': { en: 'Set or change X profile', es: 'Registrar o cambiar perfil de X' },
+  'Buscar no X e configurar perfil': { en: 'Search X and configure profile', es: 'Buscar en X y configurar perfil' },
+  'Cadastre seu @ do X para buscar publicações': { en: 'Set your X handle to search posts', es: 'Registra tu @ de X para buscar publicaciones' },
+  'Cadastre seu perfil do X para continuar.': { en: 'Set your X profile to continue.', es: 'Registra tu perfil de X para continuar.' },
+  'Cadastre ou altere o @ usado nas buscas de publicações.': { en: 'Set or change the handle used to search posts.', es: 'Registra o cambia el @ usado para buscar publicaciones.' },
+  'Seu @ do X': { en: 'Your X handle', es: 'Tu @ de X' },
+  'Use @usuario ou usuario. O mesmo perfil ficará salvo nas Configurações.': { en: 'Use @username or username. The same profile will be saved in Settings.', es: 'Usa @usuario o usuario. El mismo perfil se guardará en Configuración.' },
+  'Salvar e buscar': { en: 'Save and search', es: 'Guardar y buscar' },
+  'Salvar perfil': { en: 'Save profile', es: 'Guardar perfil' },
+  'Perfil do X salvo.': { en: 'X profile saved.', es: 'Perfil de X guardado.' },
+  'Não foi possível verificar o perfil do X. Tente novamente.': { en: 'Could not check the X profile. Try again.', es: 'No se pudo verificar el perfil de X. Inténtalo de nuevo.' },
+  'Não foi possível salvar o perfil do X. Tente novamente.': { en: 'Could not save the X profile. Try again.', es: 'No se pudo guardar el perfil de X. Inténtalo de nuevo.' },
+  'A busca automática não está liberada para esta conta.': { en: 'Automatic search is not enabled for this account.', es: 'La búsqueda automática no está habilitada para esta cuenta.' },
+  'Informe um @ do X válido, com até 15 letras, números ou _.': { en: 'Enter a valid X handle, with up to 15 letters, numbers or _.', es: 'Ingresa un @ de X válido, con hasta 15 letras, números o _.' },
   'AVALIAÇÃO DE MÉTRICAS': { en: 'METRICS EVALUATION', es: 'EVALUACIÓN DE MÉTRICAS' },
   'Transforme': { en: 'Turn', es: 'Convierte' },
   'métricas em': { en: 'metrics into', es: 'métricas en' },
