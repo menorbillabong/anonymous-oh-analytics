@@ -13,8 +13,8 @@ export default function PostExportButtons({userId}:{userId:string}){
   lock.current=true;
   setBusy(true);
   try{
-   const posts=await loadCurrentPeriodExport(supabase,userId);
-   const output=format==='csv'?buildPostsCsv(posts):buildPostsTxt(posts);
+   const {posts,manualLikes}=await loadCurrentPeriodExport(supabase,userId);
+   const output=format==='csv'?buildPostsCsv(posts,manualLikes):buildPostsTxt(posts,manualLikes);
    const url=URL.createObjectURL(new Blob(['\ufeff'+output],{type:format==='csv'?'text/csv;charset=utf-8':'text/plain;charset=utf-8'}));
    const link=document.createElement('a');
    link.href=url;

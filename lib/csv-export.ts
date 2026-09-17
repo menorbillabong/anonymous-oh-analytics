@@ -20,8 +20,8 @@ function metric(value:unknown){
  return Number.isFinite(number)?number:0;
 }
 
-export function buildPostsCsv(posts:CsvPost[]){
- return buildDelimitedPosts(posts,',',csvCell);
+export function buildPostsCsv(posts:CsvPost[],manualLikes=0){
+ return buildDelimitedPosts(posts,',',csvCell,manualLikes);
 }
 
 function txtCell(value:unknown){
@@ -30,11 +30,11 @@ function txtCell(value:unknown){
  return /^[\s]*[=+@\-"]/.test(text)?`'${text}`:text;
 }
 
-export function buildPostsTxt(posts:CsvPost[]){
- return buildDelimitedPosts(posts,'\t',txtCell);
+export function buildPostsTxt(posts:CsvPost[],manualLikes=0){
+ return buildDelimitedPosts(posts,'\t',txtCell,manualLikes);
 }
 
-function buildDelimitedPosts(posts:CsvPost[],separator:string,cell:(value:unknown)=>string){
+function buildDelimitedPosts(posts:CsvPost[],separator:string,cell:(value:unknown)=>string,manualLikes:number){
  const groups=new Map<string,CsvPost[]>();
  posts.forEach(post=>{
   const mission=String(post.mission_name||'Sem missão').trim()||'Sem missão';
@@ -45,7 +45,7 @@ function buildDelimitedPosts(posts:CsvPost[],separator:string,cell:(value:unknow
  [...groups.entries()].forEach(([mission,rows],index)=>{
   if(index)lines.push('');
   lines.push(cell(`MISSÃO: ${mission}`));
-  lines.push(['Data','Rede','Link','Visualizações','Curtidas'].map(cell).join(separator));
+  lines.push(['Data','Rede','Link','Visualizações',manualLikes>0?'Curtidas (X + manual)':'Curtidas'].map(cell).join(separator));
   [...rows]
    .sort((a,b)=>{
     const aTime=postPublishedDate(a)?.getTime()??Number.POSITIVE_INFINITY;

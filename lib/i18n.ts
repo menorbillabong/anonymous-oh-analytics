@@ -62,6 +62,7 @@ const dictionary: Record<string, Translation> = {
   'Sua sessão expirou. Entre novamente para exportar.': { en: 'Your session expired. Sign in again to export.', es: 'Tu sesión expiró. Inicia sesión de nuevo para exportar.' },
   'Abra um período antes de exportar as publicações.': { en: 'Open a period before exporting posts.', es: 'Abre un período antes de exportar las publicaciones.' },
   'O período mudou durante a exportação. Tente novamente.': { en: 'The period changed during export. Try again.', es: 'El período cambió durante la exportación. Inténtalo de nuevo.' },
+  'O ajuste de curtidas mudou durante a exportação. Tente novamente.': { en: 'The likes adjustment changed during export. Try again.', es: 'El ajuste de Me gusta cambió durante la exportación. Inténtalo de nuevo.' },
   'Nenhuma publicação encontrada no período atual para exportar.': { en: 'No posts found in the current period to export.', es: 'No hay publicaciones en el período actual para exportar.' },
   'Não foi possível preparar o arquivo. Tente novamente.': { en: 'Could not prepare the file. Try again.', es: 'No se pudo preparar el archivo. Inténtalo de nuevo.' },
   'BUSCAR NO X': { en: 'SEARCH X', es: 'BUSCAR EN X' },
