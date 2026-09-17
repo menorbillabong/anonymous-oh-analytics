@@ -16,7 +16,7 @@ export type SheetPost = {
   sheets_is_special?: boolean | null;
 };
 
-export type SheetUpdate = {range:string; values:Array<Array<string|number>>; manualNote?:string};
+export type SheetUpdate = {range:string; values:Array<Array<string|number>>};
 
 export type SheetPlan = {
   updates: SheetUpdate[];
@@ -185,7 +185,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
       const section=oldCell.special?layout.special:layout.normal;
       for(const field of SITE_MANAGED_FIELDS){
         const column=section[field];
-        if(column!==undefined)updates.push({range:cellRange(tabName,column,oldCell.row),values:[['']],...(field==='likes'&&adjustment?{manualNote:''}:{})});
+        if(column!==undefined)updates.push({range:cellRange(tabName,column,oldCell.row),values:[['']]});
       }
     }
 
@@ -202,7 +202,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
     const extra=allocation.get(manualPostKey(post))||0;
     if(section.likes!==undefined){
       const actual=safeNumber(post.likes);
-      updates.push({range:cellRange(tabName,section.likes,row),values:[[actual+extra]],...(adjustment?{manualNote:extra?`X likes: ${actual}\nManual adjustment: +${extra}\nTotal: ${actual+extra}`:''}:{})});
+      updates.push({range:cellRange(tabName,section.likes,row),values:[[actual+extra]]});
       manualLikes+=extra;
     }
     if(special){
@@ -217,7 +217,7 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
   if(manualLikes!==expectedManual)throw new Error('MANUAL_ADJUSTMENT_SHEET_MISMATCH');
   if(manualLikes){
     for(const section of [layout.normal,layout.special])if(section.likes!==undefined){
-      updates.push({range:cellRange(tabName,section.likes,layout.row),values:[['Likes (X + manual)']],manualNote:'Values include explicitly declared manual adjustments. See each cell note for real X likes and the manual addition.'});
+      updates.push({range:cellRange(tabName,section.likes,layout.row),values:[['Likes (X + manual)']]});
     }
   }
   return{updates,normalCount,specialCount,skippedOutsideMonth,manualLikes};

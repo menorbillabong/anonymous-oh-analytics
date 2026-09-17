@@ -64,7 +64,7 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
         {result.error?<p>{result.error}</p>:<>
           <div className="sheets-result-counts"><span><small>NORMAL</small><strong>{Number(result.normalCount||0)}</strong></span><span><small>ESPECIAL</small><strong>{Number(result.specialCount||0)}</strong></span><span><small>TOTAL</small><strong>{Number(result.total||0)}</strong></span></div>
           <p>As colunas disponíveis foram atualizadas. Colunas ausentes ou sem título foram ignoradas com segurança; em missões especiais, Reward e Theme são preenchidos somente quando existem.</p>
-          {Number(result.manualLikes)>0&&<p>Ajuste manual aplicado: +{Number(result.manualLikes).toLocaleString('pt-BR')} curtidas no total. A planilha identifica o acréscimo nas notas das células e no cabeçalho.</p>}
+          {Number(result.manualLikes)>0&&<p>Ajuste manual aplicado: +{Number(result.manualLikes).toLocaleString('pt-BR')} curtidas no total. A planilha identifica o acréscimo no cabeçalho, sem criar notas nas células.</p>}
         </>}
         <button type="button" onClick={()=>setResult(null)}>FECHAR</button>
       </section>

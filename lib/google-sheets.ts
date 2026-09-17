@@ -39,7 +39,7 @@ export async function syncGoogleSheet(tabName:string,posts:SheetPost[],sheetMont
   const sheet=await googleRequest(readUrl,token) as {values?:unknown[][]};
   const plan=planSheetUpdates(tabName,sheet.values||[],posts,sheetMonth,adjustment);
 
-  if(plan.updates.length){
+  if(plan.updates.length||adjustment){
     if(adjustment){
       const metadata=await googleRequest(`${SHEETS_API}/${encodeURIComponent(spreadsheetId)}?ranges=${encodeURIComponent(readRange)}&fields=sheets(properties(sheetId,title),data(startRow,startColumn,rowData(values(note))))`,token);
       const tab=metadata.sheets?.find((item:any)=>item.properties?.title===tabName);
@@ -48,9 +48,11 @@ export async function syncGoogleSheet(tabName:string,posts:SheetPost[],sheetMont
       for(const grid of tab.data||[])for(const[rowIndex,row]of(grid.rowData||[]).entries())for(const[columnIndex,cell]of(row.values||[]).entries()){
         if(cell.note)notes.set(`${(grid.startRow||0)+rowIndex}:${(grid.startColumn||0)+columnIndex}`,cell.note);
       }
+      const requests=sheetBatchRequests(plan.updates,tab.properties.sheetId,notes);
+      if(!requests.length)return plan;
       if(validateBeforeWrite)await validateBeforeWrite();
       await googleRequest(`${SHEETS_API}/${encodeURIComponent(spreadsheetId)}:batchUpdate`,token,{
-        method:'POST',body:JSON.stringify({requests:sheetBatchRequests(plan.updates,tab.properties.sheetId,notes)}),
+        method:'POST',body:JSON.stringify({requests}),
       });
     }else{
     if(validateBeforeWrite)await validateBeforeWrite();

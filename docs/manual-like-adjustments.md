@@ -4,7 +4,7 @@
 - Usuário autorizado: engrenagem ao lado de Atualizar minha planilha. Necessita acesso ao Sheets e período aberto; quantidade inteira de 0 a 1.000.000 e chave ativar/desativar.
 - Quantidade por período, distribuída de modo pseudoaleatório e determinístico entre publicações ativas elegíveis. Repetir atualização não acumula. Desativar preserva a quantidade configurada, mas retira os extras do cálculo; próxima sincronização restaura os valores reais na planilha.
 - As métricas originais nunca são substituídas no banco. Painel e CG calculado identificam os extras. Relatórios, exportações, classificação e histórico mantêm os valores reais. Novo período inicia sem ajuste.
-- Sheets recebe total real + manual, cabeçalho explícito e nota detalhada por célula, preservando notas preexistentes. Se o mês/colunas impedirem aplicar o total completo, não há escrita parcial. Permissão e período são revalidados antes da escrita atômica.
+- Sheets recebe total real + manual e cabeçalho explícito, sem criar notas nas células. Na próxima sincronização, remove apenas os blocos antigos delimitados por `[AOH MANUAL ADJUSTMENT]` e `[/AOH MANUAL ADJUSTMENT]` da aba vinculada (intervalo A1:S2000), preservando notas pessoais, valores, fórmulas e formatação. A limpeza ocorre mesmo com ajuste desativado ou sem novas publicações. Se o mês/colunas impedirem aplicar o total completo, não há escrita parcial. Permissão e período são revalidados antes da escrita atômica.
 
 ## Verificações
 
