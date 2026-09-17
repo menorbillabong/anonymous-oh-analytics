@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatPostDate, postPublishedDate } from '@/lib/post-date';
 import { userMatchesSearch } from '@/lib/admin-user-search';
+import AdminSheetsCooldown from './admin-sheets-cooldown';
 import './admin.css';
 
 type AdminSection = 'Visão geral' | 'Usuários' | 'Publicações' | 'Períodos fechados' | 'Auditoria' | 'Controles';
@@ -614,6 +615,7 @@ export default function AdminPanel() {
     </div>}
 
     {section === 'Controles' && <div className="admin-controls-grid">
+      <AdminSheetsCooldown/>
       <div className="admin-panel">
         <div className="admin-panel-head"><div><small>FECHAMENTO MENSAL</small><h2>Liberação geral antecipada</h2></div><StatusTag tone={earlyCloseBlockedCount ? 'warning' : 'success'}>{earlyCloseBlockedCount ? `${earlyCloseBlockedCount} BLOQUEADO(S)` : 'TODOS LIBERADOS'}</StatusTag></div>
         <p className="admin-panel-copy">Libera uma única antecipação para cada usuário que já está com um período aberto. Períodos abertos depois da liberação continuam seguindo a regra mensal.</p>

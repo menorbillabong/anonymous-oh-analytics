@@ -2,6 +2,7 @@ import {createClient} from '@supabase/supabase-js';
 import {NextResponse} from 'next/server';
 import {syncGoogleSheet} from '@/lib/google-sheets';
 import {parseManualAdjustment} from '@/lib/manual-like-adjustment';
+import {formatCooldown} from '@/lib/sheets-cooldown';
 import type {SheetPost} from '@/lib/google-sheets-plan';
 
 export const dynamic='force-dynamic';
@@ -33,11 +34,12 @@ export async function POST(request:Request){
 
   const{data:claim,error:claimError}=await supabase.rpc('claim_google_sheets_sync');
   if(claimError)return NextResponse.json({error:'A atualização do Google Sheets não está liberada para este perfil.'},{status:403});
-  const permission=(claim||{}) as {allowed?:boolean;retry_after_seconds?:number;sheet_tab_name?:string;sheet_month?:string};
+  const permission=(claim||{}) as {allowed?:boolean;retry_after_seconds?:number;sheet_tab_name?:string;sheet_month?:string;cooldown_seconds?:number;cooldown_ends_at?:string};
   if(!permission.allowed){
-    const retry=Math.max(1,Number(permission.retry_after_seconds||300));
-    return NextResponse.json({error:`Aguarde ${Math.ceil(retry/60)} minuto(s) para atualizar novamente.`,retryAfterSeconds:retry},{status:429,headers:{'Retry-After':String(retry)}});
+    const retry=Math.max(1,Number(permission.retry_after_seconds||permission.cooldown_seconds||90));
+    return NextResponse.json({error:`Aguarde ${formatCooldown(retry)} para atualizar novamente.`,retryAfterSeconds:retry},{status:429,headers:{'Retry-After':String(retry)}});
   }
+  const cooldown=()=>({cooldownSeconds:permission.cooldown_seconds,retryAfterSeconds:Math.max(0,Math.ceil((Date.parse(permission.cooldown_ends_at||'')-Date.now())/1000)||0)});
 
   let normalCount=0,specialCount=0;
   try{
@@ -61,11 +63,11 @@ export async function POST(request:Request){
     normalCount=result.normalCount;
     specialCount=result.specialCount;
     await supabase.rpc('complete_google_sheets_sync',{p_success:true,p_normal_count:normalCount,p_special_count:specialCount,p_error:null});
-    return NextResponse.json({success:true,normalCount,specialCount,total:normalCount+specialCount,manualLikes:result.manualLikes,skippedOutsideMonth:result.skippedOutsideMonth,cooldownSeconds:300});
+    return NextResponse.json({success:true,normalCount,specialCount,total:normalCount+specialCount,manualLikes:result.manualLikes,skippedOutsideMonth:result.skippedOutsideMonth,...cooldown()});
   }catch(error){
     const friendly=userMessage(error);
     await supabase.rpc('complete_google_sheets_sync',{p_success:false,p_normal_count:normalCount,p_special_count:specialCount,p_error:friendly.message});
-    return NextResponse.json({error:friendly.message},{status:friendly.status});
+    return NextResponse.json({error:friendly.message,...cooldown()},{status:friendly.status});
   }
 }
 

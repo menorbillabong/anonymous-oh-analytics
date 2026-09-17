@@ -21,6 +21,16 @@ type Translation = { en: string; es: string };
 // Only interface phrases belong here. Names and descriptions created by users are
 // deliberately not translated by the language layer.
 const dictionary: Record<string, Translation> = {
+  'Tempo de espera da planilha': { en: 'Spreadsheet cooldown', es: 'Tiempo de espera de la planilla' },
+  'Minutos': { en: 'Minutes', es: 'Minutos' },
+  'Segundos': { en: 'Seconds', es: 'Segundos' },
+  'Defina o intervalo entre atualizações da planilha. Vale para todos, com uma contagem individual por usuário.': { en: 'Set the interval between spreadsheet updates. It applies to everyone, with an individual countdown per user.', es: 'Define el intervalo entre actualizaciones de la planilla. Se aplica a todos, con una cuenta individual por usuario.' },
+  'Use de 1 segundo a 24 horas. A alteração também recalcula as esperas em andamento.': { en: 'Use 1 second to 24 hours. Changes also recalculate ongoing cooldowns.', es: 'Usa de 1 segundo a 24 horas. Los cambios también recalculan las esperas en curso.' },
+  'Informe um tempo válido entre 1 segundo e 24 horas.': { en: 'Enter a valid duration between 1 second and 24 hours.', es: 'Ingresa un tiempo válido entre 1 segundo y 24 horas.' },
+  'SALVAR TEMPO DE ESPERA': { en: 'SAVE COOLDOWN', es: 'GUARDAR TIEMPO DE ESPERA' },
+  'Tempo salvo para todos os usuários.': { en: 'Cooldown saved for all users.', es: 'Tiempo guardado para todos los usuarios.' },
+  'Não foi possível carregar o tempo de espera. Reabra esta aba para tentar novamente.': { en: 'Could not load the cooldown. Reopen this tab to retry.', es: 'No se pudo cargar el tiempo de espera. Vuelve a abrir esta pestaña para reintentar.' },
+  'Não foi possível salvar. Confira sua conexão e sua permissão de administrador.': { en: 'Could not save. Check your connection and administrator permission.', es: 'No se pudo guardar. Verifica tu conexión y tu permiso de administrador.' },
   'Configurar ajuste manual de curtidas': { en: 'Configure manual like adjustment', es: 'Configurar ajuste manual de Me gusta' },
   'Ajuste manual de curtidas': { en: 'Manual like adjustment', es: 'Ajuste manual de Me gusta' },
   'Fechar ajuste': { en: 'Close adjustment', es: 'Cerrar ajuste' },
@@ -270,6 +280,9 @@ const dictionary: Record<string, Translation> = {
 
 function translateDynamic(value: string, language: Exclude<SiteLanguage, 'pt-BR'>) {
   const replacements: Array<[RegExp, string, string]> = [
+    [/^PLANILHA · (\d+:\d{2})$/, 'SPREADSHEET · $1', 'PLANILLA · $1'],
+    [/^Disponível novamente em (\d+:\d{2})$/, 'Available again in $1', 'Disponible nuevamente en $1'],
+    [/^Aguarde (\d+:\d{2}) para atualizar novamente\.$/, 'Wait $1 before updating again.', 'Espera $1 para actualizar nuevamente.'],
     [/^Meta mensal de ([\d.,]+) publicações atingida\.$/, 'Monthly goal of $1 posts reached.', 'Meta mensual de $1 publicaciones alcanzada.'],
     [/^([\d.,]+) vaga\(s\) restante\(s\) neste mês$/, '$1 slot(s) remaining this month', '$1 espacio(s) restante(s) este mes'],
     [/^([\d.,]+) vaga\(s\) restante\(s\) da meta mensal de ([\d.,]+)\.$/, '$1 slot(s) remaining from the monthly goal of $2.', '$1 espacio(s) restante(s) de la meta mensual de $2.'],

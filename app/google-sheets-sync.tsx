@@ -1,8 +1,9 @@
 'use client';
 
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
+import {formatCooldown} from '@/lib/sheets-cooldown';
 import ManualLikeControls from './manual-like-controls';
 import './google-sheets-sync.css';
 
@@ -14,15 +15,30 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
   const[result,setResult]=useState<SyncResult|null>(null);
   const[cooldownUntil,setCooldownUntil]=useState(0);
   const[now,setNow]=useState(()=>Date.now());
+  const statusRequest=useRef(0);
 
   const loadPermission=useCallback(async()=>{
-    const{data}=await supabase.from('google_sheets_user_config').select('enabled,sheet_tab_name,last_sync_started_at').eq('user_id',userId).maybeSingle();
-    setEnabled(Boolean(data?.enabled&&String(data?.sheet_tab_name||'').trim()));
-    const started=data?.last_sync_started_at?new Date(data.last_sync_started_at).getTime():0;
-    if(started)setCooldownUntil(started+300000);
+    const request=++statusRequest.current;
+    try{
+      const{data,error}=await supabase.rpc('get_my_google_sheets_sync_status');
+      if(request!==statusRequest.current)return;
+      if(error||!data){setEnabled(false);return}
+      setEnabled(data.enabled===true);
+      const current=Date.now();
+      setCooldownUntil(current+Math.max(0,Number(data.retry_after_seconds)||0)*1000);
+      setNow(current);
+    }catch{if(request===statusRequest.current)setEnabled(false)}
   },[userId]);
 
-  useEffect(()=>{void loadPermission()},[loadPermission]);
+  useEffect(()=>{
+    setEnabled(false);void loadPermission();
+    const refresh=()=>{if(document.visibilityState==='visible')void loadPermission()};
+    const timer=window.setInterval(refresh,30000);
+    window.addEventListener('focus',refresh);
+    window.addEventListener('sheets-cooldown-changed',refresh);
+    document.addEventListener('visibilitychange',refresh);
+    return()=>{++statusRequest.current;window.clearInterval(timer);window.removeEventListener('focus',refresh);window.removeEventListener('sheets-cooldown-changed',refresh);document.removeEventListener('visibilitychange',refresh)};
+  },[loadPermission]);
   useEffect(()=>{if(cooldownUntil<=Date.now())return;setNow(Date.now());const timer=window.setInterval(()=>{const current=Date.now();setNow(current);if(current>=cooldownUntil)window.clearInterval(timer)},1000);return()=>window.clearInterval(timer)},[cooldownUntil]);
 
   if(!enabled)return null;
@@ -37,23 +53,22 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
       if(!session)throw new Error('Sua sessão expirou. Entre novamente.');
       const response=await fetch('/api/google-sheets/sync',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`}});
       const data=await response.json() as SyncResult;
+      ++statusRequest.current;
+      if(data.retryAfterSeconds!==undefined){setCooldownUntil(Date.now()+Math.max(0,data.retryAfterSeconds)*1000);setNow(Date.now())}
       if(!response.ok){
-        if(data.retryAfterSeconds)setCooldownUntil(Date.now()+data.retryAfterSeconds*1000);
         setResult({error:data.error||'Não foi possível atualizar a planilha.'});
         return;
       }
-      setCooldownUntil(Date.now()+Number(data.cooldownSeconds||300)*1000);
-      setNow(Date.now());
       setResult(data);
     }catch(error){
       setResult({error:error instanceof Error?error.message:'Não foi possível atualizar a planilha.'});
-    }finally{setRunning(false)}
+    }finally{await loadPermission();setRunning(false)}
   }
 
   return <>
     <div className="sheets-sync-control">
-    <button className="sheets-sync-button" type="button" disabled={running||remaining>0} onClick={sync} title={remaining>0?`Disponível novamente em ${Math.ceil(remaining/60)} minuto(s)`:'Atualizar a aba vinculada no Google Sheets'}>
-      ▦ <b>{running?'ATUALIZANDO PLANILHA...':remaining>0?`PLANILHA · ${Math.ceil(remaining/60)} MIN`:'ATUALIZAR PLANILHA'}</b>
+    <button className="sheets-sync-button" type="button" disabled={running||remaining>0} onClick={sync} title={remaining>0?`Disponível novamente em ${formatCooldown(remaining)}`:'Atualizar a aba vinculada no Google Sheets'}>
+      ▦ <b>{running?'ATUALIZANDO PLANILHA...':remaining>0?`PLANILHA · ${formatCooldown(remaining)}`:'ATUALIZAR PLANILHA'}</b>
     </button>
     <ManualLikeControls userId={userId} disabled={running}/>
     </div>
