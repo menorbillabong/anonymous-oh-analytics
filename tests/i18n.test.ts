@@ -21,6 +21,14 @@ test('translates supported dynamic status messages', () => {
   assert.equal(translateUiText('12 de 15 publicações atualizadas.', 'es'), '12 de 15 publicaciones actualizadas.');
 });
 
+test('translates the concise dashboard update button labels', () => {
+  assert.equal(translateUiText('ATUALIZAR MÉTRICAS', 'pt-BR'), 'ATUALIZAR MÉTRICAS');
+  assert.equal(translateUiText('ATUALIZAR MÉTRICAS', 'en'), 'UPDATE METRICS');
+  assert.equal(translateUiText('ATUALIZAR MÉTRICAS', 'es'), 'ACTUALIZAR MÉTRICAS');
+  assert.equal(translateUiText('ATUALIZAR PLANILHA', 'en'), 'UPDATE SPREADSHEET');
+  assert.equal(translateUiText('ATUALIZAR PLANILHA', 'es'), 'ACTUALIZAR PLANILLA');
+});
+
 test('does not change unknown text created by users', () => {
   assert.equal(translateUiText('Minha missão personalizada', 'en'), 'Minha missão personalizada');
 });
