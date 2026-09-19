@@ -1,4 +1,4 @@
-import { postDateKey, postPublishedDate } from './post-date.ts';
+import { postDateKey, postPublishedDate, postPublishedValue } from './post-date.ts';
 
 export type ActivePeriod = {
   id: number;
@@ -25,4 +25,14 @@ export function oldestActivePostDate(posts: any[]) {
 export function postIsWithinPeriod(value: any, start: string, end: string) {
   const date = postDateKey(value);
   return Boolean(date && start && end && date >= start && date <= end);
+}
+
+// Compare in the period's time zone without changing the original publication fields.
+export function publicationIsWithinPeriod(post: {
+  x_published_at?: string | null;
+  published_at?: string | null;
+  published_date?: string | null;
+  created_at?: string | null;
+}, start: string, end: string) {
+  return postIsWithinPeriod(postPublishedValue(post), start, end);
 }

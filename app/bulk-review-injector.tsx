@@ -3,6 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
 import {formatPostDate,postDateParts,postPublishedDate} from '@/lib/post-date';
+import {publicationIsWithinPeriod} from '@/lib/tracking-period';
 import {withoutExistingXPosts,xStatusId} from '@/lib/x-post-dedupe';
 import {firstNormalMissionId} from '@/lib/mission-default';
 import './bulk-review-reference.css';
@@ -31,7 +32,7 @@ export default function BulkReviewInjector(){
   if(!periodStart)throw new Error('Abra um período no Painel antes de adicionar publicações.');
   const filtered=withoutExistingXPosts(items,existing.map(post=>post.post_url),item=>item.url);
   const rows=await Promise.all(filtered.accepted.map(async item=>{const url=item.url;let data:any=item;if(!item.title&&!item.x_published_at){try{const response=await fetch('/api/x-metrics',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url})});data={...item,...await response.json()}}catch{}}return{url,title:String(data.title||data.text||'Publicação do X'),views:Number(data.views||0),comments:Number(data.comments||0),reposts:Number(data.reposts||0),likes:Number(data.likes||0),image_urls:Array.isArray(data.image_urls)?data.image_urls:[],video_url:data.video_url||null,author_handle:String(data.author_handle||''),author_name:String(data.author_name||data.author_handle||'X'),author_avatar:String(data.author_avatar||''),published_date:String(data.published_date||data.published_at||'').slice(0,10)||new Date().toISOString().slice(0,10),x_published_at:String(data.x_published_at||data.published_at||''),mission_profile_id:mission,duplicate:false,existing_url:''}}));
-  const today=postDateParts(new Date())?.key||'',inPeriod=rows.filter(row=>row.published_date>=periodStart&&row.published_date<=today),outside=rows.length-inPeriod.length,limited=withinMonthlyLimit(inPeriod,existing,goal,row=>row.x_published_at||row.published_date);
+  const today=postDateParts(new Date())?.key||'',inPeriod=rows.filter(row=>publicationIsWithinPeriod(row,periodStart,today)),outside=rows.length-inPeriod.length,limited=withinMonthlyLimit(inPeriod,existing,goal,row=>row.x_published_at||row.published_date);
   setPosts(limited.accepted);setOpen(true);
   const notices=[];if(filtered.hiddenDuplicateCount)notices.push(`${filtered.hiddenDuplicateCount} ${filtered.hiddenDuplicateCount===1?'publicação repetida foi ocultada':'publicações repetidas foram ocultadas'}.`);if(outside)notices.push(`${outside} fora do período aberto não ${outside===1?'foi incluída':'foram incluídas'}.`);if(limited.omitted.length)notices.push(`${limited.omitted.length} ${limited.omitted.length===1?'publicação não foi incluída':'publicações não foram incluídas'} porque a meta mensal de ${goal} foi atingida.`);setMsg(notices.join(' '));
  },[refreshProfiles]);
@@ -65,7 +66,7 @@ export default function BulkReviewInjector(){
   const[{data:existing},{data:settings},{data:period}]=await Promise.all([supabase.from('posts').select('post_url,x_published_at,published_at,created_at').eq('user_id',user.id),supabase.from('user_settings').select('monthly_post_goal').eq('user_id',user.id).maybeSingle(),supabase.rpc('get_my_active_period')]);
   const periodStart=String(period?.start_date||''),today=postDateParts(new Date())?.key||'';if(!periodStart){setMsg('O período foi fechado. Abra um novo período antes de adicionar publicações.');setSaving(false);return}
   const goal=Math.max(1,Number(settings?.monthly_post_goal||60)),existingIds=new Set((existing||[]).map((p:any)=>xStatusId(String(p.post_url||''))).filter(Boolean));
-  const uniqueRows=rows.filter(r=>{const id=xStatusId(r.post_url),date=String(r.published_at||'').slice(0,10);return id&&!existingIds.has(id)&&date>=periodStart&&date<=today});
+  const uniqueRows=rows.filter(r=>{const id=xStatusId(r.post_url);return id&&!existingIds.has(id)&&publicationIsWithinPeriod(r,periodStart,today)});
   if(!uniqueRows.length){setMsg('Todas as publicações desta revisão já estão no seu rastreador.');setSaving(false);setPosts([]);return}
   if(uniqueRows.length<rows.length){const remainingIds=new Set(uniqueRows.map(row=>xStatusId(row.post_url)));setPosts(posts=>posts.filter(post=>remainingIds.has(xStatusId(post.url))))}
   const limited=withinMonthlyLimit(uniqueRows,existing||[],goal,row=>row.x_published_at||row.published_at);

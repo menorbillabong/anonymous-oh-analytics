@@ -20,7 +20,7 @@ import { firstNormalMissionId } from '@/lib/mission-default';
 import { refreshStoredPostMetrics } from '@/lib/refresh-post-metrics';
 import { postDateParts, postPublishedDate } from '@/lib/post-date';
 import { isActiveCountingPost, postsForPublicationPeriod } from '@/lib/publication-period';
-import type { ActivePeriod } from '@/lib/tracking-period';
+import { publicationIsWithinPeriod, type ActivePeriod } from '@/lib/tracking-period';
 import {applyManualLikes,distributeManualLikes,emptyManualAdjustment,parseManualAdjustment} from '@/lib/manual-like-adjustment';
 import {loadDashboardPosts} from '@/lib/load-dashboard-posts';
 import './globals.css';
@@ -225,8 +225,8 @@ export default function Dashboard({ session }: {
         setAddOpen(false);
         setOpenPeriodOpen(true);
         return;
-    } const postDate = String(form.published_date || '').slice(0, 10); if (postDate && postDate < activePeriod.start_date) {
-        setRefreshNotice(`Esta publicação é anterior ao período aberto em ${activePeriod.start_date}.`);
+    } const today = postDateParts(new Date())?.key || ''; if (!publicationIsWithinPeriod({ ...form, published_date: form.published_date || new Date().toISOString().slice(0, 10) }, activePeriod.start_date, today)) {
+        setRefreshNotice('A data desta publicação está fora do período aberto.');
         return;
     } if (monthlyPostRemaining <= 0) {
         setRefreshNotice(`Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.`);
@@ -249,7 +249,7 @@ export default function Dashboard({ session }: {
     } const acceptedUrls = urls.slice(0, monthlyPostRemaining), omitted = urls.length - acceptedUrls.length; setBusy(true); setBulkMsg(`Coletando dados de ${acceptedUrls.length} publicação(ões)...`); const mp = profiles.find(x => String(x.id) === String(bulkMission)); const rows = await Promise.all(acceptedUrls.map(async (url) => { let d: any = {}; try {
         d = await fetchPostData(url);
     }
-    catch { } return { user_id: uid, title: d.title || 'Publicação do X', post_url: url, published_at: String(d.published_date || d.published_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10), x_published_at: d.published_at || null, views: Number(d.views || 0), likes: Number(d.likes || 0), reposts: Number(d.reposts || 0), comments: Number(d.comments || 0), mission_profile_id: mp?.id || null, mission_name: mp?.name || null, special_reward: Number(mp?.reward || 0), network: 'X', author_handle: d.author_handle || settings.x_handle || null, image_urls: Array.isArray(d.image_urls) ? d.image_urls : [], video_url: d.video_url || null, metrics_source: d.source || 'auto', metrics_updated_at: new Date().toISOString() }; })); const today=postDateParts(new Date())?.key||'',periodRows=rows.filter(row=>row.published_at>=activePeriod.start_date&&row.published_at<=today),outside=rows.length-periodRows.length; if(!periodRows.length){setBusy(false);setBulkMsg('Nenhuma publicação pertence ao período aberto.');return} const { error } = await supabase.from('posts').insert(periodRows); setBusy(false); if (error) {
+    catch { } return { user_id: uid, title: d.title || 'Publicação do X', post_url: url, published_at: String(d.published_date || d.published_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10), x_published_at: d.published_at || null, views: Number(d.views || 0), likes: Number(d.likes || 0), reposts: Number(d.reposts || 0), comments: Number(d.comments || 0), mission_profile_id: mp?.id || null, mission_name: mp?.name || null, special_reward: Number(mp?.reward || 0), network: 'X', author_handle: d.author_handle || settings.x_handle || null, image_urls: Array.isArray(d.image_urls) ? d.image_urls : [], video_url: d.video_url || null, metrics_source: d.source || 'auto', metrics_updated_at: new Date().toISOString() }; })); const today=postDateParts(new Date())?.key||'',periodRows=rows.filter(row=>publicationIsWithinPeriod(row,activePeriod.start_date,today)),outside=rows.length-periodRows.length; if(!periodRows.length){setBusy(false);setBulkMsg('Nenhuma publicação pertence ao período aberto.');return} const { error } = await supabase.from('posts').insert(periodRows); setBusy(false); if (error) {
         setBulkMsg(isMonthlyLimitError(error) ? `Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.` : 'Não foi possível adicionar os links.');
         return;
     } setBulkMsg(`${periodRows.length} publicação(ões) adicionada(s).${outside ? ` ${outside} link(s) ficaram fora do período aberto.` : ''}${omitted ? ` ${omitted} link(s) não foram adicionados porque a meta mensal foi alcançada.` : ''}`); setBulkText(''); await load(true); }
