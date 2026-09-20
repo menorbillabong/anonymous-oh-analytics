@@ -196,3 +196,7 @@
 @media(prefers-reduced-motion:reduce){.admin-loading span{animation:none}}
 
 
+.admin-account-review{margin:auto;border:1px solid #555;color:#f3f4f6;max-height:90vh;overflow:auto}
+.admin-account-review::backdrop{background:rgba(0,0,0,.8)}
+.admin-account-review .admin-date-delete-fields{grid-template-columns:1fr}
+.admin-account-review textarea{width:100%;min-height:90px;padding:12px;background:#111;color:#fff;border:1px solid #555;border-radius:8px;resize:vertical}

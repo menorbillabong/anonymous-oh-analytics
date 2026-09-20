@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { formatPostDate, postPublishedDate } from '@/lib/post-date';
 import { userMatchesSearch } from '@/lib/admin-user-search';
 import AdminSheetsCooldown from './admin-sheets-cooldown';
+import {AdminAccountReview, AdminAccountBackups} from './admin-account-review';
 import './admin.css';
 
 type AdminSection = 'Visão geral' | 'Usuários' | 'Publicações' | 'Períodos fechados' | 'Auditoria' | 'Controles';
@@ -110,9 +111,8 @@ export default function AdminPanel() {
   const [search, setSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [adjustmentAccessLoaded, setAdjustmentAccessLoaded] = useState(false);
-  const [cleanupEnabled, setCleanupEnabled] = useState(false);
   const [inactivityDays, setInactivityDays] = useState(90);
-  const [graceDays, setGraceDays] = useState(7);
+  const [reviewUser, setReviewUser] = useState<AdminUser | null>(null);
   const [postCleanupEnabled, setPostCleanupEnabled] = useState(false);
   const [postRetentionDays, setPostRetentionDays] = useState(40);
   const [selectedClosedPeriods, setSelectedClosedPeriods] = useState<number[]>([]);
@@ -149,9 +149,7 @@ export default function AdminPanel() {
     const countingByPeriod = new Map((Array.isArray(countingData) ? countingData : []).map((status:any) => [Number(status.id), status]));
     next.closed_periods = (next.closed_periods || []).map(period => ({...period,...(countingByPeriod.get(Number(period.id)) || {})}));
     setDashboard(next);
-    setCleanupEnabled(Boolean(next.cleanup?.auto_delete_enabled));
     setInactivityDays(Number(next.cleanup?.inactivity_days || 90));
-    setGraceDays(Number(next.cleanup?.grace_days || 7));
     setPostCleanupEnabled(Boolean(next.post_cleanup?.auto_delete_enabled));
     setPostRetentionDays(Number(next.post_cleanup?.retention_days || 40));
     setLoading(false);
@@ -299,15 +297,6 @@ export default function AdminPanel() {
     }), enabled ? 'Busca do X liberada somente para este usuário.' : 'Busca do X bloqueada para este usuário.');
   }
 
-  async function scheduleDeletion(user: AdminUser) {
-    const reason = reasonFor('agendar a exclusão desta conta');
-    if (!reason) return;
-    await run(`delete-${user.id}`, () => supabase.rpc('admin_schedule_account_deletion', {
-      p_target_user: user.id,
-      p_reason: reason,
-    }), 'Exclusão da conta agendada.');
-  }
-
   async function toggleManualAdjustment(user: AdminUser) {
     if (busy || !adjustmentAccessLoaded) return;
     const enabled = !user.manual_adjustment_enabled;
@@ -318,13 +307,6 @@ export default function AdminPanel() {
     await run(`manual-adjustment-${user.id}`, () => supabase.rpc('admin_set_manual_adjustment_access', {
       p_target_user: user.id, p_enabled: enabled, p_reason: reason,
     }), enabled ? 'Permissão de ajuste manual liberada para este usuário.' : 'Permissão de ajuste manual bloqueada para este usuário.');
-  }
-
-  async function cancelDeletion(user: AdminUser) {
-    if (!window.confirm('Cancelar a exclusão agendada desta conta?')) return;
-    await run(`delete-${user.id}`, () => supabase.rpc('admin_cancel_account_deletion', {
-      p_target_user: user.id,
-    }), 'Exclusão agendada cancelada.');
   }
 
   async function reviewPost(post: AdminPost, action: 'disqualify_post' | 'requalify_post') {
@@ -347,15 +329,15 @@ export default function AdminPanel() {
   }
 
   async function saveCleanup() {
-    if (inactivityDays < 30 || graceDays < 1) {
-      setMessage('Use ao menos 30 dias de inatividade e 1 dia de carência.');
+    if (!Number.isInteger(inactivityDays) || inactivityDays < 30 || inactivityDays > 365) {
+      setMessage('Escolha entre 30 e 365 dias para sinalizar uma conta para revisão.');
       return;
     }
     await run('cleanup', () => supabase.rpc('admin_set_account_cleanup', {
-      p_enabled: cleanupEnabled,
+      p_enabled: false,
       p_inactivity_days: inactivityDays,
-      p_grace_days: graceDays,
-    }), 'Política de limpeza automática atualizada.');
+      p_grace_days: Number(dashboard.cleanup?.grace_days || 5),
+    }), 'Prazo de revisão atualizado. Nenhuma conta será excluída automaticamente.');
   }
 
   async function savePostCleanup() {
@@ -445,7 +427,8 @@ export default function AdminPanel() {
   const suspendedCount = users.filter(user => user.suspended).length;
   const blockedCount = users.filter(user => user.ranking_blocked).length;
   const reviewedCount = posts.filter(post => post.admin_eligible === false).length;
-  const scheduledCount = users.filter(user => user.deletion_scheduled_at).length;
+  const reviewDays = Number(dashboard.cleanup?.inactivity_days || 90);
+  const reviewCount = users.filter(user => !user.is_admin && Number(user.inactive_days || 0) >= reviewDays).length;
   const scheduledPeriodCount = closedPeriods.filter(period => period.counting_active !== false && period.delete_after && !period.posts_deleted_at).length;
 
   if (loading) return <div className="admin-loading"><span>↻</span> CARREGANDO CONTROLE ADMINISTRATIVO</div>;
@@ -471,7 +454,7 @@ export default function AdminPanel() {
       <AdminStat label="CONTAS CADASTRADAS" value={users.length} detail={`${suspendedCount} suspensa(s)`}/>
       <AdminStat label="PUBLICAÇÕES" value={posts.length} detail={`${reviewedCount} desqualificada(s)`}/>
       <AdminStat label="BLOQUEIOS DE RANKING" value={blockedCount} detail="Controle individual"/>
-      <AdminStat label="EXCLUSÕES AGENDADAS" value={scheduledCount + scheduledPeriodCount} detail={scheduledPeriodCount + ' período(s) fechado(s)'}/>
+      <AdminStat label="CONTAS PARA REVISÃO" value={reviewCount} detail="Nenhuma exclusão automática de conta"/>
     </div>
 
     {section === 'Visão geral' && <div className="admin-overview">
@@ -482,11 +465,11 @@ export default function AdminPanel() {
           <button className={dashboard.controls?.ranking_self_service_enabled ? 'admin-toggle on' : 'admin-toggle'} disabled={busy === 'global-ranking'} onClick={toggleGlobalRanking}><i/>{dashboard.controls?.ranking_self_service_enabled ? 'ATIVADO' : 'DESATIVADO'}</button>
         </div>
         <div className="admin-control-row">
-          <div><strong>Limpeza automática de contas</strong><p>{cleanupEnabled ? `Contas inativas por ${inactivityDays} dias · carência de ${graceDays} dias.` : 'A limpeza automática está desativada.'}</p></div>
+          <div><strong>Revisão de contas inativas</strong><p>Após {reviewDays} dias, a conta é sinalizada para revisão. Nenhuma conta é apagada automaticamente.</p></div>
           <button className="admin-outline" onClick={() => setSection('Controles')}>CONFIGURAR</button>
         </div>
         <div className="admin-control-row">
-          <div><strong>Publicações de períodos fechados</strong><p>{postCleanupEnabled ? 'Novos fechamentos: exclusão após ' + postRetentionDays + ' dia(s).' : 'A exclusão automática está desativada.'}</p></div>
+          <div><strong>Publicações de períodos fechados</strong><p>{postCleanupEnabled ? 'Novos fechamentos: exclusão após ' + postRetentionDays + ' dia(s).' : 'A exclusão automática está desativada.'} {scheduledPeriodCount} período(s) com limpeza agendada.</p></div>
           <button className="admin-outline" onClick={() => setSection('Períodos fechados')}>GERENCIAR</button>
         </div>
       </div>
@@ -506,14 +489,14 @@ export default function AdminPanel() {
           <div className="admin-user-identity"><i>{String(user.profile_name || user.username || user.display_name || user.email || '?').slice(0, 1).toUpperCase()}</i><div><strong>{user.profile_name || user.username || user.display_name || user.x_handle || 'Sem nome'}</strong>{user.is_admin && <em>ADMINISTRADOR</em>}</div></div>
           <div><StatusTag tone={user.suspended ? 'danger' : 'success'}>{user.suspended ? 'SUSPENSA' : 'ATIVA'}</StatusTag>{user.suspension_reason && <small className="admin-reason">{user.suspension_reason}</small>}</div>
           <div><StatusTag tone={user.ranking_blocked ? 'danger' : user.ranking_control_unlocked ? 'warning' : 'neutral'}>{user.ranking_blocked ? 'BLOQUEADO' : user.ranking_control_unlocked ? 'LIBERADO' : 'PADRÃO'}</StatusTag></div>
-          <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small></div>
+          <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small>{!user.is_admin && Number(user.inactive_days || 0) >= reviewDays && <StatusTag tone="warning">INATIVA PARA REVISÃO</StatusTag>}</div>
           <SheetsAccess user={user} onSaved={load}/>
           <div className="admin-row-actions">
             <div className="admin-action-group"><small>AJUSTES MANUAIS</small><div><button className={user.manual_adjustment_enabled ? 'safe' : 'access'} disabled={Boolean(busy) || !adjustmentAccessLoaded} onClick={() => toggleManualAdjustment(user)}>{busy === `manual-adjustment-${user.id}` ? 'SALVANDO...' : !adjustmentAccessLoaded ? 'PERMISSÃO INDISPONÍVEL' : user.manual_adjustment_enabled ? 'BLOQUEAR AJUSTE MANUAL' : 'LIBERAR AJUSTE MANUAL'}</button></div><small className="admin-reason">{user.manual_adjustment_enabled ? 'Liberado individualmente' : 'Desabilitado por padrão'}</small></div>
             <div className="admin-action-group"><small>CONTA</small><div>
               <button className="access" onClick={() => setAccessUser(user)}>ALTERAR ACESSO</button>
               <button disabled={busy === `user-${user.id}` || user.is_admin} onClick={() => manageUser(user, user.suspended ? 'reactivate' : 'suspend', user.suspended ? 'reativar esta conta' : 'suspender esta conta')}>{user.suspended ? 'REATIVAR' : 'SUSPENDER'}</button>
-              {user.deletion_scheduled_at ? <button className="safe" disabled={busy === `delete-${user.id}`} onClick={() => cancelDeletion(user)}>CANCELAR EXCLUSÃO</button> : <button className="danger" disabled={busy === `delete-${user.id}` || user.is_admin} onClick={() => scheduleDeletion(user)}>AGENDAR EXCLUSÃO</button>}
+              <button disabled={Boolean(busy) || user.is_admin || Number(user.inactive_days || 0) < reviewDays} onClick={() => setReviewUser(user)}>REVISAR CONTA INATIVA</button>
             </div></div>
             <div className="admin-action-group"><small>RANKING</small><div>
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking', user.ranking_blocked ? 'liberar esta conta no ranking' : 'bloquear esta conta no ranking')}>{user.ranking_blocked ? 'LIBERAR RANKING' : 'BLOQUEAR RANKING'}</button>
@@ -525,6 +508,10 @@ export default function AdminPanel() {
         </div>)}
         {!filteredUsers.length && <div className="admin-empty">Nenhum usuário encontrado.</div>}
       </div></div>
+      {reviewUser && <AdminAccountReview userId={reviewUser.id} name={reviewUser.profile_name || reviewUser.username || reviewUser.email || 'Usuário'}
+        onClose={() => setReviewUser(null)} onDeleted={async backupId => {
+          setReviewUser(null); setMessage(`Conta excluída por confirmação manual. Cópia ${backupId} disponível em Controles.`); await load();
+        }}/>}
       {dateDeleteUser && <UserPostDateDeleteModal
         user={dateDeleteUser}
         onClose={() => setDateDeleteUser(null)}
@@ -627,14 +614,14 @@ export default function AdminPanel() {
         <button className="admin-primary" disabled={busy === 'global-ranking'} onClick={toggleGlobalRanking}>{dashboard.controls?.ranking_self_service_enabled ? 'DESATIVAR CONTROLE GLOBAL' : 'ATIVAR CONTROLE GLOBAL'}</button>
       </div>
       <div className="admin-panel">
-        <div className="admin-panel-head"><div><small>CONTAS INATIVAS</small><h2>Limpeza automática</h2></div><StatusTag tone={cleanupEnabled ? 'warning' : 'neutral'}>{cleanupEnabled ? 'CONFIGURADA' : 'DESATIVADA'}</StatusTag></div>
+        <div className="admin-panel-head"><div><small>CONTAS INATIVAS</small><h2>Revisão manual</h2></div><StatusTag tone="success">PROTEGIDAS</StatusTag></div>
         <div className="admin-form">
-          <label className="admin-check"><span><strong>Ativar limpeza automática</strong><small>Agenda contas após o período configurado.</small></span><input type="checkbox" checked={cleanupEnabled} onChange={event => setCleanupEnabled(event.target.checked)}/></label>
-          <label><span>Dias de inatividade</span><input type="number" min="30" value={inactivityDays} onChange={event => setInactivityDays(Number(event.target.value))}/></label>
-          <label><span>Dias de carência</span><input type="number" min="1" value={graceDays} onChange={event => setGraceDays(Number(event.target.value))}/></label>
-          <button className="admin-primary" disabled={busy === 'cleanup'} onClick={saveCleanup}>SALVAR POLÍTICA DE LIMPEZA</button>
+          <p className="admin-form-note">Acessos ao painel e ações reais renovam a atividade. Contas inativas ficam apenas para sua revisão, sem agendamento de exclusão.</p>
+          <label><span>Dias sem atividade para revisão</span><input type="number" min="30" max="365" value={inactivityDays} onChange={event => setInactivityDays(Number(event.target.value))}/></label>
+          <button className="admin-primary" disabled={busy === 'cleanup'} onClick={saveCleanup}>SALVAR PRAZO DE REVISÃO</button>
         </div>
       </div>
+      <AdminAccountBackups/>
       <div className="admin-panel">
         <div className="admin-panel-head"><div><small>PERÍODOS FECHADOS</small><h2>Prazo padrão das publicações</h2></div><StatusTag tone={postCleanupEnabled ? 'warning' : 'neutral'}>{postCleanupEnabled ? 'CONFIGURADO' : 'DESATIVADO'}</StatusTag></div>
         <div className="admin-form">

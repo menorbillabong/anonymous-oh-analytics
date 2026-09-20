@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Dashboard from './dashboard';
 import DatabaseRefreshTimer from './database-refresh-timer';
 import ReferencePreviewInjector from './reference-preview-injector';
+import AccountActivity from './account-activity';
 import {LanguageSelect} from './site-language';
 import { supabase } from '@/lib/supabase';
 import './globals.css';
@@ -71,7 +72,7 @@ export default function Home() {
   }
 
   if(loading)return <div className="auth-loading">ANONIMOUS_OH Analytics</div>;
-  if(session)return <><Dashboard session={session}/><DatabaseRefreshTimer/><ReferencePreviewInjector/></>;
+  if(session)return <><AccountActivity userId={session.user.id}/><Dashboard session={session}/><DatabaseRefreshTimer/><ReferencePreviewInjector/></>;
 
   return <main className="auth-shell">
     <header className="auth-topbar">
