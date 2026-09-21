@@ -64,6 +64,25 @@
 .admin-user-identity>div{min-width:0}
 .admin-user-identity strong,.admin-user-identity small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .admin-user-identity em{display:inline-block;margin-top:5px;border:1px solid #684a22;border-radius:4px;background:#271b0e;color:#ffb45f;padding:3px 5px;font-size:7px;font-style:normal;font-weight:900}
+.admin-account-list{display:grid;gap:8px;padding:0 20px 20px}
+.admin-user-disclosure{min-width:0;border:1px solid #303030;border-radius:10px;background:#151515;color:#d8dadd;font-size:12px;overflow:hidden}
+.admin-user-summary{display:flex;align-items:center;gap:12px;min-height:64px;padding:10px 16px;cursor:pointer;list-style:none}
+.admin-user-summary::-webkit-details-marker{display:none}
+.admin-user-summary:hover{background:#202020}
+.admin-user-summary:focus-visible{outline:2px solid #72b6ff;outline-offset:-3px;border-radius:9px}
+.admin-user-summary>.admin-user-identity{flex:1}
+.admin-user-summary .admin-user-identity strong{display:block}
+.admin-user-summary>.admin-tag{flex-shrink:0}
+.admin-user-chevron{font-size:24px;color:#ffb45f;line-height:1}
+.admin-user-disclosure[open]>.admin-user-summary .admin-user-chevron{transform:rotate(90deg)}
+.admin-user-disclosure[open]>.admin-user-summary{border-bottom:1px solid #303030}
+.admin-user-expanded{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:18px;padding:18px}
+.admin-user-expanded>div{min-width:0}
+.admin-user-field-label{display:block;margin-bottom:8px;color:#aeb6c2;font-size:10px;font-weight:800;letter-spacing:.06em}
+.admin-user-expanded>div>strong,.admin-user-expanded>div>small{display:block;margin-bottom:6px}
+.admin-user-expanded>div>small{color:#aeb6c2}
+.admin-user-expanded>.admin-row-actions{grid-column:2/-1;padding:0}
+@media(max-width:720px){.admin-account-list{padding:0 12px 12px}.admin-user-summary{gap:8px;padding:10px;min-height:60px}.admin-user-expanded{grid-template-columns:1fr;padding:14px;gap:16px}.admin-user-expanded>.admin-row-actions{grid-column:auto}.admin-user-summary .admin-user-identity>i{display:none}.admin-user-summary .admin-user-identity{gap:0}}
 .admin-tag{display:inline-flex;align-items:center;border:1px solid #383838;border-radius:999px;background:#202020;color:#b9bec7;padding:5px 8px;font-size:8px;font-weight:900;letter-spacing:.04em}
 .admin-tag.success{border-color:#24513e;background:#10271f;color:#2ee7a8}
 .admin-tag.danger{border-color:#632d2d;background:#291212;color:#ff7474}

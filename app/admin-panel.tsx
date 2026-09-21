@@ -497,13 +497,17 @@ export default function AdminPanel() {
       <div id="account-list-panel" role="tabpanel" aria-labelledby={`account-tab-${accountTab}`} tabIndex={0}>
       <p className="admin-user-search-summary" role="status">{filteredUsers.length} / {accountTabUsers.length} <span>usuários encontrados</span></p>
       {!adjustmentAccessLoaded && <p className="admin-adjustment-unavailable" role="status">A permissão de ajustes manuais não pôde ser consultada. Atualize a lista antes de alterá-la.</p>}
-      <div className="admin-table-scroll"><div className="admin-user-table">
-        <div className="admin-table-head"><span>USUÁRIO</span><span>STATUS</span><span>RANKING</span><span>ATIVIDADE</span><span>GOOGLE SHEETS</span><span>AÇÕES</span></div>
-        {filteredUsers.map(user => <div className="admin-user-row" key={user.id}>
-          <div className="admin-user-identity"><i>{adminUserDisplayName(user).slice(0, 1).toUpperCase()}</i><div><strong>{adminUserDisplayName(user)}</strong>{user.is_admin && <em>ADMINISTRADOR</em>}</div></div>
-          <div><StatusTag tone={user.suspended ? 'danger' : 'success'}>{user.suspended ? 'SUSPENSA' : 'ATIVA'}</StatusTag>{user.suspension_reason && <small className="admin-reason">{user.suspension_reason}</small>}</div>
-          <div><StatusTag tone={user.ranking_blocked ? 'danger' : user.ranking_control_unlocked ? 'warning' : 'neutral'}>{user.ranking_blocked ? 'BLOQUEADO' : user.ranking_control_unlocked ? 'LIBERADO' : 'PADRÃO'}</StatusTag></div>
-          <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small>{accountNeedsReview(user, reviewDays) && <StatusTag tone="warning">INATIVA PARA REVISÃO</StatusTag>}</div>
+      <div className="admin-account-list">
+        {filteredUsers.map(user => <details className="admin-user-disclosure" key={user.id}>
+          <summary className="admin-user-summary">
+            <span className="admin-user-chevron" aria-hidden="true">›</span>
+            <div className="admin-user-identity"><i aria-hidden="true">{adminUserDisplayName(user).slice(0, 1).toUpperCase()}</i><div><strong>{adminUserDisplayName(user)}</strong>{user.is_admin && <em>ADMINISTRADOR</em>}</div></div>
+            <StatusTag tone={user.suspended ? 'danger' : 'success'}>{user.suspended ? 'SUSPENSA' : 'ATIVA'}</StatusTag>
+          </summary>
+          <div className="admin-user-expanded">
+          <div><span className="admin-user-field-label">STATUS</span><StatusTag tone={user.suspended ? 'danger' : 'success'}>{user.suspended ? 'SUSPENSA' : 'ATIVA'}</StatusTag>{user.suspension_reason && <small className="admin-reason">{user.suspension_reason}</small>}</div>
+          <div><span className="admin-user-field-label">RANKING</span><StatusTag tone={user.ranking_blocked ? 'danger' : user.ranking_control_unlocked ? 'warning' : 'neutral'}>{user.ranking_blocked ? 'BLOQUEADO' : user.ranking_control_unlocked ? 'LIBERADO' : 'PADRÃO'}</StatusTag></div>
+          <div><span className="admin-user-field-label">ATIVIDADE</span><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small>{accountNeedsReview(user, reviewDays) && <StatusTag tone="warning">INATIVA PARA REVISÃO</StatusTag>}</div>
           <SheetsAccess user={user} onSaved={load}/>
           <div className="admin-row-actions">
             <div className="admin-action-group"><small>AJUSTES MANUAIS</small><div><button className={user.manual_adjustment_enabled ? 'safe' : 'access'} disabled={Boolean(busy) || !adjustmentAccessLoaded} onClick={() => toggleManualAdjustment(user)}>{busy === `manual-adjustment-${user.id}` ? 'SALVANDO...' : !adjustmentAccessLoaded ? 'PERMISSÃO INDISPONÍVEL' : user.manual_adjustment_enabled ? 'BLOQUEAR AJUSTE MANUAL' : 'LIBERAR AJUSTE MANUAL'}</button></div><small className="admin-reason">{user.manual_adjustment_enabled ? 'Liberado individualmente' : 'Desabilitado por padrão'}</small></div>
@@ -519,9 +523,10 @@ export default function AdminPanel() {
             <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button><button className={user.x_import_enabled ? 'safe' : 'access'} disabled={busy === `x-import-${user.id}`} onClick={() => toggleXImport(user)}>{busy === `x-import-${user.id}` ? 'SALVANDO...' : user.x_import_enabled ? 'BUSCA DO X LIBERADA' : 'LIBERAR BUSCA DO X'}</button></div></div>
             <div className="admin-action-group"><small>FECHAMENTO</small><div><button className={user.period_close_blocked ? 'warning' : 'safe'} disabled={!user.period_close_blocked || busy === `period-close-${user.id}`} onClick={() => resetPeriodCloseCooldown(user)}>{busy === `period-close-${user.id}` ? 'LIBERANDO...' : user.period_close_blocked ? 'LIBERAR FECHAMENTO' : user.period_close_release_source ? 'FECHAMENTO LIBERADO' : 'SEM BLOQUEIO ATIVO'}</button></div>{user.period_close_blocked && <small className="admin-reason">Liberação normal em {formatDate(user.period_close_next_allowed_at, true)}</small>}{user.period_close_release_source&&<small className="admin-reason">Liberação {user.period_close_release_source==='global'?'geral':'individual'} disponível uma vez</small>}</div>
           </div>
-        </div>)}
+          </div>
+        </details>)}
         {!filteredUsers.length && <div className="admin-empty">{accountTab === 'review' && !reviewCount ? 'Nenhuma conta precisa de revisão no momento.' : 'Nenhum usuário encontrado.'}</div>}
-      </div></div>
+      </div>
       </div>
       {reviewUser && <AdminAccountReview userId={reviewUser.id} name={reviewUser.profile_name || reviewUser.username || reviewUser.email || 'Usuário'}
         onClose={() => setReviewUser(null)} onDeleted={async backupId => {
