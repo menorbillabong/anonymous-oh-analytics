@@ -130,6 +130,8 @@ const dictionary: Record<string, Translation> = {
   'Painel': { en: 'Dashboard', es: 'Panel' },
   'Classificação': { en: 'Ranking', es: 'Clasificación' },
   'Histórico': { en: 'History', es: 'Historial' },
+  'Missões': { en: 'Missions', es: 'Misiones' },
+  'Atividades': { en: 'Activities', es: 'Actividades' },
   'Centro de Controle da Missão': { en: 'Mission Control Center', es: 'Centro de Control de Misiones' },
   'Registro de atividades': { en: 'Activity log', es: 'Registro de actividad' },
   'Configurações': { en: 'Settings', es: 'Configuración' },

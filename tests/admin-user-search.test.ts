@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {accountNeedsReview,normalizeUserSearch,userMatchesSearch} from '../lib/admin-user-search.ts';
+import {accountNeedsReview,adminUserDisplayName,sortUsersByDisplayName,normalizeUserSearch,userMatchesSearch} from '../lib/admin-user-search.ts';
 
 test('busca nomes com e sem acentos, maiúsculas e espaços repetidos',()=>{
   assert.equal(normalizeUserSearch('  JOÃO   Ávila '),'joao avila');
@@ -35,4 +35,18 @@ test('review list combines name search with eligibility without changing the all
   assert.equal(reviewed.filter(user=>userMatchesSearch(user,'maria')).length,0);
   assert.equal(users.length,3);
   assert.equal(users.filter(user=>accountNeedsReview(user,90)).length,0);
+});
+
+test('sorts by the displayed name, ignoring accents and case without mutating the source',()=>{
+  const users=Object.freeze([{profile_name:'zélia'},{profile_name:'Bruno'},{profile_name:'Álvaro'},{profile_name:'ana'}]);
+  assert.deepEqual(sortUsersByDisplayName(users).map(adminUserDisplayName),['Álvaro','ana','Bruno','zélia']);
+  assert.equal(users[0].profile_name,'zélia');
+});
+test('name fallbacks and numeric suffixes use the same order in both account tabs and search',()=>{
+  const users=[{profile_name:'Zoe',username:'aaa',inactive_days:60},{username:'Pessoa 10',inactive_days:90},{display_name:'pessoa 2',inactive_days:90},{x_handle:'Ana',inactive_days:0},{}];
+  const sorted=sortUsersByDisplayName(users);
+  assert.deepEqual(sorted.map(adminUserDisplayName),['Ana','pessoa 2','Pessoa 10','Sem nome','Zoe']);
+  assert.deepEqual(sorted.filter(user=>accountNeedsReview(user,30)).map(adminUserDisplayName),['pessoa 2','Pessoa 10','Zoe']);
+  assert.deepEqual(sorted.filter(user=>userMatchesSearch(user,'pessoa')).map(adminUserDisplayName),['pessoa 2','Pessoa 10']);
+  assert.deepEqual(sortUsersByDisplayName([]),[]);
 });
