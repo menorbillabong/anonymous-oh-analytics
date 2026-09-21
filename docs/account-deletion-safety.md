@@ -17,6 +17,8 @@ Account inactivity is now an administrative review signal, not an automatic dele
 
 In **Admin → Usuários**, inactive accounts show **INATIVA PARA REVISÃO** and **REVISAR CONTA INATIVA**. Opening a review never deletes anything. Keeping the account requires no action.
 
+Within **Gestão de contas**, **Todas as contas** is the default tab; **Contas para revisão** filters the same loaded accounts by the saved inactivity threshold, excluding administrators. Both tabs show total counts independent of the name search. Search remains active across tab changes. Arrow keys/Home/End switch tabs. The empty review state is explicit. This is a client-side view only: switching tabs does not write data or change permissions. Verified with isolated desktop/mobile browser fixtures, including search, keyboard navigation, one eligible account, and zero eligible accounts after refresh.
+
 In **Admin → Controles**, the inactivity threshold can be changed between 30 and 365 days. This does not enable scheduled deletion. Backups from subsequent manually confirmed deletions appear under **Cópias de exclusões manuais**.
 
 ## Recovery limitations and procedure
@@ -35,7 +37,7 @@ Previously deleted accounts are not restored or retroactively backed up by this 
 
 ## Verification
 
-- 105 automated JavaScript/TypeScript tests pass; production build and type checking pass.
+- 107 automated JavaScript/TypeScript tests pass; production build and type checking pass.
 - `tests/account-review-permissions.sql` uses generated synthetic users and always rolls the transaction back. It verifies legacy-path blocking, current activity protection, session checks, non-admin denial, confirmation, stale preview rejection, backup survival, and full rollback after an intentionally induced late FK failure.
 - Database inventory before/after synthetic tests: 13 users, 543 posts, 5 archives; zero fixture users/backups remain and zero account deletion schedules remain.
 - Local browser fixtures target only `127.0.0.1:3107` and fake Supabase `127.0.0.1:54321`. They test the actual application components without real credentials or external writes. Desktop and mobile dialogs render; protected users have disabled review actions; email/reason gate the confirmation; the mocked API receives the expected user and activity timestamp.

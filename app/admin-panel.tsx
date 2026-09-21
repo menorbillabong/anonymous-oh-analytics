@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { formatPostDate, postPublishedDate } from '@/lib/post-date';
-import { userMatchesSearch } from '@/lib/admin-user-search';
+import { accountNeedsReview, userMatchesSearch } from '@/lib/admin-user-search';
 import AdminSheetsCooldown from './admin-sheets-cooldown';
 import {AdminAccountReview, AdminAccountBackups} from './admin-account-review';
 import './admin.css';
@@ -110,6 +110,7 @@ export default function AdminPanel() {
   const [message, setMessage] = useState('');
   const [search, setSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [accountTab, setAccountTab] = useState<'all' | 'review'>('all');
   const [adjustmentAccessLoaded, setAdjustmentAccessLoaded] = useState(false);
   const [inactivityDays, setInactivityDays] = useState(90);
   const [reviewUser, setReviewUser] = useState<AdminUser | null>(null);
@@ -165,7 +166,10 @@ export default function AdminPanel() {
   const logs = dashboard.logs || [];
   const closedPeriods = dashboard.closed_periods || [];
   const normalizedSearch = search.trim().toLowerCase();
-  const filteredUsers = useMemo(() => users.filter(user => userMatchesSearch(user, userSearch)), [users, userSearch]);
+  const reviewDays = Number(dashboard.cleanup?.inactivity_days || 90);
+  const reviewUsers = users.filter(user => accountNeedsReview(user, reviewDays));
+  const accountTabUsers = accountTab === 'review' ? reviewUsers : users;
+  const filteredUsers = accountTabUsers.filter(user => userMatchesSearch(user, userSearch));
   const filteredPosts = useMemo(() => posts.filter(post =>
     !normalizedSearch || [post.title, post.author_handle, post.post_url]
       .some(value => String(value || '').toLowerCase().includes(normalizedSearch))
@@ -427,8 +431,7 @@ export default function AdminPanel() {
   const suspendedCount = users.filter(user => user.suspended).length;
   const blockedCount = users.filter(user => user.ranking_blocked).length;
   const reviewedCount = posts.filter(post => post.admin_eligible === false).length;
-  const reviewDays = Number(dashboard.cleanup?.inactivity_days || 90);
-  const reviewCount = users.filter(user => !user.is_admin && Number(user.inactive_days || 0) >= reviewDays).length;
+  const reviewCount = reviewUsers.length;
   const scheduledPeriodCount = closedPeriods.filter(period => period.counting_active !== false && period.delete_after && !period.posts_deleted_at).length;
 
   if (loading) return <div className="admin-loading"><span>↻</span> CARREGANDO CONTROLE ADMINISTRATIVO</div>;
@@ -481,7 +484,18 @@ export default function AdminPanel() {
 
     {section === 'Usuários' && <div className="admin-panel">
       <PanelHeading eyebrow="GESTÃO DE CONTAS" title="Usuários" search={userSearch} setSearch={setUserSearch} searchLabel="Buscar pelo nome"/>
-      <p className="admin-user-search-summary" role="status">{filteredUsers.length} / {users.length} <span>usuários encontrados</span></p>
+      <div className="admin-account-tabs" role="tablist" aria-label="Gestão de contas" onKeyDown={event => {
+        if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const next = event.key === 'Home' ? 'all' : event.key === 'End' ? 'review' : accountTab === 'all' ? 'review' : 'all';
+        setAccountTab(next);
+        event.currentTarget.querySelector<HTMLButtonElement>(`#account-tab-${next}`)?.focus();
+      }}>
+        <button type="button" role="tab" id="account-tab-all" aria-selected={accountTab === 'all'} aria-controls="account-list-panel" tabIndex={accountTab === 'all' ? 0 : -1} onClick={() => setAccountTab('all')}><span>Todas as contas</span><strong>{users.length}</strong></button>
+        <button type="button" role="tab" id="account-tab-review" aria-selected={accountTab === 'review'} aria-controls="account-list-panel" tabIndex={accountTab === 'review' ? 0 : -1} onClick={() => setAccountTab('review')}><span>Contas para revisão</span><strong>{reviewCount}</strong></button>
+      </div>
+      <div id="account-list-panel" role="tabpanel" aria-labelledby={`account-tab-${accountTab}`} tabIndex={0}>
+      <p className="admin-user-search-summary" role="status">{filteredUsers.length} / {accountTabUsers.length} <span>usuários encontrados</span></p>
       {!adjustmentAccessLoaded && <p className="admin-adjustment-unavailable" role="status">A permissão de ajustes manuais não pôde ser consultada. Atualize a lista antes de alterá-la.</p>}
       <div className="admin-table-scroll"><div className="admin-user-table">
         <div className="admin-table-head"><span>USUÁRIO</span><span>STATUS</span><span>RANKING</span><span>ATIVIDADE</span><span>GOOGLE SHEETS</span><span>AÇÕES</span></div>
@@ -489,14 +503,14 @@ export default function AdminPanel() {
           <div className="admin-user-identity"><i>{String(user.profile_name || user.username || user.display_name || user.email || '?').slice(0, 1).toUpperCase()}</i><div><strong>{user.profile_name || user.username || user.display_name || user.x_handle || 'Sem nome'}</strong>{user.is_admin && <em>ADMINISTRADOR</em>}</div></div>
           <div><StatusTag tone={user.suspended ? 'danger' : 'success'}>{user.suspended ? 'SUSPENSA' : 'ATIVA'}</StatusTag>{user.suspension_reason && <small className="admin-reason">{user.suspension_reason}</small>}</div>
           <div><StatusTag tone={user.ranking_blocked ? 'danger' : user.ranking_control_unlocked ? 'warning' : 'neutral'}>{user.ranking_blocked ? 'BLOQUEADO' : user.ranking_control_unlocked ? 'LIBERADO' : 'PADRÃO'}</StatusTag></div>
-          <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small>{!user.is_admin && Number(user.inactive_days || 0) >= reviewDays && <StatusTag tone="warning">INATIVA PARA REVISÃO</StatusTag>}</div>
+          <div><strong>{Number(user.inactive_days || 0)} dia(s)</strong><small>{formatDate(user.last_activity_at)}</small>{accountNeedsReview(user, reviewDays) && <StatusTag tone="warning">INATIVA PARA REVISÃO</StatusTag>}</div>
           <SheetsAccess user={user} onSaved={load}/>
           <div className="admin-row-actions">
             <div className="admin-action-group"><small>AJUSTES MANUAIS</small><div><button className={user.manual_adjustment_enabled ? 'safe' : 'access'} disabled={Boolean(busy) || !adjustmentAccessLoaded} onClick={() => toggleManualAdjustment(user)}>{busy === `manual-adjustment-${user.id}` ? 'SALVANDO...' : !adjustmentAccessLoaded ? 'PERMISSÃO INDISPONÍVEL' : user.manual_adjustment_enabled ? 'BLOQUEAR AJUSTE MANUAL' : 'LIBERAR AJUSTE MANUAL'}</button></div><small className="admin-reason">{user.manual_adjustment_enabled ? 'Liberado individualmente' : 'Desabilitado por padrão'}</small></div>
             <div className="admin-action-group"><small>CONTA</small><div>
               <button className="access" onClick={() => setAccessUser(user)}>ALTERAR ACESSO</button>
               <button disabled={busy === `user-${user.id}` || user.is_admin} onClick={() => manageUser(user, user.suspended ? 'reactivate' : 'suspend', user.suspended ? 'reativar esta conta' : 'suspender esta conta')}>{user.suspended ? 'REATIVAR' : 'SUSPENDER'}</button>
-              <button disabled={Boolean(busy) || user.is_admin || Number(user.inactive_days || 0) < reviewDays} onClick={() => setReviewUser(user)}>REVISAR CONTA INATIVA</button>
+              <button disabled={Boolean(busy) || !accountNeedsReview(user, reviewDays)} onClick={() => setReviewUser(user)}>REVISAR CONTA INATIVA</button>
             </div></div>
             <div className="admin-action-group"><small>RANKING</small><div>
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking', user.ranking_blocked ? 'liberar esta conta no ranking' : 'bloquear esta conta no ranking')}>{user.ranking_blocked ? 'LIBERAR RANKING' : 'BLOQUEAR RANKING'}</button>
@@ -506,8 +520,9 @@ export default function AdminPanel() {
             <div className="admin-action-group"><small>FECHAMENTO</small><div><button className={user.period_close_blocked ? 'warning' : 'safe'} disabled={!user.period_close_blocked || busy === `period-close-${user.id}`} onClick={() => resetPeriodCloseCooldown(user)}>{busy === `period-close-${user.id}` ? 'LIBERANDO...' : user.period_close_blocked ? 'LIBERAR FECHAMENTO' : user.period_close_release_source ? 'FECHAMENTO LIBERADO' : 'SEM BLOQUEIO ATIVO'}</button></div>{user.period_close_blocked && <small className="admin-reason">Liberação normal em {formatDate(user.period_close_next_allowed_at, true)}</small>}{user.period_close_release_source&&<small className="admin-reason">Liberação {user.period_close_release_source==='global'?'geral':'individual'} disponível uma vez</small>}</div>
           </div>
         </div>)}
-        {!filteredUsers.length && <div className="admin-empty">Nenhum usuário encontrado.</div>}
+        {!filteredUsers.length && <div className="admin-empty">{accountTab === 'review' && !reviewCount ? 'Nenhuma conta precisa de revisão no momento.' : 'Nenhum usuário encontrado.'}</div>}
       </div></div>
+      </div>
       {reviewUser && <AdminAccountReview userId={reviewUser.id} name={reviewUser.profile_name || reviewUser.username || reviewUser.email || 'Usuário'}
         onClose={() => setReviewUser(null)} onDeleted={async backupId => {
           setReviewUser(null); setMessage(`Conta excluída por confirmação manual. Cópia ${backupId} disponível em Controles.`); await load();

@@ -17,3 +17,8 @@ export function userMatchesSearch(user: SearchableUser, query: string) {
     .map(normalizeUserSearch);
   return terms.every(term => fields.some(field => field.includes(term)));
 }
+
+export function accountNeedsReview(user: {is_admin?: boolean; inactive_days?: number}, reviewDays: number) {
+  const days = Number(user.inactive_days ?? 0);
+  return !user.is_admin && Number.isFinite(days) && days >= reviewDays;
+}

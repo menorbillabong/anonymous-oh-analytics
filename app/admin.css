@@ -44,6 +44,11 @@
 .admin-search button{border:0;background:transparent;color:#ddd;font-size:20px;cursor:pointer;padding:4px 8px}
 .admin-search:focus-within{outline:2px solid #72b6ff;outline-offset:2px}
 .admin-user-search-summary,.admin-adjustment-unavailable{margin:0 20px 16px;font-size:12px;color:#b9c2ce}
+.admin-account-tabs{display:flex;flex-wrap:wrap;gap:8px;margin:0 20px 16px}
+.admin-account-tabs button{display:flex;align-items:center;gap:10px;min-height:42px;padding:10px 14px;border:1px solid #393939;border-radius:8px;background:#161616;color:#bcc3ce;font-size:12px;font-weight:700;cursor:pointer}
+.admin-account-tabs button[aria-selected="true"]{border-color:#f4a640;background:#f4a640;color:#18120a}
+.admin-account-tabs strong{padding:2px 7px;border-radius:12px;background:rgba(128,128,128,.18);font-size:11px}
+.admin-account-tabs button:focus-visible,#account-list-panel:focus-visible{outline:2px solid #72b6ff;outline-offset:3px}
 .admin-adjustment-unavailable{color:#ffc181}
 .admin-search input{width:100%;height:36px;border:0;outline:0;background:transparent;color:#eee;font-size:11px}
 .admin-table-scroll{overflow-x:auto}
