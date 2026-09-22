@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import {eligibleForMissionPeriod,missionSelectionError,type MissionSelectionPeriod} from '../lib/mission-selection.ts';
+import {eligibleForMissionPeriod,missionSelectionError,parseMissionAutoFillTarget,type MissionSelectionPeriod} from '../lib/mission-selection.ts';
 import {postDateKey} from '../lib/post-date.ts';
 const period:MissionSelectionPeriod={id:'first',start_date:'2026-09-10',end_date:'2026-09-15',per_user_limit:3};
+test('automatic target accepts zero and positive integers, rejecting blank and invalid values',()=>{
+ for(const [input,expected] of [['0',0],['2',2],[' 0 ',0],['2147483647',2147483647]] as const)assert.equal(parseMissionAutoFillTarget(input),expected);
+ for(const value of ['', ' ', '-1', '1.5', 'NaN', 'Infinity', '2147483648'])assert.equal(parseMissionAutoFillTarget(value),null);
+});
+test('zero target preserves manual eligibility and existing selections',()=>{
+ const disabled={...period,per_user_limit:0};
+ assert.equal(eligibleForMissionPeriod({id:1},'2026-09-12',disabled,[]),true);
+ assert.equal(eligibleForMissionPeriod({id:1},'2026-09-12',disabled,[{post_id:1,period_id:'first',mission_profile_id:5}]),true);
+ assert.equal(eligibleForMissionPeriod({id:1},'2026-09-12',disabled,[{post_id:1,period_id:'other',mission_profile_id:5}]),false);
+});
 test('includes both endpoints and rejects publications outside dates',()=>{
  for(const date of ['2026-09-10','2026-09-15'])assert.equal(eligibleForMissionPeriod({id:1},date,period,[]),true);
  for(const date of ['','2026-09-09','2026-09-16'])assert.equal(eligibleForMissionPeriod({id:1},date,period,[]),false);

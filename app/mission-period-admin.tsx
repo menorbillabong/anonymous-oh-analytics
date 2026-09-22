@@ -2,7 +2,7 @@
 import {useEffect,useRef,useState,type FormEvent} from 'react';
 import {supabase} from '@/lib/supabase';
 import {formatPostDate} from '@/lib/post-date';
-import {missionSelectionError,type MissionSelectionPeriod} from '@/lib/mission-selection';
+import {missionSelectionError,parseMissionAutoFillTarget,type MissionSelectionPeriod} from '@/lib/mission-selection';
 import './mission-selection-periods.css';
 
 export default function MissionPeriodAdmin(){
@@ -23,15 +23,15 @@ export default function MissionPeriodAdmin(){
  }
  async function save(event:FormEvent){
   event.preventDefault();if(lock.current)return;
-  const count=Number(limit);
-  if(!start||!end||end<start||!Number.isInteger(count)||count<1||count>2147483647){setNotice('Confira as datas e informe uma quantidade inteira maior que zero.');return;}
+  const count=parseMissionAutoFillTarget(limit);
+  if(!start||!end||end<start||count===null){setNotice('Confira as datas e informe uma quantidade inteira igual ou maior que zero.');return;}
   lock.current=true;setBusy(true);setNotice('');
   try{
    const {error}=editing
     ?await supabase.rpc('update_mission_selection_period',{p_period:editing.id,p_revision:editing.revision,p_start:start,p_end:end,p_limit:count})
     :await supabase.rpc('create_mission_selection_period',{p_start:start,p_end:end,p_limit:count});
    if(error)throw error;
-   reset();await load();setNotice('Período salvo. Os vínculos existentes foram preservados. O preenchimento automático será conferido quando cada usuário abrir Períodos de Missão.');
+   reset();await load();setNotice(count===0?'Período salvo. Preenchimento automático desativado. Os vínculos existentes foram preservados e as seleções manuais continuam livres.':'Período salvo. Os vínculos existentes foram preservados. O preenchimento automático será conferido quando cada usuário abrir Períodos de Missão.');
   }catch(error){setNotice(missionSelectionError(error as {message?:string}));}
   finally{lock.current=false;setBusy(false);}
  }
@@ -49,8 +49,9 @@ export default function MissionPeriodAdmin(){
   <form onSubmit={save}><h3>{editing?'Editar período de missão':'Criar período de missão'}</h3><div className="mission-period-fields">
    <label>Data inicial<input type="date" required value={start} disabled={busy} onChange={e=>setStart(e.target.value)}/></label>
    <label>Data final<input type="date" required min={start||undefined} value={end} disabled={busy} onChange={e=>setEnd(e.target.value)}/></label>
-   <label>Quantidade para preenchimento automático<input type="number" required min="1" max="2147483647" step="1" value={limit} disabled={busy} onChange={e=>setLimit(e.target.value)}/></label>
+   <label>Quantidade para preenchimento automático<input type="number" required min="0" max="2147483647" step="1" value={limit} disabled={busy} aria-describedby="mission-auto-fill-help" onChange={e=>setLimit(e.target.value)}/></label>
   </div><div className="mission-period-admin-actions"><button type="submit" disabled={busy}>{busy?'Aguarde…':editing?'Salvar alterações':'Criar período de missão'}</button>{editing&&<button type="button" disabled={busy} onClick={reset}>Cancelar edição</button>}</div></form>
+  <p id="mission-auto-fill-help">Use 0 para desativar o preenchimento automático deste período. As seleções manuais continuam livres.</p>
   <p>As duas datas estão incluídas. Publicações com bônus são vinculadas do período mais antigo para o mais novo nas datas compartilhadas. Alterar a quantidade não desfaz vínculos existentes.</p>
   <p role="status" aria-live="polite" className="mission-period-message">{notice}</p>
   {deleting&&<div className="mission-period-delete-confirm" role="group" aria-label="Confirmar exclusão do período">
@@ -60,7 +61,7 @@ export default function MissionPeriodAdmin(){
   </div>}
   <div className="mission-period-existing">{periods.map(period=><div className="mission-period-definition" key={period.id}>
    <strong>{formatPostDate(period.start_date)} a {formatPostDate(period.end_date)}</strong>
-   <small>{period.per_user_limit===null?'Defina a quantidade para ativar o preenchimento automático':`${period.per_user_limit} por usuário no preenchimento automático`}</small>
+   <small>{period.per_user_limit===0?'Preenchimento automático desativado':period.per_user_limit===null?'Defina a quantidade para ativar o preenchimento automático':`${period.per_user_limit} por usuário no preenchimento automático`}</small>
    <div className="mission-period-admin-actions"><button type="button" disabled={busy} aria-label={`Editar período ${formatPostDate(period.start_date)} a ${formatPostDate(period.end_date)}`} onClick={()=>edit(period)}>Editar</button><button type="button" disabled={busy} aria-label={`Excluir período ${formatPostDate(period.start_date)} a ${formatPostDate(period.end_date)}`} onClick={()=>{setDeleting(period);setNotice('');}}>Excluir</button></div>
   </div>)}</div>
  </section>;

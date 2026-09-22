@@ -1,6 +1,12 @@
 export type MissionSelectionPeriod = {id:string;start_date:string;end_date:string;per_user_limit:number|null;revision?:number};
 export type MissionSelection = {post_id:number;period_id:string;mission_profile_id:number};
 
+export function parseMissionAutoFillTarget(value:string):number|null{
+ if(!value.trim())return null;
+ const count=Number(value);
+ return Number.isInteger(count)&&count>=0&&count<=2147483647?count:null;
+}
+
 // Dates are normalized by the existing post-date helper before this predicate.
 export function eligibleForMissionPeriod(post:{id:string|number;counting_excluded?:boolean;special_reward?:number}, date:string, period:MissionSelectionPeriod, selections:MissionSelection[], profileReward=0){
  const assignment=selections.find(row=>String(row.post_id)===String(post.id));
@@ -13,7 +19,7 @@ export function missionSelectionError(error:{message?:string}){
  const message=error.message||'';
  if(message.includes('MISSION_PERIOD_LINKED_OUTSIDE_DATES'))return 'As novas datas deixariam publicações vinculadas fora do período. Corrija as seleções antes de reduzir as datas.';
  if(message.includes('MISSION_PERIOD_ADMIN_REQUIRED'))return 'Somente o administrador pode gerenciar períodos de missão.';
- if(message.includes('MISSION_PERIOD_INVALID'))return 'Informe datas válidas e uma quantidade inteira maior que zero.';
+ if(message.includes('MISSION_PERIOD_INVALID'))return 'Informe datas válidas e uma quantidade inteira igual ou maior que zero.';
  if(message.includes('MISSION_PERIOD_NOT_FOUND'))return 'Este período não está mais disponível. Atualize a página.';
  if(message.includes('duplicate key')||message.includes('unique constraint'))return 'Já existe um período com essas datas.';
  if(message.includes('MISSION_PERIOD_LIMIT'))return 'Você atingiu o limite deste período. Desmarque uma publicação para selecionar outra.';

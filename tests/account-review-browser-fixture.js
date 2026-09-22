@@ -19,6 +19,7 @@
   ];
   const original = window.fetch.bind(window);
   const mobileLayout = new URLSearchParams(location.search).has('mobile-layout');
+  const missionPeriods = [{id: '66666666-6666-4666-8666-666666666666', start_date: '2026-09-10', end_date: '2026-09-15', per_user_limit: 2, revision: 1}];
   const profiles = [
     {id: 1, user_id: admin, name: 'Publicações regulares', active: true, color: '#54c27a', reward: 0},
     {id: 2, user_id: admin, name: 'Missão especial de fotografias', active: true, color: '#f6ad55', reward: 200},
@@ -56,7 +57,16 @@
       if (rpc === 'get_my_google_sheets_sync_status') data = {enabled: true, retry_after_seconds: 0};
       if (rpc === 'get_my_manual_like_adjustment') data = {allowed: true, enabled: false, amount: 0};
       if (rpc === 'google_sheets_user_config') data = {enabled: true, sheet_tab_name: 'Teste', sheet_month: '2026-09'};
-      if (rpc === 'mission_selection_periods') data = [{id: '66666666-6666-4666-8666-666666666666', start_date: '2026-09-10', end_date: '2026-09-15', per_user_limit: 2, revision: 1}];
+      if (rpc === 'mission_selection_periods') data = missionPeriods;
+      if (rpc === 'update_mission_selection_period') {
+        const period = missionPeriods.find(row => row.id === body.p_period);
+        if (period) Object.assign(period, {start_date: body.p_start, end_date: body.p_end, per_user_limit: body.p_limit, revision: period.revision + 1});
+        data = null;
+      }
+      if (rpc === 'create_mission_selection_period') {
+        const period = {id: crypto.randomUUID(), start_date: body.p_start, end_date: body.p_end, per_user_limit: body.p_limit, revision: 1};
+        missionPeriods.push(period); data = period.id;
+      }
       if (rpc === 'monthly_rankings') data = [{user_id: admin, x_handle: 'perfil_de_teste', month: '2026-09-01', posts_count: 2, total_views: 2400, likes: 90, crystalgin: 180, published: true}];
       if (rpc === 'archived_periods') data = [{id: 1, period_start: '2026-08-01', period_end: '2026-08-31', expires_at: '2026-10-10T15:00:00Z', summary: {total: 180, posts: 2, views: 2400, likes: 90}}];
       if (rpc === 'activity_logs') data = [{id: 1, action: 'Publicação adicionada', description: 'Registro fictício para verificar a quebra de texto no celular.', created_at: '2026-09-12T15:00:00Z'}];
