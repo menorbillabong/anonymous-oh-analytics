@@ -144,3 +144,103 @@
  button{touch-action:manipulation}
 }
 
+/* Mobile organization: all destinations visible, without a sticky wall of controls.
+   Keep this layer screen-only so printed reports retain their original layout. */
+@media screen and (max-width:900px){
+ .exact-app{padding-top:0!important}
+ .exact-topbar{position:relative!important;z-index:40!important;display:grid!important;grid-template-columns:minmax(0,1fr) auto!important;gap:10px!important;padding:12px!important}
+ .exact-brand{grid-column:1/-1;max-width:100%!important;font-size:14px!important}
+ .db-refresh-timer-host,.refresh-pill,.wait-pill{min-width:0!important;max-width:100%;margin:0!important;justify-self:start}
+ .user-pill{max-width:100%!important;min-width:0!important;margin:0!important;justify-self:end;font-size:11px!important}
+ .exact-nav{grid-column:1/-1;display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:6px!important;height:auto!important;overflow:visible!important;touch-action:auto}
+ .exact-nav button{justify-content:center!important;gap:5px!important;min-width:0!important;min-height:46px!important;height:auto!important;padding:10px 4px!important;white-space:normal!important;overflow-wrap:anywhere;font-size:11px!important;line-height:1.3;border-radius:8px;background:#ffffff04}
+ .exact-nav button.active{align-self:stretch!important}
+ .exact-nav .nav-icon{font-size:15px;flex-shrink:0}
+ .exact-main{margin-bottom:24px!important}
+ .hero-title{flex-wrap:wrap!important;gap:10px!important}
+ .hero-title h1{font-size:28px!important}
+ .hero-actions.organized-actions{grid-template-columns:1fr!important;gap:12px!important;margin-top:18px!important}
+ .hero-actions.organized-actions .action-group{padding:12px}
+ .hero-actions.organized-actions .action-group>small{font-size:10px;color:#aeb6c2;margin-bottom:10px;line-height:1.4}
+ .hero-actions.organized-actions .action-group>div{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+ .organized-actions .action-group>div>.x-import-control,.organized-actions .action-group>div>.split-btn,.organized-actions .action-group>div>.period-action-pair{grid-column:1/-1}
+ .hero-actions.organized-actions .update-action-group>div{grid-template-columns:1fr}
+ .hero-actions button{font-size:11px!important;min-height:46px!important}
+ .hero-actions:not(.organized-actions)>.x-import-control,.hero-actions:not(.organized-actions)>.sheets-sync-control,.hero-actions:not(.organized-actions)>.period-action-pair{width:100%;min-width:0}
+ .exact-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
+ .exact-stat{min-width:0;min-height:106px!important;padding:16px 12px!important}
+ .exact-stat:last-child{grid-column:1/-1}
+ .exact-stat small{font-size:10px!important;line-height:1.4}
+ .exact-stat strong{font-size:24px!important;overflow-wrap:anywhere}
+ .stat-label-row{flex-wrap:wrap;gap:6px}
+ .formula-strip{grid-template-columns:repeat(2,minmax(0,1fr))!important;padding:14px!important;gap:14px!important}
+ .formula-caption{line-height:1.5}
+ .formula-item{min-width:0;padding:8px!important}
+ .formula-item small{font-size:10px!important;line-height:1.4}
+ .mission-summary-card .mission-row:not(.mission-columns),.mission-summary-card .mission-total-row{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .mission-summary-card .mission-row>span::before,.mission-summary-card .mission-row>strong::before{font-size:10px}
+ .mission-name{min-width:0;overflow-wrap:anywhere}
+ .mission-reward-line,.mission-official-total{flex-wrap:wrap;padding:8px 0}
+ .settings-grid-full,.reward-card .reward-highlights{padding:14px!important}
+ .settings-page>.reward-card>header{height:auto;min-height:58px;gap:12px;flex-wrap:wrap;padding:14px}
+ .settings-grid-full>div,.settings-lower>article{padding:16px;min-width:0}
+ .appearance-card .appearance-grid{grid-template-columns:minmax(0,1fr);padding:14px}
+ .color-setting,.color-setting>div{min-width:0}
+ .color-setting input[type=color]{flex:0 0 38px}
+ .settings-grid-full label,.setting-help,.settings-lower p{font-size:12px!important}
+ input:not([type=checkbox]):not([type=radio]):not([type=color]),select,textarea{font-size:16px!important;min-width:0;scroll-margin-block:20px}
+ .settings-grid-full input,.settings-grid-full select,.add-field input,.add-field select{min-height:44px}
+ .mission-existing-card{display:block;padding:16px!important;min-width:0}
+ .mission-card-actions{position:static;justify-content:flex-end;margin-top:12px}
+ .mission-existing-main h3,.mission-existing-main p{overflow-wrap:anywhere}
+ .mission-tags{flex-wrap:wrap}
+ .mission-period-admin{padding:16px}
+ .mission-period-fields{gap:12px}
+ .mission-period-fields label,.mission-period-counter,.mission-period-definition{min-width:0;flex-basis:100%}
+ .mission-period-admin-actions{display:grid;grid-template-columns:1fr 1fr}
+ .admin-tabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;overflow:visible!important}
+ .admin-tabs button{white-space:normal;min-width:0;padding:10px 5px;font-size:11px}
+ .admin-user-summary{min-height:64px;scroll-margin-top:12px}
+ .admin-user-summary .admin-user-identity strong{white-space:normal;overflow-wrap:anywhere}
+ .add-publication-heading{gap:12px;margin-bottom:20px}
+ .add-publication-plus{flex:0 0 44px;min-height:44px}
+ .exact-app .bulk-page,.add-publication-screen,.add-publication-screen.reference-exact{top:0!important;padding-top:20px!important;padding-bottom:max(24px,env(safe-area-inset-bottom))!important}
+ .x-handle-dialog{padding:20px 16px}
+ .x-handle-dialog header{align-items:flex-start}
+ .x-handle-dialog header button{flex-shrink:0;min-width:44px;min-height:44px}
+ .x-handle-dialog footer{display:grid;grid-template-columns:1fr 1fr}
+ .report-controls{position:relative}
+ .report-controls button{min-height:44px}
+ .report-control-actions{flex-wrap:wrap}
+ .report-document{overflow-wrap:anywhere}
+ .ranking-page .ranking-tabs{display:grid;grid-template-columns:1fr;gap:8px}
+ .ranking-tabs button,.history-card-actions button{min-height:44px}
+ .rank-table{border:0;background:transparent;overflow:visible}
+ .rank-table>div:first-child{display:none}
+ .rank-table>div:not(:first-child):not(.empty-row){min-width:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;padding:16px;margin-bottom:10px;border:1px solid #303030;border-radius:10px}
+ .rank-table .rank-position{text-align:left}
+ .rank-table>div>span:nth-child(2){overflow-wrap:anywhere;align-self:center}
+ .rank-table>div>span:nth-child(n+3)::before{display:block;margin-bottom:6px;color:#aeb6c2;font-size:10px;font-weight:700}
+ .rank-table>div>span:nth-child(3)::before{content:'PUBLICAÇÕES'}
+ .rank-table>div>span:nth-child(4)::before{content:'VISUALIZAÇÕES'}
+ .rank-table>div>span:nth-child(5)::before{content:'CURTIDAS'}
+ .rank-table>div>strong:last-child::before{content:'CRYSTGIN';display:block;margin-bottom:6px;font-size:10px}
+ .activity-list article{display:flex;flex-wrap:wrap;gap:12px;padding:16px;border-bottom:1px solid #303030}
+ .activity-list article>div{flex:1;min-width:0;overflow-wrap:anywhere}
+ .activity-list article time{flex-basis:100%;font-size:12px;color:#aeb6c2}
+ /* Donation remains available below content, never over a form or card. */
+ [data-pix-donation]{display:flex;justify-content:flex-end;padding:0 12px max(16px,env(safe-area-inset-bottom));z-index:auto}
+ [data-pix-donation]>button{position:static;transform:none;min-height:44px}
+ [data-pix-donation]>button:hover{transform:none}
+ body:has(.add-publication-screen,.bulk-page,.mission-review-page,.bulk-review-page,.report-page) [data-pix-donation]{display:none!important}
+ .mission-period-floating{max-height:30dvh;overflow-y:auto}
+}
+
+@media screen and (max-width:360px){
+ .exact-nav{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+ .exact-stats{grid-template-columns:1fr!important}
+ .hero-actions.organized-actions .action-group>div{grid-template-columns:1fr}
+ .organized-actions .action-group>div>*{grid-column:1!important}
+ .admin-tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
