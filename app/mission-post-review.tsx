@@ -2,6 +2,7 @@
 
 import {useEffect,useMemo,useState,type CSSProperties} from 'react';
 import {createPortal} from 'react-dom';
+import {MatrixBackground} from './matrix-background';
 import {supabase} from '@/lib/supabase';
 import {formatPostDate,postPublishedValue} from '@/lib/post-date';
 import XPostPreview from './x-post-preview';
@@ -70,7 +71,7 @@ export default function MissionPostReview({profile,posts,profiles,onClose,onSave
  }
 
  const availableProfiles=profiles.filter(candidate=>candidate.active||String(candidate.id)===String(profile.id));
- return createPortal(<div className="mission-review-page"><div className="mission-review-shell">
+ return createPortal(<div className="mission-review-page"><MatrixBackground/><div className="mission-review-shell">
   <header className="mission-review-top">
    <div><span className="mission-review-kicker">DESEMPENHO POR MISSÃO</span><h1>Publicações de {profile.name}</h1><p>Revise as publicações e altere o perfil selecionado quando precisar.</p></div>
    <div className="mission-review-actions"><button type="button" className="mission-review-back" disabled={saving} onClick={onClose}>← Voltar</button><div className="mission-review-switch" aria-label="Modo de exibição"><button type="button" className={mode==='list'?'active':''} aria-label="Exibir em lista" title="Lista" onClick={()=>setMode('list')}>☰</button><button type="button" className={mode==='cards'?'active':''} aria-label="Exibir em cartões" title="Cartões" onClick={()=>setMode('cards')}>▦</button></div>{changes.length>0&&<button type="button" className="mission-review-save" disabled={saving} onClick={()=>setConfirming(true)}>{saving?'SALVANDO...':'Salvar alterações'}</button>}</div>

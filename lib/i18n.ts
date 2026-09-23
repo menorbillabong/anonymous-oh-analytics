@@ -21,6 +21,16 @@ type Translation = { en: string; es: string };
 // Only interface phrases belong here. Names and descriptions created by users are
 // deliberately not translated by the language layer.
 const dictionary: Record<string, Translation> = {
+  '🎨 Aparência': { en: '🎨 Appearance', es: '🎨 Apariencia' },
+  'Efeito Matrix': { en: 'Matrix effect', es: 'Efecto Matrix' },
+  'Habilitar efeito Matrix': { en: 'Enable Matrix effect', es: 'Activar efecto Matrix' },
+  'Cor do efeito': { en: 'Effect color', es: 'Color del efecto' },
+  'Cores do Matrix': { en: 'Matrix colors', es: 'Colores de Matrix' },
+  'Verde clássico': { en: 'Classic green', es: 'Verde clásico' },
+  'Roxo': { en: 'Purple', es: 'Morado' },
+  'Dourado': { en: 'Gold', es: 'Dorado' },
+  'O efeito aparece no fundo de todas as telas, sem cobrir os cards e as janelas. Salve as alterações para guardar sua preferência.': { en: 'The effect appears behind every screen, without covering cards or dialogs. Save changes to keep your preference.', es: 'El efecto aparece en el fondo de todas las pantallas, sin cubrir las tarjetas ni las ventanas. Guarda los cambios para conservar tu preferencia.' },
+  'Com a opção de reduzir movimentos do aparelho, o fundo fica estático.': { en: 'When reduced motion is enabled on your device, the background stays static.', es: 'Con la opción de reducir movimiento del dispositivo, el fondo permanece estático.' },
   'Tempo de espera da planilha': { en: 'Spreadsheet cooldown', es: 'Tiempo de espera de la planilla' },
   'Minutos': { en: 'Minutes', es: 'Minutos' },
   'Segundos': { en: 'Seconds', es: 'Segundos' },

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Dashboard from './dashboard';
+import {MatrixBackground} from './matrix-background';
 import DatabaseRefreshTimer from './database-refresh-timer';
 import ReferencePreviewInjector from './reference-preview-injector';
 import AccountActivity from './account-activity';
@@ -72,9 +73,9 @@ export default function Home() {
   }
 
   if(loading)return <div className="auth-loading">ANONIMOUS_OH Analytics</div>;
-  if(session)return <><AccountActivity userId={session.user.id}/><Dashboard session={session}/><DatabaseRefreshTimer/><ReferencePreviewInjector/></>;
+  if(session)return <><AccountActivity userId={session.user.id}/><Dashboard key={session.user.id} session={session}/><DatabaseRefreshTimer/><ReferencePreviewInjector/></>;
 
-  return <main className="auth-shell">
+  return <main className="auth-shell"><MatrixBackground/>
     <header className="auth-topbar">
       <strong>AVALIAÇÃO DE MÉTRICAS</strong>
       <div className="auth-topbar-actions">

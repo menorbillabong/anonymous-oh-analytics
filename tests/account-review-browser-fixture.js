@@ -18,7 +18,8 @@
     {id: active, email: 'active@example.invalid', profile_name: 'Conta ativa de teste', inactive_days: 0, last_activity_at: new Date().toISOString()},
   ];
   const original = window.fetch.bind(window);
-  const mobileLayout = new URLSearchParams(location.search).has('mobile-layout');
+  const mobileLayout = new URLSearchParams(location.search).has('mobile-layout') || new URLSearchParams(location.search).has('matrix-test');
+  const matrixTest = new URLSearchParams(location.search).has('matrix-test');
   const missionPeriods = [{id: '66666666-6666-4666-8666-666666666666', start_date: '2026-09-10', end_date: '2026-09-15', per_user_limit: 2, revision: 1}];
   const profiles = [
     {id: 1, user_id: admin, name: 'Publicações regulares', active: true, color: '#54c27a', reward: 0},
@@ -50,6 +51,14 @@
     if (mobileLayout) {
       if (rpc === 'user') data = {id: admin, email: 'admin@example.invalid', user_metadata: {username: 'Admin teste'}, app_metadata: {}, aud: 'authenticated'};
       if (rpc === 'user_settings') data = {user_id: admin, app_name: 'Teste celular', profile_name_confirmed: true, panel_action_layout: 'organized', monthly_post_goal: 60, show_refresh_timer: true, refresh_interval: .5, next_refresh_at: new Date(Date.now() + 1800000).toISOString()};
+      if (rpc === 'user_settings' && matrixTest) {
+        const key = `matrix-fixture:${admin}`;
+        if (['POST','PATCH'].includes(init?.method || 'GET')) {
+          if (localStorage.getItem('matrix-fixture-fail') === 'true') return new Response(JSON.stringify({message:'Test save error'}), {status:500, headers:{'Content-Type':'application/json'}});
+          localStorage.setItem(key, JSON.stringify({...JSON.parse(localStorage.getItem(key) || '{}'), ...body}));
+        }
+        data = {...data, ...JSON.parse(localStorage.getItem(key) || '{}')};
+      }
       if (rpc === 'posts') data = Number(url.searchParams.get('offset') || 0) > 0 ? [] : posts;
       if (rpc === 'mission_profiles') data = profiles;
       if (rpc === 'get_my_active_period') data = {id: '55555555-5555-4555-8555-555555555555', start_date: '2026-09-01', can_close: false, close_available_on: '2026-10-01'};
