@@ -65,7 +65,8 @@
       if (rpc === 'import_my_settings_preset') {
         if(localStorage.getItem('preset-fixture-fail')==='true')return new Response(JSON.stringify({message:'Import test failure'}),{status:400,headers:{'Content-Type':'application/json'}});
         const key=`matrix-fixture:${admin}`;
-        const settings={app_name:'Teste celular',monthly_post_goal:60,language:'pt-BR',...JSON.parse(localStorage.getItem(key)||'{}'),...body.p_settings};
+        const previous={app_name:'Teste celular',profile_name_confirmed:true,monthly_post_goal:60,language:'pt-BR',...JSON.parse(localStorage.getItem(key)||'{}')};
+        const settings={...previous,...body.p_settings,app_name:previous.app_name,profile_name_confirmed:previous.profile_name_confirmed};
         let added=0,existing=0,unmarked=0;
         for(const mission of body.p_missions){
           if(profiles.some(p=>p.name.trim().toLowerCase()===mission.name.trim().toLowerCase()&&p.network.toLowerCase()===mission.network.toLowerCase())){existing++;continue;}

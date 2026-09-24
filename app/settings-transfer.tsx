@@ -9,7 +9,7 @@ import type {Settings} from './full-settings';
 const copy = {
   'pt-BR': {
     title:'▣ Gestão de Dados',help:'Exporte as configurações e os perfis de missão. Perfis com o mesmo nome e rede já existentes serão mantidos, sem duplicar.',
-    permission:'“Esta é uma missão especial” só será mantida se a conta que recebe tiver essa permissão. Permissões e publicações não são transferidas.',
+    permission:'O nome da sua conta será mantido. “Esta é uma missão especial” só será mantida se a conta que recebe tiver essa permissão. Permissões e publicações não são transferidas.',
     download:'⇩ Download',upload:'⇧ Carregar',busy:'Processando…',
     confirm:'Aplicar as configurações e adicionar os perfis de missão deste arquivo à conta atual? Os perfis já existentes não serão alterados.',
     invalid:'Arquivo inválido ou grande demais. Exporte um novo arquivo na conta de origem.',
@@ -21,7 +21,7 @@ const copy = {
   },
   en: {
     title:'▣ Data management',help:'Export settings and mission profiles. Existing profiles with the same name and network will be kept, without duplicates.',
-    permission:'“This is a special mission” is kept only if the receiving account has permission. Permissions and posts are not transferred.',
+    permission:'Your account name will be kept. “This is a special mission” is kept only if the receiving account has permission. Permissions and posts are not transferred.',
     download:'⇩ Download',upload:'⇧ Import',busy:'Processing…',
     confirm:'Apply settings and add the mission profiles in this file to the current account? Existing profiles will not be changed.',
     invalid:'Invalid or oversized file. Export a new file from the source account.',
@@ -33,7 +33,7 @@ const copy = {
   },
   es: {
     title:'▣ Gestión de datos',help:'Exporta la configuración y los perfiles de misión. Los perfiles existentes con el mismo nombre y red se conservarán, sin duplicados.',
-    permission:'“Esta es una misión especial” solo se conserva si la cuenta de destino tiene permiso. Los permisos y las publicaciones no se transfieren.',
+    permission:'El nombre de tu cuenta se conservará. “Esta es una misión especial” solo se conserva si la cuenta de destino tiene permiso. Los permisos y las publicaciones no se transfieren.',
     download:'⇩ Descargar',upload:'⇧ Cargar',busy:'Procesando…',
     confirm:'¿Aplicar la configuración y añadir los perfiles de misión de este archivo a la cuenta actual? Los perfiles existentes no se modificarán.',
     invalid:'Archivo inválido o demasiado grande. Exporta un archivo nuevo desde la cuenta de origen.',
@@ -96,7 +96,8 @@ export function SettingsTransfer({uid,settings,goal,language,onImported}:{uid:st
       if(error||!data?.settings)throw new Error('IMPORT_FAILED');
       committed=true;
       if(!alive.current||owner.current!==uid)return;
-      const next={...settings,...portableSettings(data.settings),profile_name_confirmed:true} as Settings;
+      // Use the destination's persisted name, never a file value or an unsaved edit.
+      const next={...settings,...portableSettings(data.settings),app_name:data.settings.app_name,profile_name_confirmed:data.settings.profile_name_confirmed} as Settings;
       setMessage([t.success,`${t.added}: ${data.imported_count}.`,`${t.existing}: ${data.existing_count}.`,
         data.special_unmarked_count?`${t.unmarked}: ${data.special_unmarked_count}.`:'',parsed.legacy?t.legacy:''].filter(Boolean).join(' '));
       onImported(next);

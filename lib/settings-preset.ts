@@ -1,7 +1,7 @@
-// Portable preferences only: never export account IDs, grants, posts or periods.
+// Portable preferences only: never export account names, IDs, grants, posts or periods.
 export const PRESET_MAX_BYTES = 1024 * 1024;
 export const PRESET_MAX_MISSIONS = 1000;
-const settingsKeys = ['matrix_enabled','matrix_color','x_handle','panel_action_layout','ranking_opt_in','refresh_interval','show_refresh_timer','cap_unlocked','crystalgin_limit','app_name','accent_color','background_color','surface_color','border_color','language','monthly_post_goal'] as const;
+const settingsKeys = ['matrix_enabled','matrix_color','x_handle','panel_action_layout','ranking_opt_in','refresh_interval','show_refresh_timer','cap_unlocked','crystalgin_limit','accent_color','background_color','surface_color','border_color','language','monthly_post_goal'] as const;
 const booleanKeys = new Set(['matrix_enabled','ranking_opt_in','show_refresh_timer','cap_unlocked']);
 const colorKeys = new Set(['matrix_color','accent_color','background_color','surface_color','border_color']);
 export type PortableMission = {name:string;network:string;description:string;multiplier:number;reward:number;submission_limit:number;color:string;active:boolean;is_special:boolean};
@@ -25,7 +25,6 @@ export function portableSettings(value:unknown):Record<string,unknown> {
     else if(key==='language'){if(!['pt-BR','en','es'].includes(item as string))invalid();}
     else if(key==='panel_action_layout'){if(!['classic','organized'].includes(item as string))invalid();}
     else if(key==='x_handle'){if(typeof item!=='string')invalid();item=item.trim().replace(/^@/,'');if(item!==''&&!/^[A-Za-z0-9_]{1,15}$/.test(item as string))invalid();}
-    else if(key==='app_name'){if(typeof item!=='string'||item.trim().length<2||item.trim().length>40)invalid();item=item.trim();}
     result[key]=item;
   }
   return result;

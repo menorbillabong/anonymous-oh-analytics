@@ -14,11 +14,24 @@ test('old settings files work without inventing mission profiles or overwriting 
   assert.equal(parsed.legacy,true);assert.deepEqual(parsed.missions,[]);assert.deepEqual(parsed.settings,{accent_color:'#abcdef',monthly_post_goal:45});
 });
 test('corrupt or unsupported presets are rejected before writes',()=>{
-  for(const value of [null,[],{}, {format:'anonymous-oh-settings',version:8,settings:{}},{format:'anonymous-oh-settings',version:7,settings:{}},{format:'anonymous-oh-settings',settings:{matrix_enabled:'false'}},{format:'anonymous-oh-settings',settings:{app_name:'a'}},{format:'anonymous-oh-settings',settings:{refresh_interval:0}},{format:'anonymous-oh-settings',settings:{},mission_profiles:[{...mission,reward:-1}]},{format:'anonymous-oh-settings',settings:{},mission_profiles:[{...mission,is_special:'true'}]}])assert.throws(()=>parseSettingsPreset(value));
+  for(const value of [null,[],{}, {format:'anonymous-oh-settings',version:8,settings:{}},{format:'anonymous-oh-settings',version:7,settings:{}},{format:'anonymous-oh-settings',settings:{matrix_enabled:'false'}},{format:'anonymous-oh-settings',settings:{refresh_interval:0}},{format:'anonymous-oh-settings',settings:{},mission_profiles:[{...mission,reward:-1}]},{format:'anonymous-oh-settings',settings:{},mission_profiles:[{...mission,is_special:'true'}]}])assert.throws(()=>parseSettingsPreset(value));
 });
 test('mission limits and malformed numbers cannot pass through',()=>{
   assert.throws(()=>buildSettingsPreset({},60,'pt-BR',Array(1001).fill(mission)));
   for(const value of [NaN,Infinity,1.5,0,2147483648])assert.throws(()=>portableSettings({monthly_post_goal:value}));
   assert.throws(()=>buildSettingsPreset({},60,'pt-BR',[{...mission,multiplier:0}]));
   assert.deepEqual(portableSettings({x_handle:' @example '}),{x_handle:'example'});
+});
+
+test('new exports omit account name but preserve mission names',()=>{
+  const preset=buildSettingsPreset({app_name:'Source account',accent_color:'#123456'},60,'pt-BR',[mission]);
+  assert.equal('app_name' in preset.settings,false);
+  assert.equal(preset.mission_profiles[0].name,'Fotos');
+});
+test('old and current files ignore even malformed account names without losing other preferences',()=>{
+  for(const version of [1,6,7])for(const name of ['Source account','a',null,123,{name:'other'}]){
+    const parsed=parseSettingsPreset({format:'anonymous-oh-settings',version,settings:{app_name:name,accent_color:'#123456'},...(version===7?{mission_profiles:[mission]}:{})});
+    assert.deepEqual(parsed.settings,{accent_color:'#123456'});
+    if(version===7)assert.equal(parsed.missions[0].name,'Fotos');
+  }
 });
