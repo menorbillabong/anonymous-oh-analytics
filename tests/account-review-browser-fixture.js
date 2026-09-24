@@ -25,6 +25,7 @@
     {id: 1, user_id: admin, name: 'Publicações regulares', active: true, color: '#54c27a', reward: 0},
     {id: 2, user_id: admin, name: 'Missão especial de fotografias', active: true, color: '#f6ad55', reward: 200},
   ];
+  profiles.forEach((profile,index)=>Object.assign(profile,{network:'X',description:'',multiplier:2,submission_limit:0,is_special:index===1}));
   const posts = [1, 2].map(id => ({id, user_id: admin, post_url: `https://x.com/test_fixture/status/${id}`, title: `Publicação fictícia ${id} para conferir o layout no celular`, author_name: 'Perfil de teste', author_handle: 'test_fixture', published_at: '2026-09-12T15:00:00Z', published_date: '2026-09-12', created_at: '2026-09-12T15:00:00Z', views: 1200, likes: 45, comments: 3, reposts: 7, mission_profile_id: 1, special_reward: 0, image_urls: []}));
   window.__safetyRequests = [];
   window.fetch = async (input, init) => {
@@ -61,6 +62,20 @@
       }
       if (rpc === 'posts') data = Number(url.searchParams.get('offset') || 0) > 0 ? [] : posts;
       if (rpc === 'mission_profiles') data = profiles;
+      if (rpc === 'import_my_settings_preset') {
+        if(localStorage.getItem('preset-fixture-fail')==='true')return new Response(JSON.stringify({message:'Import test failure'}),{status:400,headers:{'Content-Type':'application/json'}});
+        const key=`matrix-fixture:${admin}`;
+        const settings={app_name:'Teste celular',monthly_post_goal:60,language:'pt-BR',...JSON.parse(localStorage.getItem(key)||'{}'),...body.p_settings};
+        let added=0,existing=0,unmarked=0;
+        for(const mission of body.p_missions){
+          if(profiles.some(p=>p.name.trim().toLowerCase()===mission.name.trim().toLowerCase()&&p.network.toLowerCase()===mission.network.toLowerCase())){existing++;continue;}
+          const special=mission.is_special&&localStorage.getItem('preset-no-permission')!=='true';
+          if(mission.is_special&&!special)unmarked++;
+          profiles.push({...mission,id:profiles.length+1,user_id:admin,is_special:special});added++;
+        }
+        localStorage.setItem(key,JSON.stringify(settings));
+        data={settings,imported_count:added,existing_count:existing,special_unmarked_count:unmarked};
+      }
       if (rpc === 'get_my_active_period') data = {id: '55555555-5555-4555-8555-555555555555', start_date: '2026-09-01', can_close: false, close_available_on: '2026-10-01'};
       if (rpc === 'get_my_x_import_access') data = {enabled: true, handle: 'test_fixture'};
       if (rpc === 'get_my_google_sheets_sync_status') data = {enabled: true, retry_after_seconds: 0};
