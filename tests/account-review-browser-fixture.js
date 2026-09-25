@@ -20,6 +20,8 @@
   const original = window.fetch.bind(window);
   const mobileLayout = new URLSearchParams(location.search).has('mobile-layout') || new URLSearchParams(location.search).has('matrix-test');
   const matrixTest = new URLSearchParams(location.search).has('matrix-test');
+  const performanceTest = new URLSearchParams(location.search).get('matrix-test')==='media-performance';
+  if (performanceTest) { localStorage.setItem('aoh:post-view','cards'); localStorage.setItem('aoh:last-tab','Painel'); }
   const missionPeriods = [{id: '66666666-6666-4666-8666-666666666666', start_date: '2026-09-10', end_date: '2026-09-15', per_user_limit: 2, revision: 1}];
   const profiles = [
     {id: 1, user_id: admin, name: 'Publicações regulares', active: true, color: '#54c27a', reward: 0},
@@ -27,8 +29,37 @@
   ];
   profiles.forEach((profile,index)=>Object.assign(profile,{network:'X',description:'',multiplier:2,submission_limit:0,is_special:index===1}));
   const posts = [1, 2].map(id => ({id, user_id: admin, post_url: `https://x.com/test_fixture/status/${id}`, title: `Publicação fictícia ${id} para conferir o layout no celular`, author_name: 'Perfil de teste', author_handle: 'test_fixture', published_at: '2026-09-12T15:00:00Z', published_date: '2026-09-12', created_at: '2026-09-12T15:00:00Z', views: 1200, likes: 45, comments: 3, reposts: 7, mission_profile_id: 1, special_reward: 0, image_urls: []}));
+  // Generate an actual, seekable browser-decoded clip, with a black opening and
+  // a recognizable colored frame. No external video, X or production data.
+  const mediaReady = performanceTest ? new Promise(resolve=>{
+    const canvas=document.createElement('canvas');canvas.width=320;canvas.height=180;
+    const ctx=canvas.getContext('2d');const stream=canvas.captureStream(30);
+    const recorder=new MediaRecorder(stream,{mimeType:'video/webm;codecs=vp8'}),chunks=[];
+    let count=0;ctx.fillStyle='#000';ctx.fillRect(0,0,320,180);
+    recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+    recorder.onstop=()=>{
+      stream.getTracks().forEach(track=>track.stop());
+      const clip=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));
+      const photo='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#236090"/><text x="30" y="90" fill="white" font-size="28">FOTO DE TESTE</text></svg>');
+      const base=posts[0];posts.splice(0,posts.length,...Array.from({length:80},(_,i)=>({...base,id:i+1,post_url:`https://x.com/test_fixture/status/${i+1}`,title:`Teste de mídia ${i+1}`,image_urls:i%2?[photo]:[],video_url:i%2?null:clip,thumbnail_url:i%4===0?photo:null})));
+      window.__fixtureClip=clip;resolve();
+    };
+    recorder.start();const timer=setInterval(()=>{
+      count++;ctx.fillStyle=count<12?'#000':'#23864c';ctx.fillRect(0,0,320,180);
+      if(count>=12){ctx.fillStyle='#fff';ctx.font='24px sans-serif';ctx.fillText('FRAME DO VIDEO',35,90)}
+      if(count===66){clearInterval(timer);recorder.stop()}
+    },33);
+  }) : Promise.resolve();
+  if(performanceTest){
+    window.__matrixPaints={text:0,image:0};
+    for(const [method,key] of [['fillText','text'],['drawImage','image']]){
+      const originalPaint=CanvasRenderingContext2D.prototype[method];
+      CanvasRenderingContext2D.prototype[method]=function(...args){if(this.canvas.classList.contains('matrix-background'))window.__matrixPaints[key]++;return originalPaint.apply(this,args)};
+    }
+  }
   window.__safetyRequests = [];
   window.fetch = async (input, init) => {
+    if(performanceTest)await mediaReady;
     const url = new URL(typeof input === 'string' ? input : input.url || String(input), location.href);
     // Keep preview hydration local too: no X requests during layout checks.
     if (mobileLayout && url.origin === location.origin && url.pathname.startsWith('/api/')) {
@@ -59,6 +90,7 @@
           localStorage.setItem(key, JSON.stringify({...JSON.parse(localStorage.getItem(key) || '{}'), ...body}));
         }
         data = {...data, ...JSON.parse(localStorage.getItem(key) || '{}')};
+        if(performanceTest)data.monthly_post_goal=120;
       }
       if (rpc === 'posts') data = Number(url.searchParams.get('offset') || 0) > 0 ? [] : posts;
       if (rpc === 'mission_profiles') data = profiles;

@@ -1,6 +1,8 @@
 'use client';
 
 import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
+import Image from 'next/image';
+import {whenNearViewport} from '@/lib/near-viewport';
 import {supabase} from '@/lib/supabase';
 import {useEscapeClose} from '@/lib/use-escape-close';
 import {minimumPostProgress,monthlyReward,postContribution,viewGoalProgress} from '@/lib/reward';
@@ -256,9 +258,16 @@ function findMissionProfile(post:any,profiles:MissionProfile[]){return profiles.
 function profileColor(profile?:MissionProfile){const value=String(profile?.color||'').trim();return /^#[0-9a-f]{3,8}$/i.test(value)?value:'#38d27f'}
 
 function Media({post}:{post:any}){
+ const host=useRef<HTMLDivElement>(null);
+ const[ready,setReady]=useState(false);
+ useEffect(()=>{if(host.current)return whenNearViewport(host.current,()=>setReady(true))},[]);
+ return <div ref={host} className="ref-deferred-media">{ready?<LoadedMedia post={post}/>:<div className="ref-media-empty" aria-label="Prévia da publicação">𝕏</div>}</div>;
+}
+
+function LoadedMedia({post}:{post:any}){
  const images=Array.isArray(post.image_urls)?post.image_urls.filter(Boolean):[];
  if(post.video_url)return <VideoPreview url={post.video_url} poster={post.thumbnail_url} postUrl={post.post_url}/>;
- if(images.length)return <img src={images[0]} alt="Mídia da publicação"/>;
+ if(images.length)return <Image src={images[0]} alt="Mídia da publicação" fill unoptimized sizes="(max-width:560px) 100vw, (max-width:900px) 50vw, 25vw" decoding="async"/>;
  return <div className="ref-media-empty">𝕏</div>;
 }
 

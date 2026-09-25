@@ -13,23 +13,47 @@ async function fetchPost(postUrl:string){
 }
 
 export function VideoPreview({url,poster,postUrl}:{url:string;poster?:string|null;postUrl?:string}){
+ return <VideoFrame key={url} url={url} poster={poster} postUrl={postUrl}/>;
+}
+
+function VideoFrame({url,poster,postUrl}:{url:string;poster?:string|null;postUrl?:string}){
  const ref=useRef<HTMLVideoElement>(null);
  const targetRef=useRef(1.2);
- const revealIdRef=useRef(0);
+ const prepared=useRef(false);
+ const cancelReveal=useRef<()=>void>(()=>{});
  const[frameReady,setFrameReady]=useState(false);
  const[resolvedPoster,setResolvedPoster]=useState(poster||'');
- useEffect(()=>{revealIdRef.current++;setResolvedPoster(poster||'');setFrameReady(false)},[poster,url]);
+ useEffect(()=>{setResolvedPoster(poster||'')},[poster]);
+ useEffect(()=>()=>cancelReveal.current(),[]);
  useEffect(()=>{
   if(resolvedPoster||!postUrl||!xPostPattern.test(postUrl))return;
   let alive=true;
   fetchPost(postUrl).then(data=>{if(alive&&data?.thumbnail_url)setResolvedPoster(data.thumbnail_url)}).catch(()=>{});
   return()=>{alive=false};
  },[postUrl,resolvedPoster]);
- const revealDecodedFrame=()=>{const video=ref.current;if(!video||video.readyState<2||video.seeking)return;const revealId=++revealIdRef.current;let revealed=false;const reveal=()=>{if(revealed||revealId!==revealIdRef.current||ref.current!==video||video.readyState<2||video.seeking||Math.abs(video.currentTime-targetRef.current)>=.35)return;revealed=true;setFrameReady(true)};const fallback=window.setTimeout(()=>requestAnimationFrame(()=>requestAnimationFrame(reveal)),250);const withFrame=video as HTMLVideoElement&{requestVideoFrameCallback?:(callback:(now:number,metadata:{mediaTime:number})=>void)=>number};if(withFrame.requestVideoFrameCallback)withFrame.requestVideoFrameCallback((_now,metadata)=>{if(Math.abs(metadata.mediaTime-targetRef.current)<.35){window.clearTimeout(fallback);requestAnimationFrame(reveal)}});else requestAnimationFrame(()=>requestAnimationFrame(reveal))};
- const seek=()=>{const video=ref.current;if(!video||video.readyState<1)return;try{const duration=Number.isFinite(video.duration)?video.duration:1.2;targetRef.current=Math.min(1.2,Math.max(0,duration-.05));video.pause();if(Math.abs(video.currentTime-targetRef.current)>.03)video.currentTime=targetRef.current;else if(!video.seeking)revealDecodedFrame()}catch{}};
+ const revealDecodedFrame=()=>{
+  const video=ref.current;
+  if(prepared.current||!video||video.readyState<2||video.seeking)return;
+  cancelReveal.current();
+  let cancelled=false,raf=0,frame=0;
+  const reveal=()=>{
+   if(cancelled||prepared.current||ref.current!==video||video.readyState<2||video.seeking||Math.abs(video.currentTime-targetRef.current)>=.35)return;
+   prepared.current=true;cancelReveal.current();setFrameReady(true);
+  };
+  // A paused seek does not consistently fire requestVideoFrameCallback in all
+  // browsers. Keep the decoded-data fallback and cancel both paths on unmount.
+  const fallback=window.setTimeout(()=>{raf=requestAnimationFrame(()=>{raf=requestAnimationFrame(reveal)})},250);
+  if(video.requestVideoFrameCallback)frame=video.requestVideoFrameCallback((_now,metadata)=>{
+   if(Math.abs(metadata.mediaTime-targetRef.current)<.35)raf=requestAnimationFrame(reveal);
+  });
+  cancelReveal.current=()=>{cancelled=true;clearTimeout(fallback);cancelAnimationFrame(raf);if(frame)video.cancelVideoFrameCallback?.(frame)};
+ };
+ const seek=()=>{const video=ref.current;if(prepared.current||!video||video.readyState<1)return;try{const duration=Number.isFinite(video.duration)?video.duration:1.2;targetRef.current=Math.min(1.2,Math.max(0,duration-.05));video.pause();if(Math.abs(video.currentTime-targetRef.current)>.03)video.currentTime=targetRef.current;else if(!video.seeking)revealDecodedFrame()}catch{}};
+ const userPlayback=()=>{prepared.current=true;cancelReveal.current();setFrameReady(true)};
  return <div className={`video-frame x-video-frame${frameReady?' is-frame-ready':''}`}>
   {!frameReady&&<div className="x-video-poster">{resolvedPoster?<img src={resolvedPoster} alt="Prévia do vídeo" onError={()=>setResolvedPoster('')}/>:<span>𝕏</span>}</div>}
-  <video ref={ref} src={url} poster={resolvedPoster||undefined} controls playsInline preload="auto" muted onLoadedMetadata={seek} onLoadedData={seek} onDurationChange={seek} onSeeked={revealDecodedFrame}/>
+  {/* Card sources only mount near the viewport; retain enough buffering for the real frame and normal playback. */}
+  <video ref={ref} data-aoh-preview-managed="react" src={url} poster={resolvedPoster||undefined} controls playsInline preload="auto" muted onPlay={userPlayback} onLoadedMetadata={seek} onLoadedData={seek} onDurationChange={seek} onSeeked={revealDecodedFrame}/>
  </div>;
 }
 

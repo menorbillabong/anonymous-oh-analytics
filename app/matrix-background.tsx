@@ -34,19 +34,24 @@ export function MatrixBackground() {
     if (!ctx) return;
     const reduced = window.matchMedia('(prefers-reduced-motion: reduce)');
     const glyphs = '012345789アイウエオカキクケコサシスセソネノハヒフヘホ';
+    // Rasterize each glyph once, not thousands of times on every animation frame.
+    const atlas = document.createElement('canvas');
+    const ink = atlas.getContext('2d');
+    if (!ink) return;
     let width = 0, height = 0, last = 0, time = 0, frame = 0;
+    let scrollingUntil = 0;
     let budget = matrixRenderBudget(0, 0, 1);
     let streams: {x: number; y: number; speed: number; seed: number}[] = [];
     const draw = () => {
       ctx.clearRect(0, 0, width, height);
-      ctx.font = '13px monospace';
-      ctx.fillStyle = color;
+      const ratio = budget.pixelRatio;
       for (const stream of streams) {
         for (let j = 0; j < budget.trail; j++) {
           const y = stream.y - j * 18;
           if (y < 0 || y > height) continue;
           ctx.globalAlpha = (1 - j / budget.trail) * .36;
-          ctx.fillText(glyphs[(stream.seed + j * 13 + Math.floor(time / 300)) % glyphs.length], stream.x, y);
+          const glyph = (stream.seed + j * 13 + Math.floor(time / 300)) % glyphs.length;
+          ctx.drawImage(atlas, glyph * 24 * ratio, 0, 24 * ratio, 18 * ratio, stream.x, y - 13, 24, 18);
         }
       }
       ctx.globalAlpha = 1;
@@ -55,7 +60,7 @@ export function MatrixBackground() {
       if (document.hidden || reduced.matches) { frame = 0; return; }
       if (!last) last = now;
       const delta = now - last;
-      if (delta >= budget.frameInterval) {
+      if (delta >= (now < scrollingUntil ? Math.max(1000 / 12, budget.frameInterval) : budget.frameInterval)) {
         const step = Math.min(delta, 100);
         time += step; last = now;
         for (const stream of streams) {
@@ -77,6 +82,11 @@ export function MatrixBackground() {
       canvas.width = Math.round(width * budget.pixelRatio);
       canvas.height = Math.round(height * budget.pixelRatio);
       ctx.setTransform(budget.pixelRatio, 0, 0, budget.pixelRatio, 0, 0);
+      atlas.width = Math.ceil(glyphs.length * 24 * budget.pixelRatio);
+      atlas.height = Math.ceil(18 * budget.pixelRatio);
+      ink.setTransform(budget.pixelRatio, 0, 0, budget.pixelRatio, 0, 0);
+      ink.font = '13px monospace'; ink.fillStyle = color;
+      for (let i = 0; i < glyphs.length; i++) ink.fillText(glyphs[i], i * 24, 13);
       streams = Array.from({length: budget.columns}, (_, i) => ({
         x: i * width / budget.columns + 7, y: Math.random() * (height + 260),
         speed: .5 + Math.random() * .9, seed: i * 7,
@@ -84,7 +94,9 @@ export function MatrixBackground() {
       draw();
     };
     const observer = new ResizeObserver(resize);
+    const scrolling = () => { scrollingUntil = performance.now() + 160; };
     observer.observe(canvas);
+    document.addEventListener('scroll', scrolling, {passive: true, capture: true});
     reduced.addEventListener('change', resume);
     document.addEventListener('visibilitychange', resume);
     resize(); resume();
@@ -92,6 +104,7 @@ export function MatrixBackground() {
       cancelAnimationFrame(frame); observer.disconnect();
       reduced.removeEventListener('change', resume);
       document.removeEventListener('visibilitychange', resume);
+      document.removeEventListener('scroll', scrolling, true);
       ctx.clearRect(0, 0, width, height);
     };
   }, [enabled, color]);
