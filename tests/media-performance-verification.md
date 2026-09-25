@@ -1,5 +1,7 @@
 # Card media and Matrix verification — 2026-09-25
 
+Historical report for 0b9651f. The card loading optimization was subsequently reverted; see card-rollback-verification.md. The browser script now checks immediate media mounting instead of deferred mounting.
+
 ## Changes
 
 - A shared IntersectionObserver prepares card media within 600px of the viewport; it loads once, disconnects, and leaves prepared media mounted. Unsupported browsers load immediately.

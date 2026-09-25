@@ -42,6 +42,7 @@
       const clip=URL.createObjectURL(new Blob(chunks,{type:'video/webm'}));
       const photo='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#236090"/><text x="30" y="90" fill="white" font-size="28">FOTO DE TESTE</text></svg>');
       const base=posts[0];posts.splice(0,posts.length,...Array.from({length:80},(_,i)=>({...base,id:i+1,post_url:`https://x.com/test_fixture/status/${i+1}`,title:`Teste de mídia ${i+1}`,image_urls:i%2?[photo]:[],video_url:i%2?null:clip,thumbnail_url:i%4===0?photo:null})));
+      if(new URLSearchParams(location.search).has('photo-only'))posts.forEach(post=>{post.video_url=null;post.image_urls=[photo];post.thumbnail_url=null});
       window.__fixtureClip=clip;resolve();
     };
     recorder.start();const timer=setInterval(()=>{

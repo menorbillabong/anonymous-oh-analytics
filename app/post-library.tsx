@@ -1,9 +1,6 @@
 'use client';
 
 import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
-import Image from 'next/image';
-import {whenNearViewport} from '@/lib/near-viewport';
-import {suspendCardEffectsWhileScrolling} from '@/lib/card-scroll-effects';
 import {supabase} from '@/lib/supabase';
 import {useEscapeClose} from '@/lib/use-escape-close';
 import {minimumPostProgress,monthlyReward,postContribution,viewGoalProgress} from '@/lib/reward';
@@ -41,13 +38,9 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
  const[deletingSelected,setDeletingSelected]=useState(false);
  const[sortAsc,setSortAsc]=useState(false);
  const selectAllRef=useRef<HTMLInputElement>(null);
- const cardGridRef=useRef<HTMLDivElement>(null);
  useEscapeClose(!!edit,()=>setEdit(null));
 
  const effectiveView=view||(typeof window!=='undefined'&&localStorage.getItem('aoh:post-view')==='cards'?'cards':'list');
- useEffect(()=>{
-  if(effectiveView==='cards'&&cardGridRef.current)return suspendCardEffectsWhileScrolling(cardGridRef.current);
- },[effectiveView]);
  const countedPosts=useMemo(()=>posts.filter(post=>!post.counting_excluded),[posts]);
  const reward=monthlyReward(countedPosts);
  const missionCrystal=countedPosts.reduce((total,post)=>total+postContribution(post),0);
@@ -200,7 +193,7 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
 
  return <>
   {showSummary&&<SummaryTail posts={countedPosts} reward={reward} missionCrystal={missionCrystal} crystalginLimit={crystalginLimit}/>} 
-  <div className="ref-card-grid" ref={cardGridRef}>
+  <div className="ref-card-grid">
    {sortedPosts.map(post=>{const missionProfile=findMissionProfile(post,profiles),missionColor=profileColor(missionProfile);return <article className="ref-card" key={post.id} style={{'--post-mission-color':missionColor} as CSSProperties}>
     <div className="ref-media"><span className="x-badge">𝕏</span><Media post={post}/><button type="button" className="ref-open" onClick={()=>window.open(post.post_url,'_blank','noopener,noreferrer')} aria-label="Abrir publicação no X">↗</button></div>
     <div className="ref-card-info"><strong className="ref-mission">{displayMissionName(missionProfile?.name||post.mission_name||post.title||'PUBLICAÇÃO')}</strong><small>{formatPostDate(postPublishedValue(post))}</small>{historical&&<em className="ref-period-badge">PERÍODO ANTERIOR</em>}<div className="ref-inline-metrics"><span>◉ {Number(post.views||0).toLocaleString('pt-BR')}</span><span>◯ {Number(post.comments||0).toLocaleString('pt-BR')}</span><span>↻ {Number(post.reposts||0).toLocaleString('pt-BR')}</span><span className="heart">♥ {Number(post.likes||0).toLocaleString('pt-BR')}</span></div></div>
@@ -263,16 +256,9 @@ function findMissionProfile(post:any,profiles:MissionProfile[]){return profiles.
 function profileColor(profile?:MissionProfile){const value=String(profile?.color||'').trim();return /^#[0-9a-f]{3,8}$/i.test(value)?value:'#38d27f'}
 
 function Media({post}:{post:any}){
- const host=useRef<HTMLDivElement>(null);
- const[ready,setReady]=useState(false);
- useEffect(()=>{if(host.current)return whenNearViewport(host.current,()=>setReady(true))},[]);
- return <div ref={host} className="ref-deferred-media">{ready?<LoadedMedia post={post}/>:<div className="ref-media-empty" aria-label="Prévia da publicação">𝕏</div>}</div>;
-}
-
-function LoadedMedia({post}:{post:any}){
  const images=Array.isArray(post.image_urls)?post.image_urls.filter(Boolean):[];
  if(post.video_url)return <VideoPreview url={post.video_url} poster={post.thumbnail_url} postUrl={post.post_url}/>;
- if(images.length)return <Image src={images[0]} alt="Mídia da publicação" fill unoptimized sizes="(max-width:560px) 100vw, (max-width:900px) 50vw, 25vw" decoding="async"/>;
+ if(images.length)return <img src={images[0]} alt="Mídia da publicação"/>;
  return <div className="ref-media-empty">𝕏</div>;
 }
 

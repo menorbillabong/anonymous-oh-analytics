@@ -52,7 +52,7 @@ function VideoFrame({url,poster,postUrl}:{url:string;poster?:string|null;postUrl
  const userPlayback=()=>{prepared.current=true;cancelReveal.current();setFrameReady(true)};
  return <div className={`video-frame x-video-frame${frameReady?' is-frame-ready':''}`}>
   {!frameReady&&<div className="x-video-poster">{resolvedPoster?<img src={resolvedPoster} alt="Prévia do vídeo" onError={()=>setResolvedPoster('')}/>:<span>𝕏</span>}</div>}
-  {/* Card sources only mount near the viewport; retain enough buffering for the real frame and normal playback. */}
+  {/* Retain buffering for the real preview frame and normal playback. */}
   <video ref={ref} data-aoh-preview-managed="react" src={url} poster={resolvedPoster||undefined} controls playsInline preload="auto" muted onPlay={userPlayback} onLoadedMetadata={seek} onLoadedData={seek} onDurationChange={seek} onSeeked={revealDecodedFrame}/>
  </div>;
 }

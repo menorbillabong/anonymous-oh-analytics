@@ -21,7 +21,8 @@ const path=require('node:path');
    images:[...document.querySelectorAll('.ref-card img')].map(img=>({loading:img.loading,complete:img.complete,width:img.naturalWidth})),
    paints:window.__matrixPaints,
   }));
-  assert.ok(initial.mounted>0&&initial.mounted<40,JSON.stringify(initial));
+  assert.equal(initial.mounted,40,'Restored cards mount media immediately');
+  assert.equal(await page.locator('.ref-deferred-media').count(),0);
   assert.equal(initial.legacy,0);assert.equal(initial.paints.text,0);assert.ok(initial.paints.image>0);
   const video=page.locator('.ref-card .is-frame-ready video').first();
   const before=await video.evaluate(v=>{
@@ -32,6 +33,9 @@ const path=require('node:path');
   assert.ok(before.time>=1&&before.time<=1.5);assert.equal(before.paused,true);assert.equal(before.controls,true);
   assert.ok(before.pixel[1]>80&&before.pixel[1]>before.pixel[0]*1.5,'Frame must show the green video, not its black opening or blue poster');
   await video.scrollIntoViewIfNeeded();
+  assert.ok(await video.evaluate(v=>v.getBoundingClientRect().height<=122),'Native video controls must fit the card');
+  await page.mouse.wheel(0,100);
+  assert.equal(await page.locator('[data-scroll-active]').count(),0,'Restored cards do not toggle scroll effects');
   await page.screenshot({path:path.join(__dirname,'../media-performance-desktop.png')});
   await video.evaluate(v=>v.play());
   await page.waitForFunction(()=>[...document.querySelectorAll('.ref-card video')].some(v=>!v.paused&&v.currentTime>1.6));
@@ -41,7 +45,7 @@ const path=require('node:path');
   await page.locator('.ref-card').last().scrollIntoViewIfNeeded();
   await page.waitForFunction(()=>document.querySelector('.ref-card:last-child .is-frame-ready'));
   const after=await page.locator('.ref-card video').count();
-  assert.ok(after>initial.mounted&&after<40,'Only visited/nearby videos should mount');
+  assert.equal(after,40,'Scrolling does not mount or replace card media');
   await page.locator('.ref-card .ref-pencil').last().click();
   await page.waitForSelector('.edit-post-modal');
   await page.locator('.edit-post-close').click();

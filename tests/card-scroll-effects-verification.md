@@ -1,5 +1,7 @@
 # Card hover during scrolling — verification
 
+Historical report for 5723395. This scroll-effect suppression was subsequently reverted; its runtime helper and dedicated tests were removed. See card-rollback-verification.md and media-performance.browser.cjs for current verification.
+
 2026-09-25. Scoped client-only change: passive wheel/scroll listeners mark the card grid during a scroll burst; decorative transitions, lift and shadows are suspended, restored after 180ms idle. No pointer-event suppression, media source changes, database changes, settings changes or API changes. List mode registers no listeners; switching views/unmounting cleans listeners, timer and attribute.
 
 ## Checks
