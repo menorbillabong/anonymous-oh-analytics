@@ -1,6 +1,8 @@
 'use client';
 
 import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
+import Image from 'next/image';
+import {cardPhotoUrl} from '@/lib/card-photo';
 import {supabase} from '@/lib/supabase';
 import {useEscapeClose} from '@/lib/use-escape-close';
 import {minimumPostProgress,monthlyReward,postContribution,viewGoalProgress} from '@/lib/reward';
@@ -258,8 +260,15 @@ function profileColor(profile?:MissionProfile){const value=String(profile?.color
 function Media({post}:{post:any}){
  const images=Array.isArray(post.image_urls)?post.image_urls.filter(Boolean):[];
  if(post.video_url)return <VideoPreview url={post.video_url} poster={post.thumbnail_url} postUrl={post.post_url}/>;
- if(images.length)return <img src={images[0]} alt="Mídia da publicação"/>;
+ if(images.length)return <CardPhoto key={images[0]} original={images[0]}/>;
  return <div className="ref-media-empty">𝕏</div>;
+}
+
+function CardPhoto({original}:{original:string}){
+ const[failed,setFailed]=useState(false);
+ const preview=cardPhotoUrl(original);
+ // X serves the lightweight variant directly; no new image proxy or saved data.
+ return <Image src={failed?original:preview} alt="Mídia da publicação" fill unoptimized loading="eager" sizes="(max-width:560px) 100vw, (max-width:900px) 50vw, 25vw" onError={()=>{if(!failed&&preview!==original)setFailed(true)}}/>;
 }
 
 function ExpandedPost({post,reward,missionProfile,crystalginLimit,onDelete}:{post:any;reward:any;missionProfile?:MissionProfile;crystalginLimit:number;onDelete:()=>void}){
