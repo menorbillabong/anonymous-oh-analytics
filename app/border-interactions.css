@@ -1,23 +1,43 @@
 /* Visual-only finishing layer. Keep existing transforms, media and action handlers. */
 :root {
   --edge-accent: var(--aoh-accent, #f6ad55);
+  /* Neutral controls must not fall back to the primary action's gold. */
+  --edge-color: #8d9099;
 }
 
 /* One hierarchy for dashboard actions, in both modern and classic layouts.
    Keep the existing heights, responsive sizing and joined gear-button corners. */
 html .exact-app .hero-actions button {
-  --edge-color: var(--edge-accent);
+  --edge-color: #8d9099;
   background: #202020 !important;
   border-color: #48423a !important;
   color: #e9e6e1 !important;
 }
 html .exact-app .hero-actions button.orange-add {
+  --edge-color: var(--edge-accent);
   background: var(--edge-accent) !important;
   border-color: var(--edge-accent) !important;
   color: #18120a !important;
 }
 html .exact-app .hero-actions .x-import-button-pair > .x-import-gear {
   border-left-color: #a76c23 !important;
+}
+
+/* Retain the existing functional colors on edges, not on secondary fills.
+   These mappings also cover the joined gear and both panel layouts. */
+html body .green-btn,
+html .exact-app .hero-actions button.green-btn { --edge-color: #24d9a5; }
+html body .blue-btn,
+html .exact-app .hero-actions button.blue-btn { --edge-color: #69abff; }
+html body .sheets-sync-button,
+html body .sheets-adjustment-dialog .x-handle-save,
+html .exact-app .hero-actions button.sheets-sync-button { --edge-color: #72b6ff; }
+html body :is(.orange-add, .orange-btn, .mission-orange-btn, .report-btn,
+  .x-handle-save, .exact-nav button.active),
+html .exact-app .hero-actions button.report-btn { --edge-color: var(--edge-accent); }
+html body .sheets-adjustment-dialog button.x-handle-save { --edge-color: #72b6ff; }
+html .exact-app .hero-actions button:not(.orange-add) {
+  border-color: color-mix(in srgb, var(--edge-color) 42%, #202020) !important;
 }
 
 /* Preserve warning semantics rather than turning destructive actions gold. */
@@ -42,10 +62,10 @@ html body :is(button.danger, button.btn-danger, .post-delete-button,
 /* Border light only: no new filter, background change, animation loop or
    pointer listeners. Existing movement and other effects remain untouched. */
 @media (hover: hover) and (pointer: fine) {
-  html body button:not(:disabled):not([aria-disabled="true"]):hover {
+  html body button:not(:disabled):not([aria-disabled="true"]):is(:hover, :active) {
     border-color: var(--edge-color, var(--edge-accent)) !important;
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--edge-color, var(--edge-accent)) 25%, transparent),
-                0 0 12px color-mix(in srgb, var(--edge-color, var(--edge-accent)) 20%, transparent) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--edge-color) 40%, transparent),
+                0 0 12px color-mix(in srgb, var(--edge-color) 32%, transparent) !important;
   }
   html body :is(.ref-card, .ref-list-row, .mission-existing-card, .mission-review-card,
     .exact-stat, .metric-card, .panel, .post-card, .history-row, .review-card, .bulk-review-card,

@@ -14,3 +14,9 @@ Validated with an isolated local production build and fictitious accounts:
 - Desktop and mobile screenshots inspected. No horizontal overflow on the tested mobile viewport.
 
 This confirms the tested flows, not a guarantee of frame rates on every device. Rollback is a focused commit revert; no migration is involved.
+
+## Follow-up: per-button colors (2026-09-25)
+
+Removed the universal gold default. Neutral controls now use gray; metrics use their existing green; Sheets (including its gear and adjustment save) and period actions use their existing blue; primary/report actions retain the configurable accent. Secondary fills stay charcoal, with muted borders in the corresponding color. Active/pressed shadows no longer fall back to the legacy orange rule. Mission colors and media code are unchanged.
+
+Expanded the browser regression to assert exact hover colors for eight button types, stable backgrounds/text, and unchanged colored shadows while pressed. Production build, browser regression (including mobile/disabled/focus/delete/mission colors), and both lightweight-photo/fallback scenarios passed without page errors. Desktop screenshot inspected. Backend behavior is outside this CSS-only change; no database writes or runtime-log scan was performed.

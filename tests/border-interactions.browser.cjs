@@ -23,7 +23,17 @@ const styles=el=>{const s=getComputedStyle(el);return {background:s.backgroundCo
    assert.equal(state.background,'rgb(32, 32, 32)');
    assert.equal(state.color,'rgb(233, 230, 225)');
   }
-  for(const el of [primary.first(),page.locator('.metrics-refresh-button'),page.locator('.sheets-sync-button').first()]){
+  const coloredButtons = [
+   [primary.first(), main.background],
+   [page.locator('.metrics-refresh-button'), 'rgb(36, 217, 165)'],
+   [page.locator('.sheets-sync-button').first(), 'rgb(114, 182, 255)'],
+   [page.locator('.sheets-adjustment-gear'), 'rgb(114, 182, 255)'],
+   [page.locator('.period-action-pair button').first(), 'rgb(105, 171, 255)'],
+   [page.locator('.mission-period-button'), 'rgb(105, 171, 255)'],
+   [page.locator('.split-btn button').first(), 'rgb(141, 144, 153)'],
+   [page.locator('.report-btn'), main.background],
+  ];
+  for(const [el, expected] of coloredButtons){
    await page.mouse.move(0,0);await page.waitForTimeout(220);
    const before=await el.evaluate(styles);
    await el.hover();await page.waitForTimeout(220);
@@ -31,6 +41,11 @@ const styles=el=>{const s=getComputedStyle(el);return {background:s.backgroundCo
    assert.equal(after.background,before.background,'No new hover background change');
    assert.equal(after.color,before.color,'Keep button text contrast');
    assert.notEqual(after.shadow,'none');
+   assert.equal(after.border,expected,'Each button must light up in its own color');
+   // Holding the pointer down must not restore the legacy orange shadow.
+   await page.mouse.down();await page.waitForTimeout(220);
+   assert.equal((await el.evaluate(styles)).shadow,after.shadow);
+   await page.mouse.move(0,0);await page.mouse.up();
   }
   await page.mouse.move(0,0);await page.waitForTimeout(220);
   await page.locator('.hero-actions').screenshot({path:path.join(__dirname,'../button-harmony-desktop.png')});
