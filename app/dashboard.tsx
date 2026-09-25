@@ -36,6 +36,7 @@ import './archive-modal.css';
 import './site-legibility.css';
 import './publication-period-filter.css';
 import './panel-period-actions.css';
+import './border-interactions.css';
 const blank = { post_url: '', title: 'Publicação do X', views: 0, likes: 0, reposts: 0, comments: 0, mission_profile_id: '', image_urls: '', video_url: '', published_date: '', x_published_at: '' };
 const nav = ['Painel', 'Classificação', 'História', 'Centro de Controle da Missão', 'Registro de atividades', 'Configurações'];
 type Deltas = {

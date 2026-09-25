@@ -1,0 +1,82 @@
+/* Visual-only finishing layer. Keep existing transforms, media and action handlers. */
+:root {
+  --edge-accent: var(--aoh-accent, #f6ad55);
+}
+
+/* One hierarchy for dashboard actions, in both modern and classic layouts.
+   Keep the existing heights, responsive sizing and joined gear-button corners. */
+html .exact-app .hero-actions button {
+  --edge-color: var(--edge-accent);
+  background: #202020 !important;
+  border-color: #48423a !important;
+  color: #e9e6e1 !important;
+}
+html .exact-app .hero-actions button.orange-add {
+  background: var(--edge-accent) !important;
+  border-color: var(--edge-accent) !important;
+  color: #18120a !important;
+}
+html .exact-app .hero-actions .x-import-button-pair > .x-import-gear {
+  border-left-color: #a76c23 !important;
+}
+
+/* Preserve warning semantics rather than turning destructive actions gold. */
+html body :is(button.danger, button.btn-danger, .post-delete-button,
+  .mission-delete-confirm, .mission-delete-action, .edit-post-actions .delete,
+  .ref-selection-bar > button) {
+  --edge-color: #ff7777;
+  background: #301b1b !important;
+  border-color: #874747 !important;
+  color: #ffb0b0 !important;
+}
+
+/* Each mission keeps its own color, including its inline edit/open controls. */
+.ref-card, .ref-list-row { --edge-color: var(--post-mission-color, #38d27f); }
+.mission-existing-card { --edge-color: var(--mission-color, #54c27a); }
+.mission-review-card { --edge-color: var(--mission-review-color, #38d27f); }
+.mission-sheets-month { --edge-color: #4b91dd; }
+.mission-existing-card, .mission-review-card, .mission-period-definition, .admin-user-disclosure {
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+/* Border light only: no new filter, background change, animation loop or
+   pointer listeners. Existing movement and other effects remain untouched. */
+@media (hover: hover) and (pointer: fine) {
+  html body button:not(:disabled):not([aria-disabled="true"]):hover {
+    border-color: var(--edge-color, var(--edge-accent)) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--edge-color, var(--edge-accent)) 25%, transparent),
+                0 0 12px color-mix(in srgb, var(--edge-color, var(--edge-accent)) 20%, transparent) !important;
+  }
+  html body :is(.ref-card, .ref-list-row, .mission-existing-card, .mission-review-card,
+    .exact-stat, .metric-card, .panel, .post-card, .history-row, .review-card, .bulk-review-card,
+    .mission-create-panel, .mission-create-card, .mission-existing,
+    .mission-profile-grid > article, .settings-page article, .reward-card,
+    .settings-lower article, .activity-list article, .admin-user-disclosure,
+    .admin-post-card, .mission-period-definition, .mission-sheets-month):hover {
+    border-color: var(--edge-color, var(--edge-accent)) !important;
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--edge-color, var(--edge-accent)) 22%, transparent),
+                0 0 14px color-mix(in srgb, var(--edge-color, var(--edge-accent)) 20%, transparent) !important;
+  }
+}
+
+/* A distinct keyboard focus ring in the same color. */
+html body button:not(:disabled):not([aria-disabled="true"]):focus-visible {
+  outline: 2px solid var(--edge-color, var(--edge-accent)) !important;
+  outline-offset: 3px;
+}
+/* Legacy global hover rules also match disabled buttons; neutralize those. */
+html body button:is(:disabled, [aria-disabled="true"]):hover {
+  transform: none !important;
+  box-shadow: none !important;
+}
+html body :is(button.danger, button.btn-danger, .post-delete-button,
+  .mission-delete-confirm, .mission-delete-action, .edit-post-actions .delete,
+  .ref-selection-bar > button):not(:disabled):hover {
+  color: #ffb0b0 !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html body :is(.ref-card, .ref-list-row, .mission-existing-card, .mission-review-card,
+    .mission-period-definition, .admin-user-disclosure) {
+    transition: none !important;
+  }
+}
