@@ -52,7 +52,7 @@ const css=el=>{const s=getComputedStyle(el);return {background:s.backgroundColor
   assert.equal((await page.locator('.metrics-refresh-button').evaluate(css)).background,'rgb(146, 87, 218)');
   await settings();await page.getByRole('button',{name:'Restaurar todas as cores',exact:true}).click();
   await page.getByRole('button',{name:'Restaurar brilho padrão',exact:true}).click();await save();await panel();
-  assert.equal((await page.locator('.metrics-refresh-button').evaluate(css)).background,'rgb(32, 32, 32)');
+  assert.equal((await page.locator('.metrics-refresh-button').evaluate(css)).background,'rgb(41, 219, 168)');
   // Failed save must not silently persist the preview.
   await settings();await intensity(95);await page.evaluate(()=>localStorage.setItem('matrix-fixture-fail','true'));
   await page.getByRole('button',{name:'SALVAR ALTERAÇÕES',exact:true}).click();await page.getByText('Não foi possível salvar.',{exact:true}).waitFor();

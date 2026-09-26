@@ -1,7 +1,7 @@
 'use client';
 
 import {useEffect,useState,type CSSProperties} from 'react';
-import {BUTTON_APPEARANCE,EDGE_APPEARANCE_DEFAULTS,buttonAppearanceCss,contrastingText,isHexColor,normalizeEdgeAppearance,type ButtonAppearanceId,type EdgeAppearance} from '@/lib/edge-appearance';
+import {BUTTON_APPEARANCE,EDGE_APPEARANCE_DEFAULTS,buttonAppearanceCss,contrastingText,normalizeEdgeAppearance,type ButtonAppearanceId,type EdgeAppearance} from '@/lib/edge-appearance';
 import styles from './edge-appearance.module.css';
 
 export function useEdgeAppearance(settings:EdgeAppearance,userId:string) {
@@ -32,8 +32,7 @@ export function EdgeAppearanceSettings({settings,onChange}:{settings:EdgeAppeara
   const current=normalizeEdgeAppearance(settings);
   const [selected,setSelected]=useState<ButtonAppearanceId>('x');
   const choice=BUTTON_APPEARANCE.find(item=>item.id===selected)!;
-  const fallback=['x','bulk','add','report'].includes(selected)&&isHexColor(settings.accent_color)?settings.accent_color:choice.color;
-  const color=current.button_colors[selected]||fallback;
+  const color=current.button_colors[selected]||choice.color;
   const previewStyle={backgroundColor:color,borderColor:color,color:contrastingText(color),'--own-color-glow':color} as CSSProperties;
   function resetSelected(){const colors={...current.button_colors};delete colors[selected];onChange({...current,button_colors:colors});}
   return <div className={styles.preferences} data-testid="edge-appearance-settings">

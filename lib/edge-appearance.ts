@@ -1,20 +1,22 @@
 export const BUTTON_APPEARANCE = [
-  {id:'x', label:'Buscar no X', color:'#f6ad55'},
-  {id:'bulk', label:'Adição em massa', color:'#f6ad55'},
-  {id:'add', label:'Adicionar publicação', color:'#f6ad55'},
-  {id:'metrics', label:'Atualizar métricas', color:'#24d9a5'},
-  {id:'sheets', label:'Atualizar planilha', color:'#72b6ff'},
-  {id:'missions', label:'Períodos de missão', color:'#69abff'},
-  {id:'report', label:'Relatório', color:'#f6ad55'},
-  {id:'open', label:'Abrir período / corrigir início', color:'#69abff'},
-  {id:'close', label:'Fechar período', color:'#69abff'},
-  {id:'txt', label:'Exportar TXT', color:'#8d9099'},
-  {id:'csv', label:'Exportar CSV', color:'#8d9099'},
+  {id:'x', label:'Buscar no X', color:'#ffa97a'},
+  {id:'bulk', label:'Adição em massa', color:'#ffa97a'},
+  {id:'add', label:'Adicionar publicação', color:'#ffa97a'},
+  {id:'metrics', label:'Atualizar métricas', color:'#29dba8'},
+  {id:'sheets', label:'Atualizar planilha', color:'#29dba8'},
+  {id:'missions', label:'Períodos de missão', color:'#650094'},
+  {id:'report', label:'Relatório', color:'#650094'},
+  {id:'open', label:'Abrir período / corrigir início', color:'#352d71'},
+  {id:'close', label:'Fechar período', color:'#352d71'},
+  {id:'txt', label:'Exportar TXT', color:'#858993'},
+  {id:'csv', label:'Exportar CSV', color:'#858993'},
 ] as const;
 export type ButtonAppearanceId = typeof BUTTON_APPEARANCE[number]['id'];
 export type ButtonColors = Partial<Record<ButtonAppearanceId,string>>;
 export type EdgeAppearance = {border_glow_intensity:number; button_colors:ButtonColors};
-// 50 preserves the existing glow; no button overrides preserves the current palette.
+// Snapshot approved on 2026-09-26; personal overrides remain independent afterward.
+export const THEME_COLOR_DEFAULTS = {accent_color:'#ffb042',background_color:'#000000',surface_color:'#000000',border_color:'#ff00c8'};
+// Glow intensity is unchanged. Empty overrides now resolve to BUTTON_APPEARANCE.
 export const EDGE_APPEARANCE_DEFAULTS:EdgeAppearance = {border_glow_intensity:50,button_colors:{}};
 export function isHexColor(value:unknown):value is string {
   return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
@@ -39,8 +41,8 @@ export function contrastingText(color:string) {
 }
 export function buttonAppearanceCss(colors:ButtonColors) {
   // Whitelisted identifiers and six-digit colors only; no arbitrary CSS from storage.
-  return BUTTON_APPEARANCE.filter(({id})=>isHexColor(colors[id])).map(({id})=>{
-    const color=colors[id]!;
+  return BUTTON_APPEARANCE.map(({id,color:defaultColor})=>{
+    const color=isHexColor(colors[id])?colors[id]!:defaultColor;
     return `html body .exact-app .hero-actions button[data-appearance-button][data-appearance-button="${id}"]{background:${color}!important;border-color:${color}!important;color:${contrastingText(color)}!important;--own-color-glow:${color}!important;}`;
   }).join('\n');
 }
