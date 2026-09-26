@@ -3,7 +3,6 @@
 import {useEffect,useState,type CSSProperties} from 'react';
 import {BUTTON_APPEARANCE,EDGE_APPEARANCE_DEFAULTS,buttonAppearanceCss,contrastingText,isHexColor,normalizeEdgeAppearance,type ButtonAppearanceId,type EdgeAppearance} from '@/lib/edge-appearance';
 import styles from './edge-appearance.module.css';
-import {PwaInstall} from './pwa';
 
 export function useEdgeAppearance(settings:EdgeAppearance,userId:string) {
   const {border_glow_intensity:intensity,button_colors:colors}=normalizeEdgeAppearance(settings);
@@ -59,6 +58,5 @@ export function EdgeAppearanceSettings({settings,onChange}:{settings:EdgeAppeara
       <button type="button" className={styles.previewButton} style={previewStyle} data-edge-glow-preview="" data-own-color-glow="" aria-label="Prévia visual do botão">{choice.label}</button>
       <p>Prévia apenas visual, sem executar ações. As mudanças valem só para sua conta. Clique em <strong>Salvar alterações</strong> para guardar.</p>
     </div>
-    <PwaInstall/>
   </div>;
 }

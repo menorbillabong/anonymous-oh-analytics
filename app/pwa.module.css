@@ -1,7 +1,8 @@
-.install{grid-column:1/-1;border-top:1px solid var(--border,#444);padding-top:20px;margin-top:12px;min-width:0}
-.install h3{margin:0 0 12px}
-.install p{font-size:14px;line-height:1.6;max-width:78ch}
-.install button{min-height:44px;margin:4px 0 12px}
-.install summary{cursor:pointer;padding:10px 0;min-height:44px}
-.install details p{margin-top:0}
+.headerButton{display:flex;align-items:center;gap:5px;margin-top:4px;padding:3px 10px;min-height:28px;width:max-content;max-width:100%;border:1px solid var(--aoh-accent,#f6ad55);border-radius:7px;background:#242019;color:var(--aoh-accent,#f6ad55);font:600 11px/1.4 Arial,sans-serif;cursor:pointer;white-space:normal}
+.headerButton:disabled{opacity:.6;cursor:wait}
+.help{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto;padding:24px;border:1px solid #80603a;border-radius:14px;background:#191919;color:#eee;font:400 14px/1.6 Arial,sans-serif;white-space:normal;margin:auto}
+.help::backdrop{background:#0009}
+.help h2{font-size:20px;margin:0 0 14px}
+.help button{padding:8px 18px;min-height:44px;border:1px solid #f6ad55;border-radius:8px;background:#f6ad55;color:#171717;font:700 13px Arial,sans-serif;cursor:pointer}
+@media(pointer:coarse){.headerButton{min-height:40px}}
 .offline{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10000;width:max-content;max-width:calc(100vw - 32px);padding:14px 18px;border:1px solid #f6ad55;border-radius:12px;background:#191919;color:#fff;font:14px/1.5 Arial,sans-serif;box-shadow:0 4px 16px #0008;pointer-events:none}
