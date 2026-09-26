@@ -54,7 +54,7 @@ export default function ManualLikeControls({userId,disabled=false}:{userId:strin
     finally{lock.current=false;setBusy(false)}
   }
   return <>
-    {config.allowed&&<button ref={gear} type="button" className="sheets-sync-button sheets-adjustment-gear" aria-label="Configurar ajuste manual de curtidas" title="Configurar ajuste manual de curtidas" disabled={busy||disabled} onClick={()=>void show()}>⚙</button>}
+    {config.allowed&&<button data-appearance-button="sheets" ref={gear} type="button" className="sheets-sync-button sheets-adjustment-gear" aria-label="Configurar ajuste manual de curtidas" title="Configurar ajuste manual de curtidas" disabled={busy||disabled} onClick={()=>void show()}>⚙</button>}
     {!open&&message&&<span className="sheets-adjustment-feedback" role="status">{message}</span>}
     {open&&typeof document!=='undefined'&&createPortal(<dialog ref={dialog} className="x-handle-dialog sheets-adjustment-dialog" aria-labelledby="manual-likes-title" onCancel={event=>{event.preventDefault();if(!busy)setOpen(false)}}>
       <form onSubmit={save}>

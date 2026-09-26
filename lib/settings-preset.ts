@@ -1,7 +1,8 @@
+import {BUTTON_APPEARANCE,isHexColor} from './edge-appearance.ts';
 // Portable preferences only: never export account names, IDs, grants, posts or periods.
 export const PRESET_MAX_BYTES = 1024 * 1024;
 export const PRESET_MAX_MISSIONS = 1000;
-const settingsKeys = ['matrix_enabled','matrix_color','x_handle','panel_action_layout','ranking_opt_in','refresh_interval','show_refresh_timer','cap_unlocked','crystalgin_limit','accent_color','background_color','surface_color','border_color','language','monthly_post_goal'] as const;
+const settingsKeys = ['border_glow_intensity','button_colors','matrix_enabled','matrix_color','x_handle','panel_action_layout','ranking_opt_in','refresh_interval','show_refresh_timer','cap_unlocked','crystalgin_limit','accent_color','background_color','surface_color','border_color','language','monthly_post_goal'] as const;
 const booleanKeys = new Set(['matrix_enabled','ranking_opt_in','show_refresh_timer','cap_unlocked']);
 const colorKeys = new Set(['matrix_color','accent_color','background_color','surface_color','border_color']);
 export type PortableMission = {name:string;network:string;description:string;multiplier:number;reward:number;submission_limit:number;color:string;active:boolean;is_special:boolean};
@@ -18,7 +19,12 @@ export function portableSettings(value:unknown):Record<string,unknown> {
   for(const key of settingsKeys){
     if(!(key in value))continue;
     let item=value[key];
-    if(booleanKeys.has(key)){if(typeof item!=='boolean')invalid();}
+    if(key==='border_glow_intensity')numberIn(item,0,100,true);
+    else if(key==='button_colors'){
+      if(!object(item)||Object.keys(item).some(id=>!BUTTON_APPEARANCE.some(button=>button.id===id))||Object.values(item).some(color=>!isHexColor(color)))invalid();
+      item={...item};
+    }
+    else if(booleanKeys.has(key)){if(typeof item!=='boolean')invalid();}
     else if(colorKeys.has(key)){if(typeof item!=='string'||!/^#[0-9a-f]{6}$/i.test(item))invalid();}
     else if(key==='crystalgin_limit'||key==='monthly_post_goal')numberIn(item,1,2147483647,true);
     else if(key==='refresh_interval'){if(![.5,1,3,6,12,24].includes(item as number))invalid();}

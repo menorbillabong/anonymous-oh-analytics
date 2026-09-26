@@ -40,8 +40,8 @@ export default function XImportControls({ userId, enabled, handle, busy, atMonth
   if (!enabled) return null;
   return <div className="x-import-control">
     <div className="x-import-button-pair" role="group" aria-label="Buscar no X e configurar perfil">
-      <button type="button" className="orange-add x-import-search" disabled={busy || checking || atMonthlyLimit} title={atMonthlyLimit ? 'Meta mensal atingida' : validXHandle(handle) ? `Buscar publicações de @${normalizedXHandle(handle)}` : 'Cadastre seu @ do X para buscar publicações'} onClick={() => void open(true)}>𝕏 <b>{checking ? 'AGUARDE...' : 'BUSCAR NO X'}</b></button>
-      <button type="button" className="orange-add x-import-gear" disabled={busy || checking} aria-label="Cadastrar ou alterar perfil do X" title="Cadastrar ou alterar perfil do X" onClick={() => void open(false)}><span aria-hidden="true">⚙</span></button>
+      <button type="button" data-appearance-button="x" className="orange-add x-import-search" disabled={busy || checking || atMonthlyLimit} title={atMonthlyLimit ? 'Meta mensal atingida' : validXHandle(handle) ? `Buscar publicações de @${normalizedXHandle(handle)}` : 'Cadastre seu @ do X para buscar publicações'} onClick={() => void open(true)}>𝕏 <b>{checking ? 'AGUARDE...' : 'BUSCAR NO X'}</b></button>
+      <button type="button" data-appearance-button="x" className="orange-add x-import-gear" disabled={busy || checking} aria-label="Cadastrar ou alterar perfil do X" title="Cadastrar ou alterar perfil do X" onClick={() => void open(false)}><span aria-hidden="true">⚙</span></button>
     </div>
     {message && <p className="x-import-feedback" role="alert">{message}</p>}
     {editor && createPortal(<XHandleDialog userId={userId} initialHandle={editor.handle} searchAfterSave={editor.searchAfterSave} onClose={() => setEditor(null)} onSaved={saved => {

@@ -67,7 +67,7 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
 
   return <>
     <div className="sheets-sync-control">
-    <button className="sheets-sync-button" type="button" disabled={running||remaining>0} onClick={sync} title={remaining>0?`Disponível novamente em ${formatCooldown(remaining)}`:'Atualizar a aba vinculada no Google Sheets'}>
+    <button data-appearance-button="sheets" className="sheets-sync-button" type="button" disabled={running||remaining>0} onClick={sync} title={remaining>0?`Disponível novamente em ${formatCooldown(remaining)}`:'Atualizar a aba vinculada no Google Sheets'}>
       ▦ <b>{running?'ATUALIZANDO PLANILHA...':remaining>0?`PLANILHA · ${formatCooldown(remaining)}`:'ATUALIZAR PLANILHA'}</b>
     </button>
     <ManualLikeControls userId={userId} disabled={running}/>

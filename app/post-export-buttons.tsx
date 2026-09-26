@@ -32,7 +32,7 @@ export default function PostExportButtons({userId}:{userId:string}){
   }
  }
  return <div className="split-btn" aria-busy={busy}>
-  <button type="button" disabled={busy} title="Exportar período atual em TXT com tabulações para o Google Sheets" onClick={()=>void download('txt')}>TXT</button>
-  <button type="button" disabled={busy} title="Exportar período atual em CSV" onClick={()=>void download('csv')}>CSV</button>
+  <button data-appearance-button="txt" type="button" disabled={busy} title="Exportar período atual em TXT com tabulações para o Google Sheets" onClick={()=>void download('txt')}>TXT</button>
+  <button data-appearance-button="csv" type="button" disabled={busy} title="Exportar período atual em CSV" onClick={()=>void download('csv')}>CSV</button>
  </div>;
 }

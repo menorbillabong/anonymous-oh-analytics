@@ -58,10 +58,18 @@ html body :is(button.danger, button.btn-danger, .post-delete-button,
    above. Never recolor the border, background or text on hover. */
 @media (hover: hover) and (pointer: fine) {
   html body [data-own-color-glow]:not(:disabled):not([aria-disabled="true"]):is(:hover, :active) {
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--own-color-glow) 65%, transparent),
-                0 0 12px color-mix(in srgb, var(--own-color-glow) 38%, transparent) !important;
+    box-shadow: 0 0 0 var(--edge-glow-line, 1px) color-mix(in srgb, var(--own-color-glow) var(--edge-glow-core, 65%), transparent),
+                0 0 var(--edge-glow-radius, 12px) color-mix(in srgb, var(--own-color-glow) var(--edge-glow-halo, 38%), transparent) !important;
   }
 }
+
+/* Static settings preview, including touch screens. No animations or extra timers. */
+html body button[data-edge-glow-preview] {
+  box-shadow: 0 0 0 var(--edge-glow-line, 1px) color-mix(in srgb, var(--own-color-glow) var(--edge-glow-core, 65%), transparent),
+              0 0 var(--edge-glow-radius, 12px) color-mix(in srgb, var(--own-color-glow) var(--edge-glow-halo, 38%), transparent) !important;
+}
+html[data-edge-glow-disabled] body [data-own-color-glow]:not(:disabled):not([aria-disabled="true"]):is(:hover, :active),
+html[data-edge-glow-disabled] body button[data-edge-glow-preview] { box-shadow: none !important; }
 
 /* A distinct keyboard focus ring in the same color. */
 html body :is(button, input, select, textarea):not(:disabled):not([aria-disabled="true"]):focus-visible {
