@@ -166,7 +166,7 @@
  .organized-actions .action-group>div>.x-import-control,.organized-actions .action-group>div>.split-btn,.organized-actions .action-group>div>.period-action-pair{grid-column:1/-1}
  .hero-actions.organized-actions .update-action-group>div{grid-template-columns:1fr}
  .hero-actions button{font-size:11px!important;min-height:46px!important}
- .hero-actions:not(.organized-actions)>.x-import-control,.hero-actions:not(.organized-actions)>.sheets-sync-control,.hero-actions:not(.organized-actions)>.period-action-pair{width:100%;min-width:0}
+.hero-actions:not(.organized-actions)>.x-import-control,.hero-actions:not(.organized-actions)>.sheets-sync-control,.hero-actions:not(.organized-actions)>.metrics-sync-control,.hero-actions:not(.organized-actions)>.period-action-pair{width:100%;min-width:0}
  .exact-stats{grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
  .exact-stat{min-width:0;min-height:106px!important;padding:16px 12px!important}
  .exact-stat:last-child{grid-column:1/-1}

@@ -2,6 +2,10 @@
 .hero-actions .sheets-sync-button:hover:not(:disabled){border-color:#3b6c9f;box-shadow:0 0 18px rgba(70,145,224,.12)}
 .hero-actions .sheets-sync-button:disabled{opacity:.62!important;cursor:not-allowed}
 .sheets-sync-control{display:flex;flex-wrap:wrap;flex:1;min-width:0}
+.metrics-sync-control{display:flex;flex-wrap:wrap;flex:1;min-width:0}
+.hero-actions .metrics-sync-control>.metrics-refresh-button{flex:1;min-width:0}
+.hero-actions .metrics-sync-control:has(.sheets-adjustment-gear)>.metrics-refresh-button{border-radius:9px 0 0 9px!important}
+.hero-actions .metrics-sync-control>.sheets-adjustment-gear{flex:0 0 42px;min-width:42px;padding:0 10px;border-radius:0 9px 9px 0!important;font-size:20px}
 .hero-actions .sheets-sync-control>.sheets-sync-button:first-child{flex:1;min-width:0}
 .hero-actions .sheets-sync-control:has(.sheets-adjustment-gear)>.sheets-sync-button:first-child{border-radius:9px 0 0 9px!important}
 .hero-actions .sheets-sync-control>.sheets-adjustment-gear{flex:0 0 42px;min-width:42px;padding:0 10px;border-radius:0 9px 9px 0!important;font-size:20px}

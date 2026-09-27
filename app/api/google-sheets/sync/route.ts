@@ -6,6 +6,7 @@ import {formatCooldown} from '@/lib/sheets-cooldown';
 import type {SheetPost} from '@/lib/google-sheets-plan';
 
 export const dynamic='force-dynamic';
+export const maxDuration=60;
 
 function userMessage(error:unknown){
   const message=error instanceof Error?error.message:String(error||'');

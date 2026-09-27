@@ -26,8 +26,8 @@ export type SheetPlan = {
   manualLikes: number;
 };
 
-type HeaderField = 'month'|'publishDate'|'platform'|'contentLink'|'views'|'likes'|'eligible'|'reward'|'theme';
-type SectionColumns = Partial<Record<HeaderField,number>>;
+export type HeaderField = 'month'|'publishDate'|'platform'|'contentLink'|'views'|'likes'|'eligible'|'reward'|'theme';
+export type SectionColumns = Partial<Record<HeaderField,number>>;
 type HeaderLayout = {row:number;normal:SectionColumns;special:SectionColumns};
 
 const ESSENTIAL_FIELDS:HeaderField[]=['contentLink'];
@@ -76,7 +76,7 @@ function hasRequired(section:SectionColumns|null,required:HeaderField[]){
   return Boolean(section&&required.every(field=>section[field]!==undefined));
 }
 
-function headerLayoutForRow(row:unknown[],rowIndex:number):HeaderLayout|null{
+export function headerLayoutForRow(row:unknown[],rowIndex:number):HeaderLayout|null{
   const cells:Array<{column:number;field:HeaderField}>=[];
   row.forEach((value,column)=>{const field=headerField(value);if(field)cells.push({column,field})});
   if(cells.filter(cell=>cell.field==='contentLink').length<2)return null;

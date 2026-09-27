@@ -5,11 +5,11 @@ import {sheetBatchRequests} from './google-sheets-batch';
 import type {ManualLikeAdjustment} from './manual-like-adjustment';
 
 const SHEETS_SCOPE='https://www.googleapis.com/auth/spreadsheets';
-const SHEETS_API='https://sheets.googleapis.com/v4/spreadsheets';
+export const SHEETS_API='https://sheets.googleapis.com/v4/spreadsheets';
 
 function a1Tab(tabName:string){return `'${tabName.replaceAll("'", "''")}'`}
 
-async function accessToken(){
+export async function accessToken(){
   const email=process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
   const key=process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY?.replace(/\\n/g,'\n');
   if(!email||!key)throw new Error('GOOGLE_SHEETS_SERVER_NOT_CONFIGURED');
@@ -19,7 +19,7 @@ async function accessToken(){
   return response.token;
 }
 
-async function googleRequest(url:string,token:string,init?:RequestInit){
+export async function googleRequest(url:string,token:string,init?:RequestInit){
   const response=await fetch(url,{...init,headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json',...(init?.headers||{})},cache:'no-store'});
   if(!response.ok){
     const code=response.status;

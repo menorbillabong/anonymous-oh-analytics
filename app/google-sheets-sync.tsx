@@ -4,7 +4,7 @@ import {useCallback,useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {supabase} from '@/lib/supabase';
 import {formatCooldown} from '@/lib/sheets-cooldown';
-import ManualLikeControls from './manual-like-controls';
+import SheetDesignControls from './sheet-design-controls';
 import './google-sheets-sync.css';
 
 type SyncResult={success?:boolean;normalCount?:number;specialCount?:number;total?:number;manualLikes?:number;cooldownSeconds?:number;retryAfterSeconds?:number;error?:string};
@@ -12,6 +12,7 @@ type SyncResult={success?:boolean;normalCount?:number;specialCount?:number;total
 export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:string;beforeSync?:()=>Promise<unknown>}){
   const[enabled,setEnabled]=useState(false);
   const[running,setRunning]=useState(false);
+  const[designBusy,setDesignBusy]=useState(false);
   const[result,setResult]=useState<SyncResult|null>(null);
   const[cooldownUntil,setCooldownUntil]=useState(0);
   const[now,setNow]=useState(()=>Date.now());
@@ -45,7 +46,7 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
   const remaining=Math.max(0,Math.ceil((cooldownUntil-now)/1000));
 
   async function sync(){
-    if(running||remaining>0)return;
+    if(running||designBusy||remaining>0)return;
     setRunning(true);setResult(null);
     try{
       if(beforeSync&&await beforeSync()===false)throw new Error('Atualize as métricas antes de sincronizar a planilha.');
@@ -67,10 +68,10 @@ export default function GoogleSheetsSyncButton({userId,beforeSync}:{userId:strin
 
   return <>
     <div className="sheets-sync-control">
-    <button data-appearance-button="sheets" className="sheets-sync-button" type="button" disabled={running||remaining>0} onClick={sync} title={remaining>0?`Disponível novamente em ${formatCooldown(remaining)}`:'Atualizar a aba vinculada no Google Sheets'}>
+    <button data-appearance-button="sheets" className="sheets-sync-button" type="button" disabled={running||designBusy||remaining>0} onClick={sync} title={remaining>0?`Disponível novamente em ${formatCooldown(remaining)}`:'Atualizar a aba vinculada no Google Sheets'}>
       ▦ <b>{running?'ATUALIZANDO PLANILHA...':remaining>0?`PLANILHA · ${formatCooldown(remaining)}`:'ATUALIZAR PLANILHA'}</b>
     </button>
-    <ManualLikeControls userId={userId} disabled={running}/>
+    <SheetDesignControls userId={userId} disabled={running} onBusyChange={setDesignBusy}/>
     </div>
     {result&&typeof document!=='undefined'&&createPortal(<div className="sheets-result-backdrop" role="presentation" onMouseDown={event=>{if(event.target===event.currentTarget)setResult(null)}}>
       <section className={`sheets-result-dialog ${result.error?'error':'success'}`} role="dialog" aria-modal="true" aria-labelledby="sheets-result-title">
