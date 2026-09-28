@@ -20,7 +20,8 @@ for(const from of designs)for(const to of designs)test(`${from.properties.title}
   }
   const before=JSON.stringify(s),plan=planSheetDesign(s,to,'Backup fixture');assert.equal(JSON.stringify(s),before);
   assert.equal(plan.normalCount,2);assert.equal(plan.specialCount,1);
-  assert.deepEqual(plan.requests[0],{duplicateSheet:{sourceSheetId:987654,newSheetName:'Backup fixture'}});
+  assert.ok(!plan.requests.some(r=>r.duplicateSheet||r.copyPaste||r.addSheet));
+  assert.ok(plan.requests.some(r=>(r.updateSheetProperties as any)?.properties?.gridProperties?.columnCount===to.properties.gridProperties.columnCount));
   assert.equal(plan.writes.find(w=>w.r===next.row+1&&w.c===next.normal.likes)?.cell.userEnteredValue?.numberValue,10);
   assert.equal(plan.writes.find(w=>w.r===next.row+1&&w.c===next.special.reward)?.cell.userEnteredValue?.numberValue,200);
   assert.ok(plan.writes.some(w=>w.r<next.row&&w.cell.userEnteredValue?.stringValue==='Fixture user'));
@@ -34,7 +35,7 @@ test('numeric dates and notes survive, empty rows do not change post order',()=>
   assert.equal(w.cell.userEnteredValue?.numberValue,46280);assert.equal(w.cell.userEnteredFormat?.numberFormat?.pattern,'dd/mm/yyyy');
 });
 test('unsupported data blocks before producing a destructive plan',()=>{
-  for(const variation of ['formula','chip','extra','chart','capacity','headers','template-data']){
+  for(const variation of ['formula','chip','chart','capacity','headers','template-data']){
     const s=target(designs[0]),to=structuredClone(designs[1]),l=layout(s);post(s,1);
     if(variation==='formula')put(s,l.row+1,l.normal.likes!,{userEnteredValue:{formulaValue:'=2+2'},effectiveValue:{numberValue:4}});
     if(variation==='chip')put(s,l.row+1,l.normal.contentLink!,{...cell('@'),chipRuns:[{}]});
@@ -45,6 +46,11 @@ test('unsupported data blocks before producing a destructive plan',()=>{
     if(variation==='template-data')post(to,1);
     assert.throws(()=>planSheetDesign(s,to,'Backup'),Error,variation);
   }
+});
+
+test('extra literal data is reported for explicit removal rather than blocking',()=>{
+  const s=target(designs[0]),l=layout(s);post(s,1);put(s,l.row+1,25,cell('old extra'));
+  assert.equal(planSheetDesign(s,designs[1],'').discardedCells,1);
 });
 test('platform validation is honored without silently changing platform',()=>{
   const s=target(designs[0]),l=layout(s);post(s,1);put(s,l.row+1,l.normal.platform!,cell('TikTok'));

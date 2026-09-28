@@ -4,7 +4,7 @@ import {sheetDesign} from '@/lib/sheet-designs';
 import {prepareSheetDesign,applySheetDesign} from '@/lib/sheet-design-service';
 
 export const dynamic='force-dynamic';
-export const maxDuration=60;
+export const maxDuration=120;
 class RequestError extends Error{constructor(message:string,public status=422){super(message)}}
 async function context(request:Request){
   const token=request.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1];
@@ -34,7 +34,7 @@ export async function GET(request:Request){
     const {permission}=await context(request),id=new URL(request.url).searchParams.get('design');
     if(!sheetDesign(id))throw new RequestError('Modelo inválido.');
     const prepared=await prepareSheetDesign(permission.tab,id,permission.month);
-    return NextResponse.json({fingerprint:prepared.fingerprint,tabName:permission.tab,normalCount:prepared.plan.normalCount,specialCount:prepared.plan.specialCount,capacity:prepared.plan.capacity},{headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json({fingerprint:prepared.fingerprint,tabName:permission.tab,normalCount:prepared.plan.normalCount,specialCount:prepared.plan.specialCount,capacity:prepared.plan.capacity,discardedCells:prepared.plan.discardedCells},{headers:{'Cache-Control':'no-store'}});
   }catch(error){return failed(error)}
 }
 export async function POST(request:Request){
@@ -63,7 +63,7 @@ export async function POST(request:Request){
     await completion(true,null).catch(()=>{});
     return NextResponse.json(result);
   }catch(error){
-    const message=submitted?'Não foi possível confirmar o resultado. Confira sua aba e a cópia “Backup AOH” no Sheets antes de tentar novamente.':error instanceof Error?error.message:'Falha ao aplicar modelo.';
+    const message=submitted?'Não foi possível confirmar o resultado. Confira sua aba cadastrada antes de tentar novamente. O backup manual, se criado, está no site.':error instanceof Error?error.message:'Falha ao aplicar modelo.';
     await completion(false,message).catch(()=>{});
     return submitted?NextResponse.json({error:message,checkSheet:true},{status:502}):failed(error);
   }

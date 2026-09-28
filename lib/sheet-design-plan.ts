@@ -1,7 +1,8 @@
 import {headerLayoutForRow,type HeaderField,type SectionColumns} from './google-sheets-plan.ts';
+import {replaceNativeSheet,wholeCellLinkRequest} from './sheet-native-snapshot.ts';
 
 type Value={stringValue?:string;numberValue?:number;boolValue?:boolean;formulaValue?:string;errorValue?:unknown};
-export type DesignCell={userEnteredValue?:Value;effectiveValue?:Value;formattedValue?:string;userEnteredFormat?:{numberFormat?:{type?:string;pattern?:string}};note?:string;hyperlink?:string;chipRuns?:unknown[];textFormatRuns?:unknown[];dataValidation?:{condition?:{type?:string;values?:{userEnteredValue?:string}[]}}};
+export type DesignCell={userEnteredValue?:Value;effectiveValue?:Value;formattedValue?:string;userEnteredFormat?:{numberFormat?:{type?:string;pattern?:string};textFormat?:{link?:{uri:string}}};note?:string;hyperlink?:string;chipRuns?:unknown[];textFormatRuns?:unknown[];dataValidation?:{condition?:{type?:string;values?:{userEnteredValue?:string}[]}}};
 type Range={sheetId?:number;startRowIndex?:number;endRowIndex?:number;startColumnIndex?:number;endColumnIndex?:number};
 export type DesignSheet={properties:{sheetId:number;title:string;gridProperties:{rowCount:number;columnCount:number;frozenRowCount?:number;frozenColumnCount?:number;hideGridlines?:boolean}};merges?:Range[];conditionalFormats?:unknown[];charts?:unknown[];tables?:unknown[];bandedRanges?:unknown[];filterViews?:unknown[];basicFilter?:unknown;data?:{startRow?:number;startColumn?:number;rowData?:{values?:DesignCell[]}[];rowMetadata?:{pixelSize?:number}[];columnMetadata?:{pixelSize?:number}[]}[]};
 export type DesignRequest=Record<string,unknown>;
@@ -54,7 +55,7 @@ function scalarCell(cell:DesignCell|undefined):DesignCell{
   if(cell?.chipRuns?.length)throw new Error('A aba contém chips nas publicações. Eles precisam ser revisados antes de transformar o modelo.');
   if(cell?.userEnteredValue?.formulaValue)throw new Error('Há fórmulas personalizadas nos dados de entrada. Revise-as antes de transformar a aba.');
   const v=value(cell);
-  return {userEnteredValue:typeof v==='number'?{numberValue:v}:typeof v==='boolean'?{boolValue:v}:{stringValue:v},...(cell?.note?{note:cell.note}:{}),...(cell?.textFormatRuns?{textFormatRuns:cell.textFormatRuns}:{})};
+  return {userEnteredValue:typeof v==='number'?{numberValue:v}:typeof v==='boolean'?{boolValue:v}:{stringValue:v},...(cell?.note?{note:cell.note}:{}),...(cell?.textFormatRuns?{textFormatRuns:cell.textFormatRuns}:{}),...(cell?.userEnteredFormat?.textFormat?.link?{userEnteredFormat:{textFormat:{link:cell.userEnteredFormat.textFormat.link}}}:{})};
 }
 function dateMonth(cell:DesignCell|undefined){
   const v=value(cell);
@@ -68,11 +69,11 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
   const capacity=source.properties.gridProperties.rowCount-next.row-1;
   const requests:DesignRequest[]=[];
   const writes:{r:number;c:number;cell:DesignCell}[]=[];
-  let normalCount=0,specialCount=0,usedRows=0;
+  let normalCount=0,specialCount=0,usedRows=0,discardedCells=0;
   const mapped=new Set([...Object.values(old.normal),...Object.values(old.special)]);
   for(let r=old.row+1;r<oldRows.length;r++){
     const row=oldRows[r]||[];
-    for(let c=0;c<row.length;c++)if(!mapped.has(c)&&!runningCountHelper(row[c])&&(clean(value(row[c]))||row[c]?.note))throw new Error('Há dados ou anotações fora das colunas reconhecidas. A aba não será transformada automaticamente.');
+    for(let c=0;c<row.length;c++)if(!mapped.has(c)&&!runningCountHelper(row[c])&&!row[c]?.userEnteredValue?.formulaValue&&(clean(value(row[c]))||row[c]?.note))discardedCells++;
     const populated=(section:SectionColumns)=>fields.some(f=>section[f]!==undefined&&(clean(value(row[section[f]!]))||row[section[f]!]?.note));
     const normal=populated(old.normal),special=populated(old.special);
     if(!normal&&!special)continue;
@@ -85,7 +86,7 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
         if(to[f]===undefined){if(from[f]!==undefined&&clean(value(row[from[f]!])))throw new Error('O modelo não possui uma coluna necessária para preservar seus dados.');continue}
         const original=from[f]===undefined?undefined:row[from[f]!];
         const cell=scalarCell(original);
-        if(f==='publishDate'&&typeof value(original)==='number')cell.userEnteredFormat={numberFormat:original?.userEnteredFormat?.numberFormat||{type:'DATE',pattern:'yyyy-mm-dd'}};
+        if(f==='publishDate'&&typeof value(original)==='number')cell.userEnteredFormat={...cell.userEnteredFormat,numberFormat:original?.userEnteredFormat?.numberFormat||{type:'DATE',pattern:'yyyy-mm-dd'}};
         if(f==='month'&&!clean(value(original))){const month=dateMonth(from.publishDate===undefined?undefined:row[from.publishDate]);if(month)cell.userEnteredValue={stringValue:month}}
         const rule=newRows[next.row+1]?.[to[f]!]?.dataValidation?.condition;
         if(rule&&clean(value(cell))&&rule.type==='ONE_OF_LIST'&&!rule.values?.some(v=>v.userEnteredValue===String(value(cell))))throw new Error(`O valor “${clean(value(cell))}” não é aceito pela lista do modelo. Ajuste-o antes da transformação.`);
@@ -105,21 +106,11 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
     writes.push({r:dest.r,c:dest.c,cell});
   }
   if(!newProfile.has('month'))throw new Error('O modelo não possui o campo do mês de referência.');
-  const id=target.properties.sheetId,sourceId=source.properties.sheetId;
-  const rowCount=Math.max(target.properties.gridProperties.rowCount,source.properties.gridProperties.rowCount);
-  const columnCount=Math.max(target.properties.gridProperties.columnCount,source.properties.gridProperties.columnCount);
-  // Backup and replacement share ONE atomic Google batch. No deleteSheet, rename or privilege changes.
-  requests.push({duplicateSheet:{sourceSheetId:id,newSheetName:backupTitle}});
-  if(target.merges?.length)requests.push({unmergeCells:{range:{sheetId:id,startRowIndex:0,endRowIndex:target.properties.gridProperties.rowCount,startColumnIndex:0,endColumnIndex:target.properties.gridProperties.columnCount}}});
-  requests.push({updateSheetProperties:{properties:{sheetId:id,gridProperties:{rowCount,columnCount,frozenRowCount:source.properties.gridProperties.frozenRowCount||0,frozenColumnCount:source.properties.gridProperties.frozenColumnCount||0,hideGridlines:source.properties.gridProperties.hideGridlines||false}},fields:'gridProperties'}});
-  for(let index=(target.conditionalFormats?.length||0)-1;index>=0;index--)requests.push({deleteConditionalFormatRule:{sheetId:id,index}});
-  requests.push({updateCells:{range:{sheetId:id,startRowIndex:0,endRowIndex:rowCount,startColumnIndex:0,endColumnIndex:columnCount},fields:'userEnteredValue,userEnteredFormat,dataValidation,note,textFormatRuns'}});
-  const sourceRange={sheetId:sourceId,startRowIndex:0,endRowIndex:source.properties.gridProperties.rowCount,startColumnIndex:0,endColumnIndex:source.properties.gridProperties.columnCount};
-  for(const pasteType of ['PASTE_NORMAL','PASTE_DATA_VALIDATION','PASTE_CONDITIONAL_FORMATTING'])requests.push({copyPaste:{source:sourceRange,destination:{...sourceRange,sheetId:id},pasteType,pasteOrientation:'NORMAL'}});
-  for(const grid of source.data||[]){
-    for(const [i,dimension] of (grid.columnMetadata||[]).entries())if(dimension.pixelSize)requests.push({updateDimensionProperties:{range:{sheetId:id,dimension:'COLUMNS',startIndex:(grid.startColumn||0)+i,endIndex:(grid.startColumn||0)+i+1},properties:{pixelSize:dimension.pixelSize},fields:'pixelSize'}});
-    for(const [i,dimension] of (grid.rowMetadata||[]).entries())if(dimension.pixelSize)requests.push({updateDimensionProperties:{range:{sheetId:id,dimension:'ROWS',startIndex:(grid.startRow||0)+i,endIndex:(grid.startRow||0)+i+1},properties:{pixelSize:dimension.pixelSize},fields:'pixelSize'}});
+  const id=target.properties.sheetId;
+  requests.push(...replaceNativeSheet(target,source));
+  for(const write of writes){
+    requests.push({updateCells:{start:{sheetId:id,rowIndex:write.r,columnIndex:write.c},rows:[{values:[write.cell]}],fields:'userEnteredValue,note,textFormatRuns'+(write.cell.userEnteredFormat?.numberFormat?',userEnteredFormat.numberFormat':'')}});
+    const link=wholeCellLinkRequest(id,write.r,write.c,write.cell);if(link)requests.push(link);
   }
-  for(const write of writes)requests.push({updateCells:{start:{sheetId:id,rowIndex:write.r,columnIndex:write.c},rows:[{values:[write.cell]}],fields:'userEnteredValue,note,textFormatRuns'+(write.cell.userEnteredFormat?',userEnteredFormat.numberFormat':'')}});
-  return {requests,writes,normalCount,specialCount,capacity,backupTitle};
+  return {requests,writes,normalCount,specialCount,capacity,discardedCells};
 }

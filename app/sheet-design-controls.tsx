@@ -7,8 +7,9 @@ import {SHEET_DESIGNS,type SheetDesignId} from '@/lib/sheet-designs';
 import './x-import-controls.css';
 import './sheet-design-controls.css';
 
-type Preview={fingerprint:string;tabName:string;normalCount:number;specialCount:number;capacity:number};
-type Result={verified:boolean;backupTitle:string;backupUrl?:string};
+type Preview={fingerprint:string;tabName:string;normalCount:number;specialCount:number;capacity:number;discardedCells:number};
+type Result={verified:boolean};
+type BackupInfo={createdAt:string;expiresAt:string;tabName:string};
 
 export default function SheetDesignControls({userId,disabled,onBusyChange}:{userId:string;disabled:boolean;onBusyChange:(busy:boolean)=>void}){
   const [open,setOpen]=useState(false);
@@ -19,10 +20,29 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
   const [message,setMessage]=useState('');
   const [result,setResult]=useState<Result|null>(null);
   const [uncertain,setUncertain]=useState(false);
+  const [backupPanel,setBackupPanel]=useState(false);
+  const [backup,setBackup]=useState<BackupInfo|null>(null);
+  const [restoreFingerprint,setRestoreFingerprint]=useState('');
+  const [restoreConfirmed,setRestoreConfirmed]=useState(false);
   const dialog=useRef<HTMLDialogElement>(null),gear=useRef<HTMLButtonElement>(null),lock=useRef(false);
   useEffect(()=>{if(open){const node=dialog.current;node?.showModal();return()=>{node?.close();gear.current?.focus()}}},[open]);
 
-  function show(){setPreview(null);setConfirmed(false);setMessage('');setResult(null);setUncertain(false);setOpen(true)}
+  function show(){setPreview(null);setConfirmed(false);setMessage('');setResult(null);setUncertain(false);setBackupPanel(false);setBackup(null);setRestoreFingerprint('');setRestoreConfirmed(false);setOpen(true)}
+  async function runBackup(action:'status'|'save'|'preview'|'restore'){
+    if(lock.current||disabled||(action==='restore'&&(!restoreConfirmed||!restoreFingerprint||!backup)))return;
+    lock.current=true;setBusy(true);onBusyChange(true);setMessage('');
+    if(action==='status'){setBackup(null);setRestoreFingerprint('');setRestoreConfirmed(false);}
+    let submitted=false;
+    try{
+      const {data:{session}}=await supabase.auth.getSession();if(!session||session.user.id!==userId)throw new Error('Sua sessão mudou. Entre novamente.');
+      const write=action==='save'||action==='restore';submitted=action==='restore';
+      const response=await fetch(`/api/google-sheets/backup${action==='preview'?'?preview=restore':''}`,{method:write?'POST':'GET',cache:'no-store',headers:{Authorization:`Bearer ${session.access_token}`,...(write?{'Content-Type':'application/json'}:{})},...(write?{body:JSON.stringify({action,confirm:restoreConfirmed,fingerprint:restoreFingerprint,backupCreatedAt:backup?.createdAt})}:{})});
+      const data=await response.json();if(!response.ok){submitted=Boolean(data.checkSheet);throw new Error(data.error||'Não foi possível acessar o backup.');}
+      if(action==='restore'){setRestoreFingerprint('');setRestoreConfirmed(false);setPreview(null);setMessage('O Google confirmou a restauração na mesma aba. Confira sua planilha antes de continuar.');}
+      else{setBackup(data.backup);setRestoreFingerprint(data.fingerprint||'');setRestoreConfirmed(false);if(action==='save')setMessage('Backup salvo no site por 7 dias. Nenhuma aba foi criada no Sheets.');}
+    }catch(error){if(submitted)setUncertain(true);setMessage(submitted?'Confira a aba antes de tentar restaurar novamente; a resposta foi interrompida.':error instanceof Error?error.message:'Falha no backup.');}
+    finally{lock.current=false;setBusy(false);onBusyChange(false);if(action==='restore')window.dispatchEvent(new Event('sheets-cooldown-changed'));}
+  }
   async function run(apply:boolean){
     if(lock.current||disabled||(apply&&(!preview||!confirmed||uncertain)))return;
     lock.current=true;setBusy(true);onBusyChange(true);setMessage('');
@@ -44,7 +64,7 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
       if(apply){setResult(data);setPreview(null);setConfirmed(false)}
       else {setPreview(data);setConfirmed(false)}
     }catch(error){
-      if(submitted){setUncertain(true);setPreview(null);setMessage('A resposta foi interrompida. Confira sua aba e a cópia Backup AOH no Sheets antes de tentar novamente.')}
+      if(submitted){setUncertain(true);setPreview(null);setMessage('A resposta foi interrompida. Confira sua aba cadastrada antes de tentar novamente.')}
       else setMessage(error instanceof Error?error.message:'Não foi possível concluir.');
     }finally{lock.current=false;setBusy(false);onBusyChange(false);if(apply)window.dispatchEvent(new Event('sheets-cooldown-changed'))}
   }
@@ -53,10 +73,16 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
     <button ref={gear} data-appearance-button="sheets" className="sheets-sync-button sheets-adjustment-gear" type="button" aria-label="Escolher modelo da planilha" title="Escolher modelo da planilha" disabled={disabled||busy} onClick={show}>⚙</button>
     {open&&typeof document!=='undefined'&&createPortal(<dialog ref={dialog} className="x-handle-dialog sheet-design-dialog" aria-labelledby="sheet-design-title" onCancel={event=>{event.preventDefault();if(!busy)setOpen(false)}}>
       <header><h2 id="sheet-design-title">Modelo da planilha</h2><button type="button" aria-label="Fechar modelos" disabled={busy} onClick={()=>setOpen(false)}>×</button></header>
-      {result?<div role="status">
+      {backupPanel?<section aria-label="Backup da planilha">
+        <p>Uma única cópia da aba cadastrada fica guardada no site por 7 dias. Criar outra substitui a anterior somente depois de salvar com sucesso. Nenhuma aba extra é criada no Sheets.</p>
+        {backup?<p>Aba: <strong>{backup.tabName}</strong><br/>Criado em {new Date(backup.createdAt).toLocaleString('pt-BR')}<br/>Válido até {new Date(backup.expiresAt).toLocaleString('pt-BR')}</p>:<p>{busy?'Consultando backup…':'Não há backup válido para a aba cadastrada.'}</p>}
+        {!uncertain&&<div className="sheet-backup-actions"><button className="x-handle-save" disabled={busy||disabled} onClick={()=>void runBackup('save')}>{backup?'SUBSTITUIR BACKUP':'CRIAR BACKUP'}</button>{backup&&<button disabled={busy||disabled} onClick={()=>void runBackup('preview')}>CONFERIR RESTAURAÇÃO</button>}</div>}
+        {restoreFingerprint&&!uncertain&&<div className="sheet-design-confirm"><p>Restaurar substitui o conteúdo e o visual atuais desta aba pelos do backup. Alterações posteriores ao backup serão perdidas.</p><label><input type="checkbox" checked={restoreConfirmed} onChange={event=>setRestoreConfirmed(event.target.checked)} disabled={busy}/><span>Confirmo a restauração da aba {backup?.tabName}.</span></label><button className="x-handle-save" disabled={busy||disabled||!restoreConfirmed} onClick={()=>void runBackup('restore')}>RESTAURAR BACKUP</button></div>}
+        {message&&<p role="status">{message}</p>}
+      </section>:result?<div role="status">
         <h3>{result.verified?'Modelo aplicado e dados conferidos':'Modelo aplicado — confira a planilha'}</h3>
         <p>{result.verified?'A aba manteve seu nome e vínculo com o site.':'O Google confirmou a aplicação, mas não foi possível conferir todos os dados. Não reaplique antes de conferir.'}</p>
-        <p>Cópia de segurança: {result.backupUrl?<a href={result.backupUrl} target="_blank" rel="noreferrer">{result.backupTitle}</a>:result.backupTitle}.</p>
+        <p>Nenhuma aba extra foi criada. O backup manual, se você o criou, continua disponível no site até vencer.</p>
       </div>:<>
         <p>Escolha um dos quatro modelos para transformar sua aba atual, mantendo o nome e o vínculo com o site.</p>
         <fieldset disabled={busy||uncertain} className="sheet-design-options"><legend>Modelo desejado</legend>{SHEET_DESIGNS.map(item=><label key={item.id} className={design===item.id?'selected':''}>
@@ -64,16 +90,18 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
           <span className="sheet-design-swatch" style={{background:item.color}} aria-hidden="true"/>
           <span><strong>{item.title}</strong><small>{item.description}</small></span>
         </label>)}</fieldset>
-        <p>As fórmulas e o visual serão substituídos pelos do modelo. Os dados de perfil e publicações reconhecidos serão preservados; personalizações antigas permanecerão na cópia de segurança. Evite editar a aba no Sheets durante a aplicação.</p>
+        <p>As fórmulas e o visual serão substituídos pelos do modelo. Os dados de perfil e publicações reconhecidos serão preservados. Colunas extras e personalizações fora do modelo serão removidas. Use BACKUP antes de aplicar se quiser guardar a versão atual por 7 dias. Não há backup automático. Evite editar a aba no Sheets durante a aplicação.</p>
         {preview&&<div className="sheet-design-confirm">
           <strong>Aba: {preview.tabName}</strong>
           <p>{preview.normalCount} publicações normais e {preview.specialCount} especiais identificadas.</p>
-          <label><input type="checkbox" checked={confirmed} disabled={busy} onChange={event=>setConfirmed(event.target.checked)}/><span>Confirmo a transformação desta aba. Uma cópia Backup AOH será criada antes da substituição.</span></label>
+          {!!preview.discardedCells&&<p>{preview.discardedCells} células com dados extras fora das colunas reconhecidas serão removidas.</p>}
+          <label><input type="checkbox" checked={confirmed} disabled={busy} onChange={event=>setConfirmed(event.target.checked)}/><span>Confirmo a substituição do visual, fórmulas e colunas extras nesta aba, sem criar backup automático.</span></label>
         </div>}
         {message&&<p role="alert">{message}</p>}
       </>}
-      <footer><button type="button" disabled={busy} onClick={()=>setOpen(false)}>{result||uncertain?'FECHAR':'CANCELAR'}</button>
-        {!result&&!uncertain&&<button type="button" className="x-handle-save" disabled={busy||disabled||(!!preview&&!confirmed)} onClick={()=>void run(!!preview)}>{busy?'AGUARDE...':preview?'APLICAR À ABA ATUAL':'CONFERIR SEM ALTERAR'}</button>}
+      <footer>{!backupPanel?<button type="button" className="x-handle-save" disabled={busy||disabled} onClick={()=>{setBackupPanel(true);setMessage('');void runBackup('status')}}>BACKUP</button>:<button type="button" disabled={busy} onClick={()=>{setBackupPanel(false);setMessage('');setPreview(null);setConfirmed(false)}}>VOLTAR</button>}
+        <button type="button" disabled={busy} onClick={()=>setOpen(false)}>{result||uncertain?'FECHAR':'CANCELAR'}</button>
+        {!backupPanel&&!result&&!uncertain&&<button type="button" className="x-handle-save" disabled={busy||disabled||(!!preview&&!confirmed)} onClick={()=>void run(!!preview)}>{busy?'AGUARDE...':preview?'APLICAR À ABA ATUAL':'CONFERIR SEM ALTERAR'}</button>}
       </footer>
     </dialog>,document.body)}
   </>;
