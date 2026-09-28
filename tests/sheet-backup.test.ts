@@ -46,3 +46,36 @@ test('unsupported protected ranges block backup and replacement before writing',
  assert.throws(()=>nativeSnapshot(source),/proteções/);
  assert.throws(()=>replaceNativeSheet(source,designs[1]),/proteções/);
 });
+
+function protectedSheet(){return {...structuredClone(designs[0]),protectedRanges:[{protectedRangeId:123,range:{sheetId:designs[0].properties.sheetId},requestingUserCanEdit:true,editors:{users:['fixture@example.test']}}]}}
+test('whole-sheet protection is backed up, preserved in place for designs and restored without permission requests',()=>{
+ const target=protectedSheet(),snapshot=nativeSnapshot(target);
+ assert.deepEqual((snapshot as any).protectedRanges,target.protectedRanges);
+ assert.deepEqual(openBackup(sealBackup({...fixture,sheet:snapshot},secret),secret,'owner','book',now).sheet,snapshot);
+ for(const requests of [planSheetDesign(target,designs[1],'','2026-09').requests,replaceNativeSheet(target,snapshot)]){
+  assert.ok(requests.length>0);
+  assert.ok(requests.every(r=>!Object.keys(r).some(k=>/ProtectedRange|deleteSheet|addSheet/.test(k))));
+  assert.ok(!JSON.stringify(requests).includes('fixture@example.test'));
+ }
+});
+test('partial, foreign-sheet and exception protections remain blocked',()=>{
+ for(const patch of [{range:{sheetId:designs[0].properties.sheetId,startRowIndex:0,endRowIndex:10}},{range:{sheetId:999}},{unprotectedRanges:[{sheetId:designs[0].properties.sheetId}]},{namedRangeId:'named'}]){
+  const target=protectedSheet();Object.assign(target.protectedRanges[0],patch);
+  assert.throws(()=>nativeSnapshot(target),/proteções/);
+ }
+});
+test('backup is read-only but applying requires current permission; changed protection blocks restore',()=>{
+ const target=protectedSheet(),saved=nativeSnapshot(target);
+ target.protectedRanges[0].requestingUserCanEdit=false;
+ assert.doesNotThrow(()=>nativeSnapshot(target));
+ assert.throws(()=>replaceNativeSheet(target,saved),/permissão/);
+ assert.throws(()=>planSheetDesign(target,designs[1],'','2026-09'),/permissão/);
+ target.protectedRanges[0].requestingUserCanEdit=true;
+ target.protectedRanges[0].editors.users=['changed@example.test'];
+ assert.throws(()=>replaceNativeSheet(target,saved),/mudaram/);
+ assert.throws(()=>replaceNativeSheet(designs[0],saved),/mudaram/);
+ assert.throws(()=>replaceNativeSheet(target,designs[0]),/mudaram/);
+});
+test('other unsupported features keep precise failure messages',()=>{
+ assert.throws(()=>nativeSnapshot({...designs[0],charts:[{}]}),/gráficos \(1\)/);
+});

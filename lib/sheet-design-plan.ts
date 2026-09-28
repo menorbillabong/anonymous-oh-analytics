@@ -107,7 +107,7 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
   }
   if(!newProfile.has('month'))throw new Error('O modelo não possui o campo do mês de referência.');
   const id=target.properties.sheetId;
-  requests.push(...replaceNativeSheet(target,source));
+  requests.push(...replaceNativeSheet(target,source,'design'));
   for(const write of writes){
     requests.push({updateCells:{start:{sheetId:id,rowIndex:write.r,columnIndex:write.c},rows:[{values:[write.cell]}],fields:'userEnteredValue,note,textFormatRuns'+(write.cell.userEnteredFormat?.numberFormat?',userEnteredFormat.numberFormat':'')}});
     const link=wholeCellLinkRequest(id,write.r,write.c,write.cell);if(link)requests.push(link);

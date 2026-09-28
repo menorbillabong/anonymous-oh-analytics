@@ -1,6 +1,19 @@
 import type {DesignSheet,DesignRequest,DesignCell} from './sheet-design-plan.ts';
 
 const cellFields=['userEnteredValue','userEnteredFormat','note','textFormatRuns','dataValidation'] as const;
+type Protection={protectedRangeId?:number;range?:Record<string,number>;namedRangeId?:string;tableId?:string;unprotectedRanges?:unknown[];requestingUserCanEdit?:boolean;[key:string]:unknown};
+function protections(sheet:DesignSheet):Protection[]{return (sheet as DesignSheet & {protectedRanges?:Protection[]}).protectedRanges||[]}
+// Whole-sheet protections remain on the same sheetId throughout replacement.
+// Never delete/recreate protections or write editors/warningOnly permissions.
+function validateProtections(sheet:DesignSheet){
+  for(const p of protections(sheet))if(!Number.isInteger(p.protectedRangeId)||!p.range||p.range.sheetId!==sheet.properties.sheetId||Object.keys(p.range).some(key=>key!=='sheetId')||p.namedRangeId||p.tableId||p.unprotectedRanges?.length){
+    throw new Error('Esta aba contém proteções parciais ou com exceções ainda não suportadas. As proteções foram mantidas e nada foi alterado.');
+  }
+}
+function protectionSignature(sheet:DesignSheet){
+  const canonical=(value:unknown):unknown=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.entries(value).filter(([key])=>key!=='requestingUserCanEdit').sort(([a],[b])=>a.localeCompare(b)).map(([key,item])=>[key,canonical(item)])):value;
+  return JSON.stringify(protections(sheet).map(p=>canonical(p)).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b))));
+}
 // Clearing textFormatRuns in a broad cell update also clears whole-cell links in
 // Sheets. Restore those links last with a narrow mask, after values/runs/merges.
 export function wholeCellLinkRequest(sheetId:number,rowIndex:number,columnIndex:number,cell:DesignCell):DesignRequest|null{
@@ -9,7 +22,8 @@ export function wholeCellLinkRequest(sheetId:number,rowIndex:number,columnIndex:
 }
 export function nativeSnapshot(sheet:DesignSheet):DesignSheet{
   const raw=sheet as DesignSheet & Record<string,any>;
-  const unsupported:Record<string,string>={charts:'gráficos',tables:'tabelas',bandedRanges:'cores alternadas',filterViews:'visualizações de filtro',rowGroups:'agrupamentos de linhas',columnGroups:'agrupamentos de colunas',slicers:'segmentações de dados',developerMetadata:'metadados personalizados',protectedRanges:'proteções de intervalos'};
+  validateProtections(sheet);
+  const unsupported:Record<string,string>={charts:'gráficos',tables:'tabelas',bandedRanges:'cores alternadas',filterViews:'visualizações de filtro',rowGroups:'agrupamentos de linhas',columnGroups:'agrupamentos de colunas',slicers:'segmentações de dados',developerMetadata:'metadados personalizados'};
   const found=Object.entries(unsupported).filter(([key])=>raw[key]?.length).map(([key,label])=>`${label} (${raw[key].length})`);
   if(raw.basicFilter)found.push('filtro básico');
   if(found.length)throw new Error(`Não foi possível concluir: esta aba contém ${found.join(', ')}, ainda não suportados nesta operação. Nenhum backup foi salvo e a planilha não foi alterada.`);
@@ -23,9 +37,13 @@ export function nativeSnapshot(sheet:DesignSheet):DesignSheet{
 }
 
 // No copyPaste/duplicateSheet: source is a server snapshot, never a live template tab.
-export function replaceNativeSheet(target:DesignSheet,input:DesignSheet):DesignRequest[]{
+export function replaceNativeSheet(target:DesignSheet,input:DesignSheet,mode:'restore'|'design'='restore'):DesignRequest[]{
   nativeSnapshot(target);
   const source=nativeSnapshot(input),id=target.properties.sheetId,grid=source.properties.gridProperties;
+  if(protections(target).some(p=>p.requestingUserCanEdit!==true))throw new Error('A integração do site não tem permissão para editar esta aba protegida. Nenhuma proteção foi removida e nada foi alterado.');
+  if(mode==='design'){
+    if(protections(source).length)throw new Error('O modelo contém proteções próprias e não pode substituir as permissões da sua aba.');
+  }else if(protectionSignature(target)!==protectionSignature(source))throw new Error('As proteções da aba mudaram desde o backup. A restauração foi bloqueada para não alterar permissões.');
   const requests:DesignRequest[]=[];
   if(target.merges?.length)requests.push({unmergeCells:{range:{sheetId:id}}});
   for(let index=(target.conditionalFormats?.length||0)-1;index>=0;index--)requests.push({deleteConditionalFormatRule:{sheetId:id,index}});
