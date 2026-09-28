@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { extractTimelineData, pinnedStatusIdFromProfileHtml, postsWithinDateRange, timelineCursorFromFxData, timelinePostsFromData, timelinePostsFromFxData, xPostDateKey, type XTimelinePost } from '@/lib/x-timeline';
+import { pinnedStatusIdFromProfileHtml, postsWithinDateRange, timelinePostsFromFxData, xPostDateKey, type XTimelinePost } from '@/lib/x-timeline';
+import { fetchPublicTimeline, X_PARTIAL_WARNING } from '@/lib/x-timeline-fetch';
 
-const X_TIMELINE_HOSTS = ['https://syndication.x.com', 'https://syndication.twitter.com'];
-const FX_TIMELINE_URL = 'https://api.fxtwitter.com/2/profile';
+export const maxDuration = 60;
 const FX_STATUS_URL = 'https://api.fxtwitter.com/2/status';
 const X_PROFILE_URL = 'https://x.com';
 
@@ -18,6 +18,7 @@ async function claimImport(token: string) {
   const response = await fetch(`${url}/rest/v1/rpc/claim_my_x_import_request`, {
     method: 'POST',
     cache: 'no-store',
+    signal: AbortSignal.timeout(8_000),
     headers: {
       apikey: key,
       authorization: `Bearer ${token}`,
@@ -34,76 +35,6 @@ async function claimImport(token: string) {
     throw new Error('X_IMPORT_NOT_ALLOWED');
   }
   return payload as { handle?: string; limit?: number; start_date?: string };
-}
-
-async function fetchTimeline(handle: string, limit: number, startDate: string, endDate: string) {
-  const collected = new Map<string, XTimelinePost>();
-  const since = Math.floor(new Date(`${startDate}T00:00:00-03:00`).getTime() / 1000) - 1;
-  let cursor: string | null = null;
-  try {
-    for (let page = 0; page < 5 && collected.size < limit; page++) {
-      const fxController = new AbortController();
-      const fxTimeout = setTimeout(() => fxController.abort(), 9_000);
-      try {
-        const query = cursor
-          ? `count=100&cursor=${encodeURIComponent(cursor)}`
-          : `count=100&since=${since}`;
-        const response = await fetch(`${FX_TIMELINE_URL}/${encodeURIComponent(handle)}/statuses?${query}`, {
-          cache: 'no-store',
-          signal: fxController.signal,
-          headers: {
-            accept: 'application/json',
-            'user-agent': 'AnonymousOHAnalytics/2.0 (public X post importer)',
-          },
-        });
-        if (response.status === 204) break;
-        if (!response.ok) throw new Error('X_TIMELINE_FALLBACK');
-        const body = await response.text();
-        if (body.length > 5_000_000) throw new Error('X_TIMELINE_UNAVAILABLE');
-        const payload = JSON.parse(body);
-        for (const post of timelinePostsFromFxData(payload, handle, 100)) collected.set(post.id, post);
-        cursor = timelineCursorFromFxData(payload);
-        if (!cursor) break;
-      } finally {
-        clearTimeout(fxTimeout);
-      }
-    }
-    if (collected.size || !cursor) {
-      return postsWithinDateRange([...collected.values()], startDate, endDate).slice(0, limit);
-    }
-  } catch (error) {
-    if (error instanceof Error && error.message === 'X_TIMELINE_UNAVAILABLE') throw error;
-  }
-
-  let rateLimited = false;
-  for (const host of X_TIMELINE_HOSTS) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 9_000);
-    try {
-      const response = await fetch(`${host}/srv/timeline-profile/screen-name/${encodeURIComponent(handle)}`, {
-        cache: 'no-store',
-        signal: controller.signal,
-        headers: {
-          accept: 'text/html,application/xhtml+xml',
-          'user-agent': 'Mozilla/5.0 (compatible; AnonymousOHAnalytics/2.0)',
-        },
-      });
-      if (response.status === 429) {
-        rateLimited = true;
-        continue;
-      }
-      if (!response.ok) continue;
-      const html = await response.text();
-      if (html.length > 5_000_000) throw new Error('X_TIMELINE_UNAVAILABLE');
-      const posts = postsWithinDateRange(timelinePostsFromData(extractTimelineData(html), handle, limit), startDate, endDate);
-      if (posts.length) return posts;
-    } catch (error) {
-      if (error instanceof Error && error.name === 'AbortError') continue;
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-  throw new Error(rateLimited ? 'X_TIMELINE_RATE_LIMITED' : 'X_TIMELINE_UNAVAILABLE');
 }
 
 async function fetchPinnedPost(handle: string) {
@@ -177,7 +108,7 @@ function bestVideo(media: any) {
 
 async function enrichPost(post: XTimelinePost) {
   try {
-    const response = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(post.author_handle)}/status/${post.id}`, { cache: 'no-store' });
+    const response = await fetch(`https://api.fxtwitter.com/${encodeURIComponent(post.author_handle)}/status/${post.id}`, { cache: 'no-store', signal: AbortSignal.timeout(5_000) });
     if (!response.ok) return post;
     const payload = await response.json();
     const tweet = payload?.tweet || payload?.status;
@@ -214,12 +145,12 @@ export async function POST(request: Request) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate)) throw new Error('X_IMPORT_PERIOD_REQUIRED');
     const endDate = xPostDateKey(new Date().toISOString());
     const [timeline, pinned] = await Promise.all([
-      fetchTimeline(handle, limit, startDate, endDate),
+      fetchPublicTimeline(handle, limit, startDate, endDate),
       fetchPinnedPost(handle),
     ]);
-    const mergedTimeline = mergeTimelineWithPinnedPost(timeline, pinned, startDate, endDate, limit);
+    const mergedTimeline = mergeTimelineWithPinnedPost(timeline.posts, pinned, startDate, endDate, limit);
     const posts = await Promise.all(mergedTimeline.map(post => post.views === undefined ? enrichPost(post) : post));
-    return NextResponse.json({ handle, period_start: startDate, period_end: endDate, posts }, { headers: { 'cache-control': 'no-store' } });
+    return NextResponse.json({ handle, period_start: startDate, period_end: endDate, posts, partial: timeline.partial, warning: timeline.partial ? X_PARTIAL_WARNING : null }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     const code = error instanceof Error ? error.message : 'X_TIMELINE_UNAVAILABLE';
     if (code === 'X_IMPORT_RATE_LIMIT') return NextResponse.json({ error: 'Aguarde alguns segundos antes de buscar novamente.' }, { status: 429 });
@@ -227,6 +158,8 @@ export async function POST(request: Request) {
     if (code === 'X_IMPORT_PERIOD_REQUIRED') return NextResponse.json({ error: 'Abra um período no Painel antes de buscar publicações no X.' }, { status: 409 });
     if (code === 'X_IMPORT_NOT_ALLOWED') return NextResponse.json({ error: 'A busca automática não está liberada para esta conta.' }, { status: 403 });
     if (code === 'CONFIGURATION_ERROR') return NextResponse.json({ error: 'A busca automática não está configurada.' }, { status: 500 });
+    console.warn('[x-import:failed]', { reason: ['X_TIMELINE_RATE_LIMITED', 'X_TIMELINE_UNAVAILABLE'].includes(code) ? code : 'unexpected' });
+    if (code === 'X_TIMELINE_RATE_LIMITED') return NextResponse.json({ error: 'O serviço de consulta do X está limitando as buscas agora. Aguarde um pouco e tente novamente, ou use a adição manual.' }, { status: 503 });
     return NextResponse.json({ error: 'O X não liberou a lista pública agora. Tente novamente depois ou use a adição manual.' }, { status: 503 });
   }
 }
