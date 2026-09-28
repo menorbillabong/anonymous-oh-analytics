@@ -9,3 +9,11 @@ test('no active normal profile never silently defaults to a bonus',()=>{
  assert.equal(firstNormalMissionId([]),'');
  assert.equal(firstNormalMissionId([{id:2,active:true,reward:'0'}]),'2');
 });
+
+test('the built-in normal profile wins over earlier custom profiles and survives renaming',()=>{
+ assert.equal(firstNormalMissionId([{id:1,active:true,reward:0},{id:2,active:true,reward:0,builtin_kind:'normal'},{id:3,active:true,reward:200,builtin_kind:'hq'}]),'2');
+});
+
+test('an inactive built-in falls back to the first active non-bonus profile',()=>{
+ assert.equal(firstNormalMissionId([{id:1,active:false,reward:0,builtin_kind:'normal'},{id:2,active:true,reward:0}]),'2');
+});
