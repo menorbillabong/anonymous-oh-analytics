@@ -64,3 +64,19 @@ prevent users overriding server-managed expiry timestamps.
 Rollback: revert this feature commit; the additive backup table and expiry job can
 remain without affecting the prior application. Never restore a user's sheet
 automatically after rollback; ask them to review changes since backup and confirm.
+
+## Registered former-template tabs and footer correction — 2026-09-28
+
+- Removed only the former template sheet-ID denylist in the shared registered-tab
+  reader. Designs are embedded; a registered DESIGN 2 tab is a valid user target.
+  Legacy backup-tab protection, bounds, workbook constraint, authenticated route
+  ownership, permission rechecks and confirmation remain unchanged.
+- Added six regression tests covering all four former source IDs, exact registered
+  tab lookup, oversized tabs and legacy backup protection. All 179 tests pass.
+- Dialog footer uses equal-width grid columns, shared 44px minimum height,
+  padding and typography. Backup remains left of Cancel; on narrow screens the
+  third action spans a second row. Changes are scoped to this dialog.
+- Production build passed using placeholder public Supabase values for local
+  prerendering, without production credentials. Vercel builds with its own env.
+- Browser visual and authenticated production save/apply remain unverified.
+  No user spreadsheet was written during this correction.

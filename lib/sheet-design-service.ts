@@ -1,7 +1,7 @@
 import 'server-only';
 import {createHash} from 'node:crypto';
 import {accessToken,googleRequest as sheetsRequest,SHEETS_API} from './google-sheets';
-import {sheetDesign,SHEET_DESIGNS} from './sheet-designs';
+import {sheetDesign} from './sheet-designs';
 import {designGrid,planSheetDesign,type DesignSheet} from './sheet-design-plan';
 import packedBlueprints from './sheet-design-blueprints.json';
 import {nativeSnapshot,replaceNativeSheet} from './sheet-native-snapshot';
@@ -25,7 +25,9 @@ export async function readRegisteredSheet(tabName:string){
   const metadata=await googleRequest(`${base}?fields=sheets(properties)`,token) as {sheets:DesignSheet[]};
   const targetMeta=metadata.sheets.find(s=>s.properties.title===tabName);
   if(!targetMeta)throw new Error('Não encontrei a aba vinculada.');
-  if(SHEET_DESIGNS.some(d=>d.sheetId===targetMeta.properties.sheetId)||/^Backup AOH /i.test(tabName))throw new Error('Esta aba é um modelo ou uma cópia de segurança e não pode ser transformada.');
+  // Designs are embedded in the site. Their former source tabs may now be
+  // registered user tabs; the authenticated routes control access to them.
+  if(/^Backup AOH /i.test(tabName))throw new Error('Esta aba é uma cópia de segurança e não pode ser transformada.');
   const result=await googleRequest(`${base}?ranges=${encodeURIComponent(bounds(targetMeta))}&includeGridData=true`,token) as {sheets:DesignSheet[]};
   const target=result.sheets.find(s=>s.properties.sheetId===targetMeta.properties.sheetId)!;
   if(!target)throw new Error('Não foi possível conferir as células da planilha.');
