@@ -13,6 +13,10 @@
 .sheet-backup-actions{display:flex;flex-wrap:wrap;gap:10px;margin:16px 0}
 .sheet-backup-actions button,.sheet-design-confirm>button{padding:12px 16px;border-radius:8px;border:1px solid #444;cursor:pointer}
 .sheet-design-dialog .x-handle-save{background:#ffb43b;color:#111;border-color:#ffb43b;font-weight:800}
+.sheet-operation-message{margin:16px 0;padding:14px;border:1px solid;border-radius:9px;overflow-wrap:anywhere}
+.sheet-operation-message.error{color:#ffc9c9;background:#381919;border-color:#d95e5e}
+.sheet-operation-message.success,.sheet-backup-summary{color:#c0f3d4;background:#152b20;border:1px solid #418f61;border-radius:9px;padding:14px}
+.sheet-operation-message p{margin:6px 0 0}
 .sheet-design-dialog footer{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:stretch;gap:10px}
 .sheet-design-dialog footer>button{box-sizing:border-box;display:flex;align-items:center;justify-content:center;width:100%;min-width:0;min-height:44px;margin:0;padding:10px 12px;line-height:1.4;font-size:12px;font-weight:800;text-align:center;white-space:normal;overflow-wrap:anywhere}
 .sheet-design-dialog footer:not(:has(>button:nth-child(3))){grid-template-columns:repeat(2,minmax(0,1fr))}

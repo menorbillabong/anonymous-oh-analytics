@@ -9,8 +9,10 @@ export function wholeCellLinkRequest(sheetId:number,rowIndex:number,columnIndex:
 }
 export function nativeSnapshot(sheet:DesignSheet):DesignSheet{
   const raw=sheet as DesignSheet & Record<string,any>;
-  if(['charts','tables','bandedRanges','filterViews','rowGroups','columnGroups','slicers','developerMetadata','protectedRanges'].some(k=>raw[k]?.length)||raw.basicFilter)
-    throw new Error('Esta aba contém gráficos, tabelas, filtros, proteções ou agrupamentos que ainda não podem ser preservados pelo backup do site. Nada foi alterado.');
+  const unsupported:Record<string,string>={charts:'gráficos',tables:'tabelas',bandedRanges:'cores alternadas',filterViews:'visualizações de filtro',rowGroups:'agrupamentos de linhas',columnGroups:'agrupamentos de colunas',slicers:'segmentações de dados',developerMetadata:'metadados personalizados',protectedRanges:'proteções de intervalos'};
+  const found=Object.entries(unsupported).filter(([key])=>raw[key]?.length).map(([key,label])=>`${label} (${raw[key].length})`);
+  if(raw.basicFilter)found.push('filtro básico');
+  if(found.length)throw new Error(`Não foi possível concluir: esta aba contém ${found.join(', ')}, ainda não suportados nesta operação. Nenhum backup foi salvo e a planilha não foi alterada.`);
   const snapshot=structuredClone(sheet);
   for(const grid of snapshot.data||[])for(const row of grid.rowData||[])row.values=(row.values||[]).map(cell=>{
     const c=cell as Record<string,any>;
