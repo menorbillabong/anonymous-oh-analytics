@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {buildDesignBlocks,shiftTemplateFormula} from '../lib/sheet-design-blocks.ts';
+import {buildDesignBlocks,shiftTemplateFormula,insertTemplateFormulaRow} from '../lib/sheet-design-blocks.ts';
 import {designGrid,planSheetDesign,type DesignSheet,type DesignCell} from '../lib/sheet-design-plan.ts';
 import {headerLayoutForRow,planSheetUpdates} from '../lib/google-sheets-plan.ts';
 
@@ -22,6 +22,10 @@ test('formula extension respects absolute rows and quoted strings',()=>{
  assert.equal(shiftTemplateFormula('=IF(A18="A18",$B$3+$B18+B$18+SUM($C$18:C18),"say ""A18""")',100),'=IF(A118="A18",$B$3+$B118+B$18+SUM($C$18:C118),"say ""A18""")');
 });
 
+test('template insertion moves relative and absolute references without changing quoted text',()=>{
+ assert.equal(insertTemplateFormulaRow('=SUM($A$18:A19)+B$3+IF(A14="A18",$C15,0)',14),'=SUM($A$19:A20)+B$3+IF(A14="A18",$C16,0)');
+});
+
 for(const source of designs){
  test(`${source.properties.title}: all existing formula rows agree with expansion; last block capacity is 60`,()=>{
   const rows=designGrid(source),h=header(source);
@@ -33,13 +37,34 @@ for(const source of designs){
   assert.equal(JSON.stringify(source),before);assert.deepEqual(expanded.capacities,[130,60]);
   assert.equal(expanded.rowCount-expanded.headers[1]-1,60);
   const result=designGrid(expanded.sheet);
-  assert.deepEqual(result.slice(0,h.row),rows.slice(0,h.row));
+  const inserted=expanded.headers[0]-h.row;
+  assert.ok(inserted===0||inserted===1);
+  const top=structuredClone(rows.slice(0,h.row-2));
+  if(inserted)for(const row of top)for(const c of row)if(c.userEnteredValue?.formulaValue)c.userEnteredValue.formulaValue=insertTemplateFormulaRow(c.userEnteredValue.formulaValue,h.row-2);
+  assert.deepEqual(result.slice(0,h.row-2),top);
   assert.ok(headerLayoutForRow(result[expanded.headers[1]].map(c=>c.userEnteredValue?.stringValue||''),expanded.headers[1]));
   for(const blockHeader of expanded.headers)for(const r of [blockHeader+1,blockHeader+expanded.capacities[expanded.headers.indexOf(blockHeader)]]){
    for(const columns of [h.normal,h.special])assert.ok(result[r][columns.eligible!].userEnteredValue?.formulaValue?.includes('<=75'));
   }
-  assert.equal(result.at(-1)![h.normal.eligible!].userEnteredValue?.formulaValue,shiftTemplateFormula(rows[h.row+2][h.normal.eligible!].userEnteredValue!.formulaValue!,expanded.rowCount-1-h.row-2));
+  const baseFormula=rows[h.row+2][h.normal.eligible!].userEnteredValue!.formulaValue!;
+  assert.equal(result.at(-1)![h.normal.eligible!].userEnteredValue?.formulaValue,shiftTemplateFormula(inserted?insertTemplateFormulaRow(baseFormula,h.row-2):baseFormula,expanded.rowCount-1-h.row-2-inserted));
   assert.equal(expanded.sheet.data![0].rowMetadata?.length,expanded.rowCount);
+ });
+
+ test(`${source.properties.title}: every block keeps three title rows, styling and merges outside data capacity`,()=>{
+  const rows=designGrid(source),h=header(source),out=buildDesignBlocks(source,rows,h.row,[2,0,3,45]),result=designGrid(out.sheet);
+  const first=out.headers[0],inserted=first-h.row;
+  for(const [i,b] of out.headers.entries()){
+   assert.ok(result[b-3].every(c=>!c.userEnteredValue));
+   assert.deepEqual(result.slice(b-2,b+1),rows.slice(h.row-2,h.row+1));
+   assert.deepEqual(result.slice(b-3,b+1),result.slice(first-3,first+1));
+   assert.deepEqual(out.sheet.data![0].rowMetadata!.slice(b-3,b+1).map(x=>x.pixelSize),out.sheet.data![0].rowMetadata!.slice(first-3,first+1).map(x=>x.pixelSize));
+   if(i)assert.equal(b-out.headers[i-1]-1-out.capacities[i-1],3);
+   for(const m of source.merges!.filter(m=>(m.startRowIndex||0)>=h.row-2))assert.ok(out.sheet.merges!.some(n=>n.startRowIndex===m.startRowIndex!+inserted+b-first&&n.endRowIndex===m.endRowIndex!+inserted+b-first&&n.startColumnIndex===m.startColumnIndex&&n.endColumnIndex===m.endColumnIndex));
+  }
+  assert.equal(out.rowCount-out.headers.at(-1)!-1,60);
+  for(const m of out.sheet.merges!)assert.ok(m.endRowIndex!<=out.rowCount);
+  for(const rule of out.sheet.conditionalFormats||[])for(const r of (rule as any).ranges)assert.ok(r.startRowIndex<r.endRowIndex&&r.endRowIndex<=out.rowCount);
  });
 
  test(`${source.properties.title}: old history beyond 100 stays separate; ordinary sync targets only last header`,()=>{

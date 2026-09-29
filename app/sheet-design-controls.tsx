@@ -104,6 +104,7 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
           <p>{preview.normalCount} publicações normais e {preview.specialCount} especiais identificadas.</p>
           <p>Serão mantidos os campos reconhecidos do perfil e das publicações, inclusive em linhas ocultas ou agrupadas. Datas e valores de entrada não serão recalculados pela troca.</p>
           {!!preview.sourceSections&&preview.sourceSections>1&&<p>{preview.sourceSections} blocos de publicações serão mantidos separados, com seus cabeçalhos, na ordem original. O histórico não ocupará a capacidade do último bloco.</p>}
+          <p>Cada bloco terá três linhas acima do cabeçalho, com separação e os títulos Normal Mission / Special Mission nas cores do modelo. Essas três linhas e o cabeçalho não entram na capacidade de publicações.</p>
           <p>Capacidade abaixo do último cabeçalho: {preview.capacity} linhas por seção, incluindo as já preenchidas{preview.currentBlockRows!==undefined?` (${preview.currentBlockRows} linhas ocupadas; ${Math.max(0,preview.capacity-preview.currentBlockRows)} totalmente livres)`:''}. Isso não altera os limites de recompensa.</p>
           {preview.capacityExpanded&&<p role="note">O último bloco já utiliza mais de 60 linhas. O espaço foi ampliado para preservar todas as publicações existentes.</p>}
           <p>Serão recriados: visual, colunas, validações e fórmulas do modelo{preview.replacedFormulas!==undefined?` (${preview.replacedFormulas} fórmulas antigas substituídas)`:''}.</p>

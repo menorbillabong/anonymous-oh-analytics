@@ -22,8 +22,8 @@ for(const from of designs)for(const to of designs)test(`${from.properties.title}
   assert.equal(plan.normalCount,2);assert.equal(plan.specialCount,1);
   assert.ok(!plan.requests.some(r=>r.duplicateSheet||r.copyPaste||r.addSheet));
   assert.ok(plan.requests.some(r=>(r.updateSheetProperties as any)?.properties?.gridProperties?.columnCount===to.properties.gridProperties.columnCount));
-  assert.equal(plan.writes.find(w=>w.r===next.row+1&&w.c===next.normal.likes)?.cell.userEnteredValue?.numberValue,10);
-  assert.equal(plan.writes.find(w=>w.r===next.row+1&&w.c===next.special.reward)?.cell.userEnteredValue?.numberValue,200);
+  assert.equal(plan.writes.find(w=>w.r===plan.blockHeaders[0]+1&&w.c===next.normal.likes)?.cell.userEnteredValue?.numberValue,10);
+  assert.equal(plan.writes.find(w=>w.r===plan.blockHeaders[0]+1&&w.c===next.special.reward)?.cell.userEnteredValue?.numberValue,200);
   assert.ok(plan.writes.some(w=>w.r<next.row&&w.cell.userEnteredValue?.stringValue==='Fixture user'));
   assert.ok(!JSON.stringify(plan.requests).includes('deleteSheet'));
   assert.ok(plan.requests.every(r=>Object.keys(r).length===1));

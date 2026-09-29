@@ -39,6 +39,14 @@ ordem dos dados. Não altera datas/valores literais de entrada. Não adivinha
 cabeçalhos ambíguos, não converte fórmulas de entrada em valores e não descarta
 publicações por falta de capacidade.
 
+Nos quatro modelos, cada bloco conserva três linhas acima do cabeçalho: separação,
+títulos Normal Mission / Special Mission e espaçamento (incluindo as mesclagens
+verticais do modelo). Cores, formatos e alturas acompanham o modelo escolhido.
+Quando o resumo ocupa a linha de separação, insere uma linha sem apagar o resumo
+e ajusta as referências das fórmulas, inclusive absolutas. A faixa de identificação
+é repetida inteira; não repete as informações do resumo nos blocos históricos.
+As três linhas e o próprio cabeçalho ficam fora da capacidade de publicações.
+
 Cada bloco identificado conserva um cabeçalho no novo design; os blocos antigos
 não são misturados ao atual. Linhas vazias intermediárias são compactadas, mantendo
 a ordem e o pareamento das publicações normais/especiais. O último bloco recebe
