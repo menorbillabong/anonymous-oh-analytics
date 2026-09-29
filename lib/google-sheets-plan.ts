@@ -215,9 +215,10 @@ export function planSheetUpdates(tabName:string,rows:unknown[][],posts:SheetPost
   }
 
   if(manualLikes!==expectedManual)throw new Error('MANUAL_ADJUSTMENT_SHEET_MISMATCH');
-  if(manualLikes){
-    for(const section of [layout.normal,layout.special])if(section.likes!==undefined){
-      updates.push({range:cellRange(tabName,section.likes,layout.row),values:[['Likes (X + manual)']]});
+  // Preserve existing labels; only undo the exact legacy label written by the site.
+  for(const section of [layout.normal,layout.special]){
+    if(section.likes!==undefined&&rows[layout.row]?.[section.likes]==='Likes (X + manual)'){
+      updates.push({range:cellRange(tabName,section.likes,layout.row),values:[['Likes']]});
     }
   }
   return{updates,normalCount,specialCount,skippedOutsideMonth,manualLikes};

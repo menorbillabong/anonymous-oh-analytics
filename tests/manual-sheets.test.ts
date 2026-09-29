@@ -8,15 +8,44 @@ const posts=[{post_url:'https://x.com/a/status/1',published_at:'2026-09-02',like
 const legacyNote='[AOH MANUAL ADJUSTMENT]\nX likes: 10\nManual adjustment: +150\nTotal: 160\n[/AOH MANUAL ADJUSTMENT]';
 const likeValues=(plan:ReturnType<typeof planSheetUpdates>)=>plan.updates.filter(u=>/![BE][2-9]\d*$/.test(u.range));
 
-test('sheet gets exactly real plus 150 and visible headers without creating notes',()=>{
+test('sheet gets exactly real plus 150 without changing headers or creating notes',()=>{
  const plan=planSheetUpdates('Tab',rows,posts,'2026-09',config);
  assert.equal(plan.manualLikes,150);
  assert.equal(likeValues(plan).reduce((a,u)=>a+Number(u.values[0][0]),0),180);
- assert.equal(plan.updates.filter(u=>u.values[0][0]==='Likes (X + manual)').length,2);
+ assert.ok(plan.updates.every(u=>!/[A-Z]+1$/.test(u.range)));
  assert.deepEqual(planSheetUpdates('Tab',rows,posts,'2026-09',config),plan);
  const requests=sheetBatchRequests(plan.updates,7,new Map());
  assert.ok(requests.every(r=>r.updateCells.fields==='userEnteredValue'));
  assert.ok(requests.every(r=>!('note' in r.updateCells.rows[0].values[0])));
+});
+
+test('original header spelling and whitespace remain untouched with manual likes',()=>{
+ const original=[['Content Link',' LIKES ','','Content Link','likes','Reward']];
+ const before=JSON.stringify(original);
+ const plan=planSheetUpdates('Tab',original,posts,'2026-09',config);
+ assert.ok(plan.updates.every(u=>!/[A-Z]+1$/.test(u.range)));
+ assert.equal(likeValues(plan).reduce((a,u)=>a+Number(u.values[0][0]),0),180);
+ assert.equal(JSON.stringify(original),before);
+});
+
+test('legacy labels return to Likes with adjustment enabled, disabled, revoked or absent',()=>{
+ const legacy=[['Content Link','Likes (X + manual)','','Content Link','Likes (X + manual)','Reward']];
+ for(const settings of [config,{...config,enabled:false},{...config,allowed:false},undefined]){
+  const plan=planSheetUpdates('Tab',legacy,posts,'2026-09',settings);
+  assert.deepEqual(plan.updates.filter(u=>/[A-Z]+1$/.test(u.range)),[
+   {range:"'Tab'!B1",values:[['Likes']]},{range:"'Tab'!E1",values:[['Likes']]},
+  ]);
+  const total=settings?.enabled&&settings.allowed?180:30;
+  assert.equal(likeValues(plan).reduce((a,u)=>a+Number(u.values[0][0]),0),total);
+  const restored=planSheetUpdates('Tab',rows,posts,'2026-09',settings);
+  assert.ok(restored.updates.every(u=>!/[A-Z]+1$/.test(u.range)));
+ }
+});
+
+test('header repair stays in the current block and changes only the site legacy label',()=>{
+ const legacy=['Content Link','Likes (X + manual)','','Content Link',' LIKES ','Reward'];
+ const plan=planSheetUpdates('Tab',[legacy,[],legacy],[], '2026-09');
+ assert.deepEqual(plan.updates,[{range:"'Tab'!B3",values:[['Likes']]}]);
 });
 test('disabling or revoking restores original values with no accumulating extras',()=>{
  for(const settings of [{...config,enabled:false},{...config,allowed:false}]){
