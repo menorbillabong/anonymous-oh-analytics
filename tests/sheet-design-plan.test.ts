@@ -92,3 +92,74 @@ test('extra content on a repeated header row is not silently discarded',()=>{
  assert.equal(p.discardedCells,before.discardedCells+1);
  assert.ok(p.discardedExamples.includes(`Z${l.row+1}`));
 });
+
+function legacyHistoricalBlock(){
+ const s=target(designs.find(s=>s.properties.title==='DESIGN 1')!),l=layout(s),header=l.row+10,r=header+1;
+ for(let i=0;i<=r+2;i++)s.data![0].rowData![i]??={values:[]};
+ s.data![0].rowData![header]=structuredClone(s.data![0].rowData![l.row]);
+ const month=l.special.month!,helper=month-1;
+ put(s,header,helper,cell('Month'));put(s,header,month,cell(''));
+ put(s,r,helper,{userEnteredValue:{formulaValue:`=IF(K${r+1}="","",COUNTIF($K$18:K${r+1},K${r+1}))`},effectiveValue:{numberValue:1}});
+ put(s,r,month,cell('2026-07'));
+ put(s,r,l.special.publishDate!,{...cell(46198),userEnteredFormat:{numberFormat:{type:'DATE',pattern:'yyyy-mm-dd'}}});
+ put(s,r,l.special.contentLink!,cell('https://x.com/fixture/status/999'));
+ return {s,l,header,r,month,helper};
+}
+
+test('legacy separator titles and placeholder rows do not become publications',()=>{
+ const s=target(designs.find(s=>s.properties.title==='DESIGN 1')!),l=layout(s),r=l.row+2;
+ post(s,1);post(s,3,true);
+ put(s,r,l.normal.month!,cell('Normal Mission'));
+ put(s,r,l.special.publishDate!,cell('Special Mission'));
+ put(s,r,l.special.likes!,{userEnteredValue:{formulaValue:'=IF(1,1,)'},effectiveValue:{numberValue:1}});
+ put(s,r+2,l.special.contentLink!,cell('-'));
+ const p=planSheetDesign(s,designs[1],'');
+ assert.equal(p.normalCount,1);assert.equal(p.specialCount,1);
+ assert.ok(!p.writes.some(w=>['Normal Mission','Special Mission','-'].includes(w.cell.userEnteredValue?.stringValue||'')));
+ assert.ok(p.discardedCells>0);assert.ok(p.replacedFormulas>0);
+});
+
+test('legacy shifted month uses the referenced month, never the count or publication date',()=>{
+ const {s,l,r,month,helper}=legacyHistoricalBlock();
+ put(s,r,month,{...cell('2026-07'),note:'original settlement month'});
+ put(s,r+1,helper,{userEnteredValue:{formulaValue:`=IF(K${r+2}="","",COUNTIF($K$18:K${r+2},K${r+2}))`},effectiveValue:{stringValue:''}});
+ put(s,r+1,l.special.contentLink!,cell('-'));
+ const before=JSON.stringify(s),p=planSheetDesign(s,designs[1],''),next=layout(designs[1]);
+ assert.equal(JSON.stringify(s),before);assert.equal(p.sourceSections,2);assert.equal(p.specialCount,1);assert.equal(p.normalCount,0);
+ const monthWrite=p.writes.find(w=>w.c===next.special.month&&w.r===next.row+1)!;
+ assert.equal(monthWrite.cell.userEnteredValue?.stringValue,'2026-07');
+ assert.equal(monthWrite.cell.note,'original settlement month');
+ assert.equal(p.writes.find(w=>w.c===next.special.publishDate&&w.r===next.row+1)?.cell.userEnteredValue?.numberValue,46198);
+});
+
+test('ambiguous month mappings and unknown input formulas still block with the cell address',()=>{
+ for(const variation of ['wrong-reference','wrong-row','month-formula','invalid-month','occupied-header','helper-note']){
+  const {s,header,r,month,helper}=legacyHistoricalBlock();
+  if(variation==='wrong-reference')put(s,r,helper,{userEnteredValue:{formulaValue:`=IF(K${r+1}="","",COUNTIF($L$18:K${r+1},K${r+1}))`},effectiveValue:{numberValue:1}});
+  if(variation==='wrong-row')put(s,r,helper,{userEnteredValue:{formulaValue:'=IF(K18="","",COUNTIF($K$18:K18,K18))'},effectiveValue:{numberValue:1}});
+  if(variation==='month-formula')put(s,r,month,{userEnteredValue:{formulaValue:'="2026-07"'},effectiveValue:{stringValue:'2026-07'}});
+  if(variation==='invalid-month')put(s,r,month,cell('2026-99'));
+  if(variation==='occupied-header')put(s,header,month,cell('Custom field'));
+  if(variation==='helper-note')s.data![0].rowData![r].values![helper].note='keep this note';
+  assert.throws(()=>planSheetDesign(s,designs[1],''),new RegExp(`J${r+1}`),variation);
+ }
+});
+
+test('incomplete posts and notes remain preserved; custom formulas on posts still block even with empty results',()=>{
+ const s=target(designs[0]),l=layout(s),r=l.row+1;
+ put(s,r,l.normal.month!,cell('2026-09'));
+ put(s,r+1,l.special.contentLink!,{...cell(''),note:'Incomplete post'});
+ let p=planSheetDesign(s,designs[1],'');
+ assert.equal(p.normalCount,1);assert.equal(p.specialCount,1);
+ assert.ok(p.writes.some(w=>w.cell.note==='Incomplete post'));
+ put(s,r+2,l.normal.likes!,{userEnteredValue:{formulaValue:'=IF(TRUE,"",1)'},effectiveValue:{stringValue:''}});
+ assert.equal(planSheetDesign(s,designs[1],'').normalCount,1);
+ put(s,r+2,l.normal.contentLink!,cell('https://x.com/fixture/status/555'));
+ assert.throws(()=>planSheetDesign(s,designs[1],''),/fórmulas personalizadas.*\([A-Z]+\d+\)/);
+});
+
+test('a real publication is not skipped just because its theme names a mission',()=>{
+ const s=target(designs[0]),l=layout(s);post(s,1,true);
+ put(s,l.row+1,l.special.theme!,cell('Special Mission'));
+ assert.equal(planSheetDesign(s,designs[1],'').specialCount,1);
+});

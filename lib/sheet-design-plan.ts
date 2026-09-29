@@ -10,6 +10,7 @@ export type DesignRequest=Record<string,unknown>;
 const fields:HeaderField[]=['month','publishDate','platform','contentLink','views','likes','reward','theme'];
 const clean=(s:unknown)=>String(s??'').trim();
 const normalize=(s:unknown)=>clean(s).toLowerCase().replace(/[^a-z0-9]/g,'');
+function address(r:number,c:number){let col='',n=c+1;while(n){col=String.fromCharCode(65+(n-1)%26)+col;n=Math.floor((n-1)/26);}return `${col}${r+1}`}
 // Older approved layouts have a hidden running-count helper beside each section.
 function runningCountHelper(cell:DesignCell|undefined){return /^=IF\([A-Z]+\d+="","",COUNTIF\(\$[A-Z]+\$\d+:[A-Z]+\d+,[A-Z]+\d+\)\)$/i.test(cell?.userEnteredValue?.formulaValue||'')&&!cell?.note}
 function value(cell:DesignCell|undefined):string|number|boolean{
@@ -35,6 +36,38 @@ function layout(rows:DesignCell[][]){
   if(matches.length!==1)throw new Error('Não foi possível identificar uma única tabela de missões normais e especiais. A aba não será alterada.');
   return matches[0];
 }
+const missionHeading=(v:unknown)=>/^(normal|special)miss(ion|on)$/.test(normalize(v));
+const monthLiteral=(v:unknown)=>/^\d{4}[-/](0?[1-9]|1[0-2])$/.test(clean(v));
+const placeholder=(v:unknown)=>clean(v)===''||clean(v)==='-';
+// Only recognizable separator/empty-template rows are excluded. Partial posts,
+// notes and unknown formulas continue through the conservative input checks.
+function structuralSection(row:DesignCell[],columns:SectionColumns){
+  const cells=fields.flatMap(f=>columns[f]===undefined?[]:[row[columns[f]!]||{}]);
+  if(cells.some(c=>c.note||c.chipRuns?.length))return false;
+  const link=row[columns.contentLink!];
+  if(!placeholder(value(link))||link?.userEnteredValue?.formulaValue)return false;
+  const literals=cells.filter(c=>!c.userEnteredValue?.formulaValue).map(value);
+  if(literals.some(missionHeading))return literals.every(v=>placeholder(v)||missionHeading(v)||monthLiteral(v));
+  return cells.every(c=>runningCountHelper(c)||(!c.userEnteredValue?.formulaValue&&placeholder(value(c))));
+}
+function inputColumns(row:DesignCell[],header:DesignCell[],columns:SectionColumns,r:number){
+  const c=columns.month;
+  if(c===undefined||!runningCountHelper(row[c]))return columns;
+  // A legacy header can sit over the counter immediately left of the month.
+  // Require the exact running-count references and an otherwise unassigned,
+  // unlabeled adjacent month cell. Never infer the month from the counter/date.
+  const candidate=c+1,ref=address(r,candidate);
+  const col=ref.replace(/\d+$/,'');
+  const formula=row[c].userEnteredValue!.formulaValue!.toUpperCase();
+  const match=formula.match(/^=IF\(([A-Z]+\d+)="","",COUNTIF\(\$([A-Z]+)\$(\d+):([A-Z]+\d+),([A-Z]+\d+)\)\)$/);
+  if(match&&match[1]===ref&&match[2]===col&&Number(match[3])<=r+1&&match[4]===ref&&match[5]===ref
+    &&columns.publishDate!==undefined&&candidate<columns.publishDate
+    &&!Object.values(columns).includes(candidate)&&!clean(value(header[candidate]))
+    &&monthLiteral(value(row[candidate]))&&!row[candidate]?.userEnteredValue?.formulaValue){
+    return {...columns,month:candidate};
+  }
+  return columns;
+}
 function profileField(label:unknown){
   const n=normalize(label);
   if(n.startsWith('settlementmonth'))return'month';
@@ -57,9 +90,9 @@ function profileCells(sheet:DesignSheet,rows:DesignCell[][],header:number){
   }));
   return map;
 }
-function scalarCell(cell:DesignCell|undefined):DesignCell{
+function scalarCell(cell:DesignCell|undefined,location=''):DesignCell{
   if(cell?.chipRuns?.length)throw new Error('A aba contém chips nas publicações. Eles precisam ser revisados antes de transformar o modelo.');
-  if(cell?.userEnteredValue?.formulaValue)throw new Error('Há fórmulas personalizadas nos dados de entrada. Revise-as antes de transformar a aba.');
+  if(cell?.userEnteredValue?.formulaValue)throw new Error(`Há fórmulas personalizadas nos dados de entrada${location?` (${location})`:''}. Revise-as antes de transformar a aba. Nada foi alterado.`);
   const v=value(cell);
   return {userEnteredValue:typeof v==='number'?{numberValue:v}:typeof v==='boolean'?{boolValue:v}:{stringValue:v},...(cell?.note?{note:cell.note}:{}),...(cell?.textFormatRuns?{textFormatRuns:cell.textFormatRuns}:{}),...(cell?.userEnteredFormat?.textFormat?.link?{userEnteredFormat:{textFormat:{link:cell.userEnteredFormat.textFormat.link}}}:{})};
 }
@@ -78,19 +111,20 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
   const copied=new Set<string>(),discardedExamples:string[]=[];
   for(const [index,section] of sections.entries())for(let r=section.row+1;r<(sections[index+1]?.row??oldRows.length);r++){
     const row=oldRows[r]||[];
-    const populated=(section:SectionColumns)=>fields.some(f=>section[f]!==undefined&&(clean(value(row[section[f]!]))||row[section[f]!]?.note));
+    const populated=(section:SectionColumns)=>!structuralSection(row,section)&&fields.some(f=>section[f]!==undefined&&(clean(value(row[section[f]!]))||row[section[f]!]?.note||row[section[f]!]?.chipRuns?.length));
     const normal=populated(section.normal),special=populated(section.special);
     if(!normal&&!special)continue;
     if(++usedRows>capacity)throw new Error(`Este modelo comporta ${capacity} linhas por seção. Seus dados excedem esse espaço; nada será alterado.`);
     const destinationRow=next.row+usedRows;
-    for(const [from,to,present] of [[section.normal,next.normal,normal],[section.special,next.special,special]] as const){
+    for(const [originalColumns,to,present] of [[section.normal,next.normal,normal],[section.special,next.special,special]] as const){
       if(!present)continue;
-      if(from===section.normal)normalCount++;else specialCount++;
+      const from=inputColumns(row,oldRows[section.row]||[],originalColumns,r);
+      if(originalColumns===section.normal)normalCount++;else specialCount++;
       for(const f of fields){
         if(to[f]===undefined){if(from[f]!==undefined&&clean(value(row[from[f]!])))throw new Error('O modelo não possui uma coluna necessária para preservar seus dados.');continue}
         const original=from[f]===undefined?undefined:row[from[f]!];
         if(from[f]!==undefined)copied.add(`${r}:${from[f]}`);
-        const cell=scalarCell(original);
+        const cell=scalarCell(original,from[f]===undefined?'':address(r,from[f]!));
         if(f==='publishDate'&&typeof value(original)==='number')cell.userEnteredFormat={...cell.userEnteredFormat,numberFormat:original?.userEnteredFormat?.numberFormat||{type:'DATE',pattern:'yyyy-mm-dd'}};
         if(f==='month'&&!clean(value(original))){const month=dateMonth(from.publishDate===undefined?undefined:row[from.publishDate]);if(month)cell.userEnteredValue={stringValue:month}}
         const rule=newRows[next.row+1]?.[to[f]!]?.dataValidation?.condition;
@@ -106,7 +140,7 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
   const oldProfile=profileCells(target,oldRows,old.row),newProfile=profileCells(source,newRows,next.row);
   for(const [field,current] of oldProfile)if(!newProfile.has(field)&&clean(value(current.cell)))throw new Error('O modelo não possui um campo necessário para preservar seu perfil.');
   for(const [field,dest] of newProfile){
-    const current=oldProfile.get(field);let cell=scalarCell(current?.cell);
+    const current=oldProfile.get(field);let cell=scalarCell(current?.cell,current?address(current.r,current.c):'');
     if(current)copied.add(`${current.r}:${current.c}`);
     if(field==='month'&&!clean(value(cell))&&/^\d{4}-\d{2}$/.test(sheetMonth))cell={userEnteredValue:{stringValue:sheetMonth}};
     writes.push({r:dest.r,c:dest.c,cell});
