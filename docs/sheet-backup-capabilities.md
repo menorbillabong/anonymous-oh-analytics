@@ -37,7 +37,18 @@ Lê inclusive dados ocultos. Reconhece um ou mais blocos com os cabeçalhos norm
 e especiais já suportados, incluindo blocos históricos repetidos, e mantém a
 ordem dos dados. Não altera datas/valores literais de entrada. Não adivinha
 cabeçalhos ambíguos, não converte fórmulas de entrada em valores e não descarta
-publicações por falta de capacidade: nesses casos bloqueia.
+publicações por falta de capacidade.
+
+Cada bloco identificado conserva um cabeçalho no novo design; os blocos antigos
+não são misturados ao atual. Linhas vazias intermediárias são compactadas, mantendo
+a ordem e o pareamento das publicações normais/especiais. O último bloco recebe
+60 linhas de capacidade por seção, incluindo as já preenchidas (não 60 extras).
+Se já houver mais de 60 linhas ocupadas, mantém todas e informa a ampliação na
+conferência. Histórico e cabeçalhos são dimensionados à parte, até 2.000 linhas
+no total; acima disso a transformação é bloqueada sem descartar dados.
+As fórmulas e validações do modelo são estendidas até a última linha, preservando
+as referências absolutas, o teto de 35.000 e a regra das primeiras 75 publicações.
+Isso não cria um novo limite de recompensa ou altera a sincronização normal.
 
 O modelo substitui fórmulas/estilo/colunas. Grupos, filtros, cores alternadas e
 gráficos antigos não são reaproveitados após remapear as colunas. A conferência

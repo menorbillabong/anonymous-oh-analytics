@@ -7,7 +7,7 @@ import {SHEET_DESIGNS,type SheetDesignId} from '@/lib/sheet-designs';
 import './x-import-controls.css';
 import './sheet-design-controls.css';
 
-type Preview={fingerprint:string;tabName:string;normalCount:number;specialCount:number;capacity:number;discardedCells:number;discardedExamples?:string[];replacedFormulas?:number;sourceSections?:number;removedFeatures?:string[]};
+type Preview={fingerprint:string;tabName:string;normalCount:number;specialCount:number;capacity:number;currentBlockRows?:number;capacityExpanded?:boolean;totalRows?:number;discardedCells:number;discardedExamples?:string[];replacedFormulas?:number;sourceSections?:number;removedFeatures?:string[]};
 type Result={verified:boolean};
 type BackupInfo={createdAt:string;expiresAt:string;tabName:string;features?:string[]};
 
@@ -103,7 +103,9 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
           <strong>Aba: {preview.tabName}</strong>
           <p>{preview.normalCount} publicações normais e {preview.specialCount} especiais identificadas.</p>
           <p>Serão mantidos os campos reconhecidos do perfil e das publicações, inclusive em linhas ocultas ou agrupadas. Datas e valores de entrada não serão recalculados pela troca.</p>
-          {!!preview.sourceSections&&preview.sourceSections>1&&<p>{preview.sourceSections} blocos de publicações serão reunidos nas seções do novo modelo, na ordem original.</p>}
+          {!!preview.sourceSections&&preview.sourceSections>1&&<p>{preview.sourceSections} blocos de publicações serão mantidos separados, com seus cabeçalhos, na ordem original. O histórico não ocupará a capacidade do último bloco.</p>}
+          <p>Capacidade abaixo do último cabeçalho: {preview.capacity} linhas por seção, incluindo as já preenchidas{preview.currentBlockRows!==undefined?` (${preview.currentBlockRows} linhas ocupadas; ${Math.max(0,preview.capacity-preview.currentBlockRows)} totalmente livres)`:''}. Isso não altera os limites de recompensa.</p>
+          {preview.capacityExpanded&&<p role="note">O último bloco já utiliza mais de 60 linhas. O espaço foi ampliado para preservar todas as publicações existentes.</p>}
           <p>Serão recriados: visual, colunas, validações e fórmulas do modelo{preview.replacedFormulas!==undefined?` (${preview.replacedFormulas} fórmulas antigas substituídas)`:''}.</p>
           {!!preview.removedFeatures?.length&&<p role="note">Organização antiga que não será mantida no novo design: {preview.removedFeatures.join('; ')}. Esses recursos podem ser guardados pelo BACKUP antes da troca.</p>}
           {!!preview.discardedCells&&<p>{preview.discardedCells} células com dados extras fora dos campos reconhecidos serão removidas. {preview.discardedExamples?.length?`Confira: ${preview.discardedExamples.join(', ')}${preview.discardedCells>preview.discardedExamples.length?' (primeiras 20)':''}.`:''}</p>}

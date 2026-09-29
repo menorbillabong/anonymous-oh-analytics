@@ -126,10 +126,11 @@ test('legacy shifted month uses the referenced month, never the count or publica
  put(s,r+1,l.special.contentLink!,cell('-'));
  const before=JSON.stringify(s),p=planSheetDesign(s,designs[1],''),next=layout(designs[1]);
  assert.equal(JSON.stringify(s),before);assert.equal(p.sourceSections,2);assert.equal(p.specialCount,1);assert.equal(p.normalCount,0);
- const monthWrite=p.writes.find(w=>w.c===next.special.month&&w.r===next.row+1)!;
+ const currentRow=p.blockHeaders.at(-1)!+1;
+ const monthWrite=p.writes.find(w=>w.c===next.special.month&&w.r===currentRow)!;
  assert.equal(monthWrite.cell.userEnteredValue?.stringValue,'2026-07');
  assert.equal(monthWrite.cell.note,'original settlement month');
- assert.equal(p.writes.find(w=>w.c===next.special.publishDate&&w.r===next.row+1)?.cell.userEnteredValue?.numberValue,46198);
+ assert.equal(p.writes.find(w=>w.c===next.special.publishDate&&w.r===currentRow)?.cell.userEnteredValue?.numberValue,46198);
 });
 
 test('ambiguous month mappings and unknown input formulas still block with the cell address',()=>{

@@ -40,7 +40,7 @@ export async function prepareSheetDesign(tabName:string,designId:unknown,month:s
   const packed=packedBlueprints.sheets.find(s=>s.properties.sheetId===design.sheetId)!;
   const source={...packed,data:packed.data.map(g=>({...g,rowData:g.rowData.map(row=>({values:row.values.map(index=>packedBlueprints.cells[index])}))}))} as DesignSheet;
   const plan=planSheetDesign(target,source,'',month);
-  return {token,base,target,source,plan,fingerprint:digest(target,source,month),design,tabName};
+  return {token,base,target,source:plan.outputSheet,plan,fingerprint:digest(target,plan.outputSheet,month),design,tabName};
 }
 
 export async function applySheetDesign(prepared:Awaited<ReturnType<typeof prepareSheetDesign>>,validatePermission:()=>Promise<void>){

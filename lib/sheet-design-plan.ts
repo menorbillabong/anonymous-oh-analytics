@@ -1,6 +1,7 @@
 import {headerLayoutForRow,type HeaderField,type SectionColumns} from './google-sheets-plan.ts';
 import {replaceNativeSheet,wholeCellLinkRequest} from './sheet-native-snapshot.ts';
 import {featureSummary,type DimensionGroup} from './sheet-native-features.ts';
+import {buildDesignBlocks,CURRENT_BLOCK_CAPACITY} from './sheet-design-blocks.ts';
 
 type Value={stringValue?:string;numberValue?:number;boolValue?:boolean;formulaValue?:string;errorValue?:unknown};
 export type DesignCell={userEnteredValue?:Value;effectiveValue?:Value;formattedValue?:string;userEnteredFormat?:{numberFormat?:{type?:string;pattern?:string};textFormat?:{link?:{uri:string}}};note?:string;hyperlink?:string;chipRuns?:unknown[];textFormatRuns?:unknown[];dataValidation?:{condition?:{type?:string;values?:{userEnteredValue?:string}[]}}};
@@ -104,18 +105,25 @@ function dateMonth(cell:DesignCell|undefined){
 export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitle:string,sheetMonth=''){
   if(target.properties.sheetId===source.properties.sheetId)throw new Error('O modelo original não pode ser transformado.');
   const oldRows=designGrid(target),newRows=designGrid(source),sections=layouts(oldRows),old=sections[0],next=layout(newRows);
-  const capacity=source.properties.gridProperties.rowCount-next.row-1;
+  const blocks=sections.map((section,index)=>{
+    const records:{r:number;normal:boolean;special:boolean}[]=[];
+    for(let r=section.row+1;r<(sections[index+1]?.row??oldRows.length);r++){
+      const row=oldRows[r]||[];
+      const populated=(columns:SectionColumns)=>!structuralSection(row,columns)&&fields.some(f=>columns[f]!==undefined&&(clean(value(row[columns[f]!]))||row[columns[f]!]?.note||row[columns[f]!]?.chipRuns?.length));
+      const normal=populated(section.normal),special=populated(section.special);
+      if(normal||special)records.push({r,normal,special});
+    }
+    return records;
+  });
+  const expanded=buildDesignBlocks(source,newRows,next.row,blocks.map(b=>b.length));
+  const capacity=expanded.capacities.at(-1)!;
   const requests:DesignRequest[]=[];
   const writes:{r:number;c:number;cell:DesignCell}[]=[];
-  let normalCount=0,specialCount=0,usedRows=0,discardedCells=0;
+  let normalCount=0,specialCount=0,discardedCells=0;
   const copied=new Set<string>(),discardedExamples:string[]=[];
-  for(const [index,section] of sections.entries())for(let r=section.row+1;r<(sections[index+1]?.row??oldRows.length);r++){
+  for(const [index,section] of sections.entries())for(const [offset,{r,normal,special}] of blocks[index].entries()){
     const row=oldRows[r]||[];
-    const populated=(section:SectionColumns)=>!structuralSection(row,section)&&fields.some(f=>section[f]!==undefined&&(clean(value(row[section[f]!]))||row[section[f]!]?.note||row[section[f]!]?.chipRuns?.length));
-    const normal=populated(section.normal),special=populated(section.special);
-    if(!normal&&!special)continue;
-    if(++usedRows>capacity)throw new Error(`Este modelo comporta ${capacity} linhas por seção. Seus dados excedem esse espaço; nada será alterado.`);
-    const destinationRow=next.row+usedRows;
+    const destinationRow=expanded.headers[index]+1+offset;
     for(const [originalColumns,to,present] of [[section.normal,next.normal,normal],[section.special,next.special,special]] as const){
       if(!present)continue;
       const from=inputColumns(row,oldRows[section.row]||[],originalColumns,r);
@@ -161,10 +169,10 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
     if(discardedExamples.length<20){let col='',n=c+1;while(n){col=String.fromCharCode(65+(n-1)%26)+col;n=Math.floor((n-1)/26);}discardedExamples.push(`${col}${r+1}`);}
   }
   const id=target.properties.sheetId;
-  requests.push(...replaceNativeSheet(target,source,'design'));
+  requests.push(...replaceNativeSheet(target,expanded.sheet,'design'));
   for(const write of writes){
     requests.push({updateCells:{start:{sheetId:id,rowIndex:write.r,columnIndex:write.c},rows:[{values:[write.cell]}],fields:'userEnteredValue,note,textFormatRuns'+(write.cell.userEnteredFormat?.numberFormat?',userEnteredFormat.numberFormat':'')}});
     const link=wholeCellLinkRequest(id,write.r,write.c,write.cell);if(link)requests.push(link);
   }
-  return {requests,writes,normalCount,specialCount,capacity,discardedCells,discardedExamples,replacedFormulas,sourceSections:sections.length,removedFeatures:featureSummary(target)};
+  return {requests,writes,normalCount,specialCount,capacity,currentBlockRows:blocks.at(-1)!.length,capacityExpanded:capacity>CURRENT_BLOCK_CAPACITY,totalRows:expanded.rowCount,outputSheet:expanded.sheet,blockHeaders:expanded.headers,discardedCells,discardedExamples,replacedFormulas,sourceSections:sections.length,removedFeatures:featureSummary(target)};
 }

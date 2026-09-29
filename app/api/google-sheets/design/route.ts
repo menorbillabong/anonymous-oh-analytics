@@ -34,7 +34,7 @@ export async function GET(request:Request){
     const {permission}=await context(request),id=new URL(request.url).searchParams.get('design');
     if(!sheetDesign(id))throw new RequestError('Modelo inválido.');
     const prepared=await prepareSheetDesign(permission.tab,id,permission.month);
-    return NextResponse.json({fingerprint:prepared.fingerprint,tabName:permission.tab,normalCount:prepared.plan.normalCount,specialCount:prepared.plan.specialCount,capacity:prepared.plan.capacity,discardedCells:prepared.plan.discardedCells,discardedExamples:prepared.plan.discardedExamples,replacedFormulas:prepared.plan.replacedFormulas,sourceSections:prepared.plan.sourceSections,removedFeatures:prepared.plan.removedFeatures},{headers:{'Cache-Control':'no-store'}});
+    return NextResponse.json({fingerprint:prepared.fingerprint,tabName:permission.tab,normalCount:prepared.plan.normalCount,specialCount:prepared.plan.specialCount,capacity:prepared.plan.capacity,currentBlockRows:prepared.plan.currentBlockRows,capacityExpanded:prepared.plan.capacityExpanded,totalRows:prepared.plan.totalRows,discardedCells:prepared.plan.discardedCells,discardedExamples:prepared.plan.discardedExamples,replacedFormulas:prepared.plan.replacedFormulas,sourceSections:prepared.plan.sourceSections,removedFeatures:prepared.plan.removedFeatures},{headers:{'Cache-Control':'no-store'}});
   }catch(error){return failed(error)}
 }
 export async function POST(request:Request){
