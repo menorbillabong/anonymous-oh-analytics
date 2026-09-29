@@ -77,5 +77,5 @@ test('backup is read-only but applying requires current permission; changed prot
  assert.throws(()=>replaceNativeSheet(target,designs[0]),/mudaram/);
 });
 test('other unsupported features keep precise failure messages',()=>{
- assert.throws(()=>nativeSnapshot({...designs[0],charts:[{}]}),/gráficos \(1\)/);
+ assert.throws(()=>nativeSnapshot({...designs[0],tables:[{}]}),/tabelas estruturadas \(1\)/);
 });

@@ -1,7 +1,8 @@
 import {NextResponse} from 'next/server';
 import {backupContext} from '@/lib/sheet-backup-context';
 import {sealBackup,openBackup} from '@/lib/sheet-backup-codec';
-import {nativeSnapshot} from '@/lib/sheet-native-snapshot';
+import {nativeSnapshot,replaceNativeSheet} from '@/lib/sheet-native-snapshot';
+import {featureSummary} from '@/lib/sheet-native-features';
 import {readRegisteredSheet,sheetFingerprint,restoreRegisteredSheet} from '@/lib/sheet-design-service';
 
 export const dynamic='force-dynamic';
@@ -19,10 +20,11 @@ export async function GET(request:Request){
     const ctx=await backupContext(request),backup=await saved(ctx);
     if(!backup)return json({backup:null});
     if(backup.sheet.properties.title!==ctx.config.tab)return json({backup:null});
-    const info={createdAt:backup.createdAt,expiresAt:backup.expiresAt,tabName:backup.sheet.properties.title};
+    const info={createdAt:backup.createdAt,expiresAt:backup.expiresAt,tabName:backup.sheet.properties.title,features:featureSummary(backup.sheet)};
     if(new URL(request.url).searchParams.get('preview')!=='restore')return json({backup:info});
     const current=await readRegisteredSheet(ctx.config.tab);
     if(current.target.properties.sheetId!==backup.sheet.properties.sheetId)throw new Error('A aba cadastrada mudou. Este backup não pode ser aplicado a ela.');
+    replaceNativeSheet(current.target,backup.sheet); // Validate the full restore before offering confirmation.
     return json({backup:info,fingerprint:sheetFingerprint(current.target)});
   }catch(error){return failed(error)}
 }
@@ -38,7 +40,7 @@ export async function POST(request:Request){
       // Atomic upsert; a failed save never deletes the existing snapshot.
       const {error}=await ctx.client.from('google_sheets_site_backup').upsert({user_id:ctx.user.id,snapshot},{onConflict:'user_id'});
       if(error)throw new Error('Não foi possível salvar o novo backup. A cópia anterior não foi removida.');
-      return json({backup:{createdAt,expiresAt,tabName:ctx.config.tab}});
+      return json({backup:{createdAt,expiresAt,tabName:ctx.config.tab,features:featureSummary(sheet)}});
     }
     if(body.confirm!==true||!/^[a-f0-9]{64}$/.test(body.fingerprint||'')||typeof body.backupCreatedAt!=='string')throw new Error('Confira e confirme a restauração.');
     const {data:claim,error}=await ctx.client.rpc('claim_google_sheets_sync');

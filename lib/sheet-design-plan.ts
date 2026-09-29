@@ -1,10 +1,11 @@
 import {headerLayoutForRow,type HeaderField,type SectionColumns} from './google-sheets-plan.ts';
 import {replaceNativeSheet,wholeCellLinkRequest} from './sheet-native-snapshot.ts';
+import {featureSummary,type DimensionGroup} from './sheet-native-features.ts';
 
 type Value={stringValue?:string;numberValue?:number;boolValue?:boolean;formulaValue?:string;errorValue?:unknown};
 export type DesignCell={userEnteredValue?:Value;effectiveValue?:Value;formattedValue?:string;userEnteredFormat?:{numberFormat?:{type?:string;pattern?:string};textFormat?:{link?:{uri:string}}};note?:string;hyperlink?:string;chipRuns?:unknown[];textFormatRuns?:unknown[];dataValidation?:{condition?:{type?:string;values?:{userEnteredValue?:string}[]}}};
 type Range={sheetId?:number;startRowIndex?:number;endRowIndex?:number;startColumnIndex?:number;endColumnIndex?:number};
-export type DesignSheet={properties:{sheetId:number;title:string;gridProperties:{rowCount:number;columnCount:number;frozenRowCount?:number;frozenColumnCount?:number;hideGridlines?:boolean}};merges?:Range[];conditionalFormats?:unknown[];charts?:unknown[];tables?:unknown[];bandedRanges?:unknown[];filterViews?:unknown[];basicFilter?:unknown;data?:{startRow?:number;startColumn?:number;rowData?:{values?:DesignCell[]}[];rowMetadata?:{pixelSize?:number}[];columnMetadata?:{pixelSize?:number}[]}[]};
+export type DesignSheet={properties:{sheetId:number;title:string;gridProperties:{rowCount:number;columnCount:number;frozenRowCount?:number;frozenColumnCount?:number;hideGridlines?:boolean;rowGroupControlAfter?:boolean;columnGroupControlAfter?:boolean}};rowGroups?:DimensionGroup[];columnGroups?:DimensionGroup[];merges?:Range[];conditionalFormats?:unknown[];charts?:unknown[];tables?:unknown[];bandedRanges?:unknown[];filterViews?:unknown[];basicFilter?:unknown;data?:{startRow?:number;startColumn?:number;rowData?:{values?:DesignCell[]}[];rowMetadata?:{pixelSize?:number;hiddenByUser?:boolean}[];columnMetadata?:{pixelSize?:number;hiddenByUser?:boolean}[]}[]};
 export type DesignRequest=Record<string,unknown>;
 const fields:HeaderField[]=['month','publishDate','platform','contentLink','views','likes','reward','theme'];
 const clean=(s:unknown)=>String(s??'').trim();
@@ -24,8 +25,13 @@ export function designGrid(sheet:DesignSheet){
   }
   return rows;
 }
-function layout(rows:DesignCell[][]){
+function layouts(rows:DesignCell[][]){
   const matches=rows.flatMap((row,r)=>{const match=headerLayoutForRow((row||[]).map(value),r);return match?[match]:[]});
+  if(!matches.length)throw new Error('Não foi possível identificar as colunas de missões normais e especiais. A aba não será alterada.');
+  return matches;
+}
+function layout(rows:DesignCell[][]){
+  const matches=layouts(rows);
   if(matches.length!==1)throw new Error('Não foi possível identificar uma única tabela de missões normais e especiais. A aba não será alterada.');
   return matches[0];
 }
@@ -64,27 +70,26 @@ function dateMonth(cell:DesignCell|undefined){
 }
 export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitle:string,sheetMonth=''){
   if(target.properties.sheetId===source.properties.sheetId)throw new Error('O modelo original não pode ser transformado.');
-  if([target,source].some(s=>(s.charts?.length||s.tables?.length||s.bandedRanges?.length||s.filterViews?.length||s.basicFilter)))throw new Error('Esta aba possui tabelas, gráficos ou filtros personalizados. A aplicação automática foi bloqueada para preservá-los.');
-  const oldRows=designGrid(target),newRows=designGrid(source),old=layout(oldRows),next=layout(newRows);
+  const oldRows=designGrid(target),newRows=designGrid(source),sections=layouts(oldRows),old=sections[0],next=layout(newRows);
   const capacity=source.properties.gridProperties.rowCount-next.row-1;
   const requests:DesignRequest[]=[];
   const writes:{r:number;c:number;cell:DesignCell}[]=[];
   let normalCount=0,specialCount=0,usedRows=0,discardedCells=0;
-  const mapped=new Set([...Object.values(old.normal),...Object.values(old.special)]);
-  for(let r=old.row+1;r<oldRows.length;r++){
+  const copied=new Set<string>(),discardedExamples:string[]=[];
+  for(const [index,section] of sections.entries())for(let r=section.row+1;r<(sections[index+1]?.row??oldRows.length);r++){
     const row=oldRows[r]||[];
-    for(let c=0;c<row.length;c++)if(!mapped.has(c)&&!runningCountHelper(row[c])&&!row[c]?.userEnteredValue?.formulaValue&&(clean(value(row[c]))||row[c]?.note))discardedCells++;
     const populated=(section:SectionColumns)=>fields.some(f=>section[f]!==undefined&&(clean(value(row[section[f]!]))||row[section[f]!]?.note));
-    const normal=populated(old.normal),special=populated(old.special);
+    const normal=populated(section.normal),special=populated(section.special);
     if(!normal&&!special)continue;
     if(++usedRows>capacity)throw new Error(`Este modelo comporta ${capacity} linhas por seção. Seus dados excedem esse espaço; nada será alterado.`);
     const destinationRow=next.row+usedRows;
-    for(const [from,to,present] of [[old.normal,next.normal,normal],[old.special,next.special,special]] as const){
+    for(const [from,to,present] of [[section.normal,next.normal,normal],[section.special,next.special,special]] as const){
       if(!present)continue;
-      if(from===old.normal)normalCount++;else specialCount++;
+      if(from===section.normal)normalCount++;else specialCount++;
       for(const f of fields){
         if(to[f]===undefined){if(from[f]!==undefined&&clean(value(row[from[f]!])))throw new Error('O modelo não possui uma coluna necessária para preservar seus dados.');continue}
         const original=from[f]===undefined?undefined:row[from[f]!];
+        if(from[f]!==undefined)copied.add(`${r}:${from[f]}`);
         const cell=scalarCell(original);
         if(f==='publishDate'&&typeof value(original)==='number')cell.userEnteredFormat={...cell.userEnteredFormat,numberFormat:original?.userEnteredFormat?.numberFormat||{type:'DATE',pattern:'yyyy-mm-dd'}};
         if(f==='month'&&!clean(value(original))){const month=dateMonth(from.publishDate===undefined?undefined:row[from.publishDate]);if(month)cell.userEnteredValue={stringValue:month}}
@@ -102,15 +107,30 @@ export function planSheetDesign(target:DesignSheet,source:DesignSheet,backupTitl
   for(const [field,current] of oldProfile)if(!newProfile.has(field)&&clean(value(current.cell)))throw new Error('O modelo não possui um campo necessário para preservar seu perfil.');
   for(const [field,dest] of newProfile){
     const current=oldProfile.get(field);let cell=scalarCell(current?.cell);
+    if(current)copied.add(`${current.r}:${current.c}`);
     if(field==='month'&&!clean(value(cell))&&/^\d{4}-\d{2}$/.test(sheetMonth))cell={userEnteredValue:{stringValue:sheetMonth}};
     writes.push({r:dest.r,c:dest.c,cell});
   }
   if(!newProfile.has('month'))throw new Error('O modelo não possui o campo do mês de referência.');
+  let replacedFormulas=0;
+  const headerCells=new Set(sections.flatMap(s=>[...Object.values(s.normal),...Object.values(s.special)].map(c=>`${s.row}:${c}`)));
+  // Account for custom content above and below the table, including extra
+  // columns. Never silently describe an unmapped literal as preserved.
+  for(const [r,row] of oldRows.entries())for(const [c,cell] of (row||[]).entries()){
+    if(!cell)continue;
+    if(copied.has(`${r}:${c}`))continue;
+    if(cell.userEnteredValue?.formulaValue){replacedFormulas++;continue;}
+    if((headerCells.has(`${r}:${c}`)&&!cell.note)||runningCountHelper(cell)||(!clean(value(cell))&&!cell.note))continue;
+    // Recognized template headings above the first table are rebuilt.
+    if(r<old.row&&!cell.note&&(profileField(value(cell))||newRows.slice(0,next.row).some(line=>line?.some(item=>clean(value(item))===clean(value(cell))))))continue;
+    discardedCells++;
+    if(discardedExamples.length<20){let col='',n=c+1;while(n){col=String.fromCharCode(65+(n-1)%26)+col;n=Math.floor((n-1)/26);}discardedExamples.push(`${col}${r+1}`);}
+  }
   const id=target.properties.sheetId;
   requests.push(...replaceNativeSheet(target,source,'design'));
   for(const write of writes){
     requests.push({updateCells:{start:{sheetId:id,rowIndex:write.r,columnIndex:write.c},rows:[{values:[write.cell]}],fields:'userEnteredValue,note,textFormatRuns'+(write.cell.userEnteredFormat?.numberFormat?',userEnteredFormat.numberFormat':'')}});
     const link=wholeCellLinkRequest(id,write.r,write.c,write.cell);if(link)requests.push(link);
   }
-  return {requests,writes,normalCount,specialCount,capacity,discardedCells};
+  return {requests,writes,normalCount,specialCount,capacity,discardedCells,discardedExamples,replacedFormulas,sourceSections:sections.length,removedFeatures:featureSummary(target)};
 }

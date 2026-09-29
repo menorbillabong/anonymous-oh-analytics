@@ -14,7 +14,8 @@ function route(options:Options={}){
   'next/server':{NextResponse:{json:(body:unknown,init?:ResponseInit)=>Response.json(body,init)}},
   '@/lib/sheet-backup-context':{backupContext:async()=>{if(options.unauthorized)throw new Error('Sessão inválida.');return{client,user:{id:'owner'},config:{tab:'Own tab'},permission:async()=>{if(options.revoked)throw new Error('Permission revoked');return{tab:'Own tab'}}}}},
   '@/lib/sheet-backup-codec':{sealBackup:(data:any)=>{assert.equal(data.userId,'owner');assert.equal(data.sheet.properties.title,'Own tab');assert.equal(Date.parse(data.expiresAt)-Date.parse(data.createdAt),7*86400000);return'new-encrypted'},openBackup:(_snapshot:string,_key:string,user:string,book:string)=>{assert.equal(user,'owner');assert.equal(book,'fixture-book');if(options.corrupt)throw new Error('Corrupt backup');return{createdAt,expiresAt:'2099-01-01',sheet:{properties:{sheetId:options.otherId?999:123,title:options.otherTab?'Other tab':'Own tab'}}}}},
-  '@/lib/sheet-native-snapshot':{nativeSnapshot:(sheet:unknown)=>sheet},
+  '@/lib/sheet-native-snapshot':{nativeSnapshot:(sheet:unknown)=>sheet,replaceNativeSheet:()=>[]},
+  '@/lib/sheet-native-features':{featureSummary:()=>['2 agrupamentos de linhas']},
   '@/lib/sheet-design-service':{
    readRegisteredSheet:async(tab:string)=>{assert.equal(tab,'Own tab');calls.push('read');return{target,spreadsheetId:'fixture-book'}},
    sheetFingerprint:()=>options.stale?'b'.repeat(64):fingerprint,

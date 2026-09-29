@@ -1,4 +1,5 @@
 import type {DesignSheet,DesignRequest,DesignCell} from './sheet-design-plan.ts';
+import {validateNativeFeatures,clearNativeFeatures,restoreNativeFeatures} from './sheet-native-features.ts';
 
 const cellFields=['userEnteredValue','userEnteredFormat','note','textFormatRuns','dataValidation'] as const;
 type Protection={protectedRangeId?:number;range?:Record<string,number>;namedRangeId?:string;tableId?:string;unprotectedRanges?:unknown[];requestingUserCanEdit?:boolean;[key:string]:unknown};
@@ -23,14 +24,16 @@ export function wholeCellLinkRequest(sheetId:number,rowIndex:number,columnIndex:
 export function nativeSnapshot(sheet:DesignSheet):DesignSheet{
   const raw=sheet as DesignSheet & Record<string,any>;
   validateProtections(sheet);
-  const unsupported:Record<string,string>={charts:'gráficos',tables:'tabelas',bandedRanges:'cores alternadas',filterViews:'visualizações de filtro',rowGroups:'agrupamentos de linhas',columnGroups:'agrupamentos de colunas',slicers:'segmentações de dados',developerMetadata:'metadados personalizados'};
+  const unsupported:Record<string,string>={tables:'tabelas estruturadas',slicers:'segmentações de dados',developerMetadata:'metadados personalizados',commentAnchors:'comentários'};
   const found=Object.entries(unsupported).filter(([key])=>raw[key]?.length).map(([key,label])=>`${label} (${raw[key].length})`);
-  if(raw.basicFilter)found.push('filtro básico');
   if(found.length)throw new Error(`Não foi possível concluir: esta aba contém ${found.join(', ')}, ainda não suportados nesta operação. Nenhum backup foi salvo e a planilha não foi alterada.`);
+  const sheetType=(raw.properties as Record<string,unknown>).sheetType;
+  if(sheetType&&sheetType!=='GRID')throw new Error('Somente abas de células comuns podem ser copiadas pelo site. Nada foi alterado.');
+  validateNativeFeatures(sheet);
   const snapshot=structuredClone(sheet);
   for(const grid of snapshot.data||[])for(const row of grid.rowData||[])row.values=(row.values||[]).map(cell=>{
     const c=cell as Record<string,any>;
-    if(c.chipRuns?.length||c.pivotTable||c.dataSourceTable||c.dataSourceFormula)throw new Error('Esta aba contém chips ou fontes de dados não suportados pelo backup. Nada foi alterado.');
+    if(c.chipRuns?.length||c.pivotTable||c.dataSourceTable||c.dataSourceFormula||c.userEnteredValue?.imageValue)throw new Error('Esta aba contém chips, imagens em células, tabelas dinâmicas ou fontes de dados não suportados pelo backup. Nada foi alterado.');
     return Object.fromEntries(cellFields.filter(key=>c[key]!==undefined).map(key=>[key,c[key]])) as DesignCell;
   });
   return snapshot;
@@ -44,13 +47,15 @@ export function replaceNativeSheet(target:DesignSheet,input:DesignSheet,mode:'re
   if(mode==='design'){
     if(protections(source).length)throw new Error('O modelo contém proteções próprias e não pode substituir as permissões da sua aba.');
   }else if(protectionSignature(target)!==protectionSignature(source))throw new Error('As proteções da aba mudaram desde o backup. A restauração foi bloqueada para não alterar permissões.');
-  const requests:DesignRequest[]=[];
+  const requests:DesignRequest[]=[...clearNativeFeatures(target)];
   if(target.merges?.length)requests.push({unmergeCells:{range:{sheetId:id}}});
   for(let index=(target.conditionalFormats?.length||0)-1;index>=0;index--)requests.push({deleteConditionalFormatRule:{sheetId:id,index}});
   requests.push({updateSheetProperties:{properties:{sheetId:id,gridProperties:{frozenRowCount:0,frozenColumnCount:0}},fields:'gridProperties.frozenRowCount,gridProperties.frozenColumnCount'}});
   requests.push({updateSheetProperties:{properties:{sheetId:id,gridProperties:{rowCount:grid.rowCount,columnCount:grid.columnCount,frozenRowCount:grid.frozenRowCount||0,frozenColumnCount:grid.frozenColumnCount||0,hideGridlines:grid.hideGridlines||false}},fields:'gridProperties.rowCount,gridProperties.columnCount,gridProperties.frozenRowCount,gridProperties.frozenColumnCount,gridProperties.hideGridlines'}});
+  requests.push({updateSheetProperties:{properties:{sheetId:id,gridProperties:{rowGroupControlAfter:!!grid.rowGroupControlAfter,columnGroupControlAfter:!!grid.columnGroupControlAfter}},fields:'gridProperties.rowGroupControlAfter,gridProperties.columnGroupControlAfter'}});
   requests.push({updateCells:{range:{sheetId:id},fields:cellFields.join(',')}});
   for(const dimension of ['ROWS','COLUMNS'])requests.push({updateDimensionProperties:{range:{sheetId:id,dimension,startIndex:0,endIndex:dimension==='ROWS'?grid.rowCount:grid.columnCount},properties:{pixelSize:dimension==='ROWS'?21:100,hiddenByUser:false},fields:'pixelSize,hiddenByUser'}});
+  requests.push(...restoreNativeFeatures(source,id));
   for(const data of source.data||[]){
     if(data.rowData?.length)requests.push({updateCells:{start:{sheetId:id,rowIndex:data.startRow||0,columnIndex:data.startColumn||0},rows:data.rowData,fields:cellFields.join(',')}});
     for(const [dimension,items,offset] of [['ROWS',data.rowMetadata,data.startRow||0],['COLUMNS',data.columnMetadata,data.startColumn||0]] as const){

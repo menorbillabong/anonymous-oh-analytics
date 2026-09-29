@@ -7,9 +7,9 @@ import {SHEET_DESIGNS,type SheetDesignId} from '@/lib/sheet-designs';
 import './x-import-controls.css';
 import './sheet-design-controls.css';
 
-type Preview={fingerprint:string;tabName:string;normalCount:number;specialCount:number;capacity:number;discardedCells:number};
+type Preview={fingerprint:string;tabName:string;normalCount:number;specialCount:number;capacity:number;discardedCells:number;discardedExamples?:string[];replacedFormulas?:number;sourceSections?:number;removedFeatures?:string[]};
 type Result={verified:boolean};
-type BackupInfo={createdAt:string;expiresAt:string;tabName:string};
+type BackupInfo={createdAt:string;expiresAt:string;tabName:string;features?:string[]};
 
 export default function SheetDesignControls({userId,disabled,onBusyChange}:{userId:string;disabled:boolean;onBusyChange:(busy:boolean)=>void}){
   const [open,setOpen]=useState(false);
@@ -80,7 +80,10 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
       {message&&<div className={`sheet-operation-message ${messageError?'error':'success'}`} role={messageError?'alert':'status'}><strong>{messageError?'Operação não concluída':'Operação concluída'}</strong><p>{message}</p></div>}
       {backupPanel?<section aria-label="Backup da planilha">
         <p>Uma única cópia da aba cadastrada fica guardada no site por 7 dias. Criar outra substitui a anterior somente depois de salvar com sucesso. Nenhuma aba extra é criada no Sheets.</p>
+        <p>Inclui células, fórmulas, notas, links, formatação, validações, mesclagens, linhas e colunas ocultas, agrupamentos, filtros comuns, cores alternadas e gráficos locais compatíveis. As publicações em linhas agrupadas também entram na cópia.</p>
+        <details><summary>Limites desta cópia</summary><p>É um backup da aba cadastrada, não do arquivo Google inteiro. Não inclui histórico de versões, compartilhamento, scripts, comentários, desenhos ou imagens flutuantes. Outras abas e dados externos usados por fórmulas não são copiados. Tabelas estruturadas ou dinâmicas, chips, fontes conectadas, proteções parciais e demais recursos detectados sem suporte bloqueiam a operação. Limite: 2.000 linhas, 100 colunas e 32 MB antes da compressão.</p></details>
         {backup?<p className="sheet-backup-summary"><strong>✓ Backup disponível</strong><br/>Aba: <strong>{backup.tabName}</strong><br/>Criado em {new Date(backup.createdAt).toLocaleString('pt-BR')}<br/>Válido até {new Date(backup.expiresAt).toLocaleString('pt-BR')}</p>:<p>{backupAction==='status'?'Consultando backup…':backupLoaded?'Não há backup válido para a aba cadastrada.':'Não foi possível confirmar se há um backup salvo.'}</p>}
+        {!!backup?.features?.length&&<p>Recursos incluídos: {backup.features.join('; ')}.</p>}
         {!uncertain&&<div className="sheet-backup-actions"><button className="x-handle-save" disabled={busy||disabled} onClick={()=>void runBackup('save')}>{backupAction==='save'?'SALVANDO BACKUP…':backup?'SUBSTITUIR BACKUP':'CRIAR BACKUP'}</button><button disabled={busy||disabled||!backup} onClick={()=>void runBackup('preview')}>{backupAction==='preview'?'CONFERINDO…':'RESTAURAR BACKUP…'}</button></div>}
         {!backup&&<p>Restaurar fica disponível após salvar um backup com sucesso.</p>}
         {restoreFingerprint&&!uncertain&&<div className="sheet-design-confirm"><p>Restaurar substitui o conteúdo e o visual atuais desta aba pelos do backup. Alterações posteriores ao backup serão perdidas.</p><label><input type="checkbox" checked={restoreConfirmed} onChange={event=>setRestoreConfirmed(event.target.checked)} disabled={busy}/><span>Confirmo a restauração da aba {backup?.tabName}.</span></label><button className="x-handle-save" disabled={busy||disabled||!restoreConfirmed} onClick={()=>void runBackup('restore')}>RESTAURAR BACKUP</button></div>}
@@ -99,7 +102,11 @@ export default function SheetDesignControls({userId,disabled,onBusyChange}:{user
         {preview&&<div className="sheet-design-confirm">
           <strong>Aba: {preview.tabName}</strong>
           <p>{preview.normalCount} publicações normais e {preview.specialCount} especiais identificadas.</p>
-          {!!preview.discardedCells&&<p>{preview.discardedCells} células com dados extras fora das colunas reconhecidas serão removidas.</p>}
+          <p>Serão mantidos os campos reconhecidos do perfil e das publicações, inclusive em linhas ocultas ou agrupadas. Datas e valores de entrada não serão recalculados pela troca.</p>
+          {!!preview.sourceSections&&preview.sourceSections>1&&<p>{preview.sourceSections} blocos de publicações serão reunidos nas seções do novo modelo, na ordem original.</p>}
+          <p>Serão recriados: visual, colunas, validações e fórmulas do modelo{preview.replacedFormulas!==undefined?` (${preview.replacedFormulas} fórmulas antigas substituídas)`:''}.</p>
+          {!!preview.removedFeatures?.length&&<p role="note">Organização antiga que não será mantida no novo design: {preview.removedFeatures.join('; ')}. Esses recursos podem ser guardados pelo BACKUP antes da troca.</p>}
+          {!!preview.discardedCells&&<p>{preview.discardedCells} células com dados extras fora dos campos reconhecidos serão removidas. {preview.discardedExamples?.length?`Confira: ${preview.discardedExamples.join(', ')}${preview.discardedCells>preview.discardedExamples.length?' (primeiras 20)':''}.`:''}</p>}
           <label><input type="checkbox" checked={confirmed} disabled={busy} onChange={event=>setConfirmed(event.target.checked)}/><span>Confirmo a substituição do visual, fórmulas e colunas extras nesta aba, sem criar backup automático.</span></label>
         </div>}
         {!preview&&!uncertain&&<p>Etapa 1 de 2: confira o modelo. O botão Aplicar será liberado somente se a conferência terminar sem erros.</p>}

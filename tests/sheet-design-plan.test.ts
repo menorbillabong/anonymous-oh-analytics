@@ -35,7 +35,7 @@ test('numeric dates and notes survive, empty rows do not change post order',()=>
   assert.equal(w.cell.userEnteredValue?.numberValue,46280);assert.equal(w.cell.userEnteredFormat?.numberFormat?.pattern,'dd/mm/yyyy');
 });
 test('unsupported data blocks before producing a destructive plan',()=>{
-  for(const variation of ['formula','chip','chart','capacity','headers','template-data']){
+  for(const variation of ['formula','chip','chart','capacity','template-data']){
     const s=target(designs[0]),to=structuredClone(designs[1]),l=layout(s);post(s,1);
     if(variation==='formula')put(s,l.row+1,l.normal.likes!,{userEnteredValue:{formulaValue:'=2+2'},effectiveValue:{numberValue:4}});
     if(variation==='chip')put(s,l.row+1,l.normal.contentLink!,{...cell('@'),chipRuns:[{}]});
@@ -49,8 +49,8 @@ test('unsupported data blocks before producing a destructive plan',()=>{
 });
 
 test('extra literal data is reported for explicit removal rather than blocking',()=>{
-  const s=target(designs[0]),l=layout(s);post(s,1);put(s,l.row+1,25,cell('old extra'));
-  assert.equal(planSheetDesign(s,designs[1],'').discardedCells,1);
+  const s=target(designs[0]),l=layout(s);post(s,1);const baseline=planSheetDesign(s,designs[1],'').discardedCells;put(s,l.row+1,25,cell('old extra'));
+  assert.equal(planSheetDesign(s,designs[1],'').discardedCells,baseline+1);
 });
 test('platform validation is honored without silently changing platform',()=>{
   const s=target(designs[0]),l=layout(s);post(s,1);put(s,l.row+1,l.normal.platform!,cell('TikTok'));
@@ -60,4 +60,35 @@ test('legacy running-count helpers are replaced, not mistaken for user input',()
   const s=target(designs.find(s=>s.properties.title==='DESIGN 1')!),l=layout(s);post(s,1,true);
   put(s,l.row+1,9,{userEnteredValue:{formulaValue:'=IF(K18="","",COUNTIF($K$18:K18,K18))'},effectiveValue:{numberValue:1}});
   assert.equal(planSheetDesign(s,designs[1],'Backup').specialCount,1);
+});
+
+test('repeated headers in collapsed historical groups preserve publications in their original order',()=>{
+ const s=target(designs[0]),l=layout(s);post(s,1);
+ const second=l.row+10;
+ for(let r=0;r<=second+1;r++)s.data![0].rowData![r]??={values:[]};
+ s.data![0].rowData![second]=structuredClone(s.data![0].rowData![l.row]);
+ put(s,second+1,l.normal.contentLink!,cell('https://x.com/fixture/status/999'));
+ put(s,second+1,l.normal.likes!,cell(123));
+ s.rowGroups=[{range:{sheetId:s.properties.sheetId,dimension:'ROWS',startIndex:second,endIndex:second+3},depth:1,collapsed:true}];
+ s.data![0].rowMetadata??=[];for(let r=0;r<=second+1;r++)s.data![0].rowMetadata![r]??={};s.data![0].rowMetadata![second+1]={hiddenByUser:true};
+ const p=planSheetDesign(s,designs[1],'');
+ assert.equal(p.sourceSections,2);assert.equal(p.normalCount,2);
+ const links=p.writes.filter(w=>w.cell.userEnteredValue?.stringValue?.startsWith('https://x.com/fixture/')).map(w=>w.cell.userEnteredValue!.stringValue);
+ assert.deepEqual(links,['https://x.com/fixture/status/10','https://x.com/fixture/status/999']);
+ assert.ok(p.removedFeatures.includes('1 agrupamentos de linhas'));
+ assert.equal(p.requests.filter(r=>r.deleteDimensionGroup).length,1);
+});
+test('custom cells above the table and formulas outside inputs are explicitly reported',()=>{
+ const s=target(designs[0]),before=planSheetDesign(s,designs[1],'');
+ put(s,0,25,cell('custom information'));put(s,1,25,{userEnteredValue:{formulaValue:'=42'},effectiveValue:{numberValue:42}});
+ const p=planSheetDesign(s,designs[1],'');
+ assert.equal(p.discardedCells,before.discardedCells+1);assert.ok(p.discardedExamples.includes('Z1'));
+ assert.equal(p.replacedFormulas,before.replacedFormulas+1);
+});
+test('extra content on a repeated header row is not silently discarded',()=>{
+ const s=target(designs[0]),l=layout(s),before=planSheetDesign(s,designs[1],'');
+ put(s,l.row,25,cell('header custom data'));
+ const p=planSheetDesign(s,designs[1],'');
+ assert.equal(p.discardedCells,before.discardedCells+1);
+ assert.ok(p.discardedExamples.includes(`Z${l.row+1}`));
 });
