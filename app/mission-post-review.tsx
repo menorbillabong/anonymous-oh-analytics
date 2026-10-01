@@ -4,6 +4,7 @@ import {useEffect,useMemo,useState,type CSSProperties} from 'react';
 import {createPortal} from 'react-dom';
 import {MatrixBackground} from './matrix-background';
 import {supabase} from '@/lib/supabase';
+import {syncMissionSelectionsAfterSave} from '@/lib/sync-mission-selections';
 import {formatPostDate,postPublishedValue} from '@/lib/post-date';
 import XPostPreview from './x-post-preview';
 import './x-post-preview.css';
@@ -65,7 +66,8 @@ export default function MissionPostReview({profile,posts,profiles,onClose,onSave
   if(error){setSaving(false);setConfirming(false);setMessage('Não foi possível salvar as alterações. Nada foi modificado.');return}
   setBaseline({...assignments});
   setConfirming(false);
-  setMessage(`${changes.length} ${changes.length===1?'publicação alterada':'publicações alteradas'} com sucesso.`);
+  const warning=await syncMissionSelectionsAfterSave(supabase);
+  setMessage(warning||`${changes.length} ${changes.length===1?'publicação alterada':'publicações alteradas'} com sucesso.`);
   await onSaved();
   setSaving(false);
  }

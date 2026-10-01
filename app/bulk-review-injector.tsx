@@ -3,6 +3,7 @@ import {useCallback,useEffect,useMemo,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {MatrixBackground} from './matrix-background';
 import {supabase} from '@/lib/supabase';
+import {syncMissionSelectionsAfterSave} from '@/lib/sync-mission-selections';
 import {formatPostDate,postDateParts,postPublishedDate} from '@/lib/post-date';
 import {publicationIsWithinPeriod} from '@/lib/tracking-period';
 import {withoutExistingXPosts,xStatusId} from '@/lib/x-post-dedupe';
@@ -76,6 +77,8 @@ export default function BulkReviewInjector(){
   if(!limited.accepted.length){setMsg(`Meta mensal de ${goal} publicações atingida.`);setSaving(false);return}
   const{error}=await supabase.from('posts').insert(limited.accepted);
   if(error){setMsg(isMonthlyLimitError(error)?`Meta mensal de ${goal} publicações atingida.`:'Não foi possível adicionar as publicações.');setSaving(false);return}
+  const warning=await syncMissionSelectionsAfterSave(supabase);
+  if(warning){setPosts(posts=>posts.filter(post=>!limited.accepted.some(row=>row.post_url===post.url)));setMsg(warning);setSaving(false);return}
   if(limited.omitted.length){setMsg(`${limited.accepted.length} adicionadas. ${limited.omitted.length} não foram incluídas porque a meta mensal foi atingida.`);setSaving(false);setPosts(posts=>posts.filter(post=>limited.omitted.some(row=>row.post_url===post.url)));return}
   window.location.reload()
  }

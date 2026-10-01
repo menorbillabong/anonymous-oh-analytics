@@ -1,6 +1,7 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import {syncMissionSelectionsAfterSave} from '@/lib/sync-mission-selections';
 import PostLibrary from './post-library';
 import AdminPanel from './admin-panel';
 import { HistoryPage, ActivityPage, RankingPage } from './tracker-pages-v2';
@@ -246,7 +247,7 @@ export default function Dashboard({ session }: {
     } setBusy(true); const mp = profiles.find(x => String(x.id) === String(form.mission_profile_id)); const imgs = String(form.image_urls || '').split(/[\n,]/).map((x: string) => x.trim()).filter(Boolean); const { error } = await supabase.from('posts').insert({ user_id: uid, title: form.title.trim() || 'Publicação do X', post_url: form.post_url.trim(), published_at: form.published_date || new Date().toISOString().slice(0, 10), x_published_at: form.x_published_at || null, views: Number(form.views), likes: Number(form.likes), reposts: Number(form.reposts), comments: Number(form.comments), mission_profile_id: mp?.id || null, mission_name: mp?.name || null, special_reward: Number(mp?.reward || 0), network: 'X', image_urls: imgs, video_url: form.video_url || null, author_handle: settings.x_handle || null, metrics_source: 'auto', metrics_updated_at: new Date().toISOString() }); setBusy(false); if (error) {
         setRefreshNotice(isMonthlyLimitError(error) ? `Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.` : 'Não foi possível adicionar a publicação.');
         return;
-    } setAddOpen(false); setForm(blank); await load(true); }
+    } setAddOpen(false); setForm(blank); setBusy(true); const warning=await syncMissionSelectionsAfterSave(supabase); if(warning)setRefreshNotice(warning); setBusy(false); await load(true); }
     async function processBulk() { if (!activePeriod) {
         setBulkOpen(false);
         setOpenPeriodOpen(true);
@@ -263,7 +264,7 @@ export default function Dashboard({ session }: {
     catch { } return { user_id: uid, title: d.title || 'Publicação do X', post_url: url, published_at: String(d.published_date || d.published_at || '').slice(0, 10) || new Date().toISOString().slice(0, 10), x_published_at: d.published_at || null, views: Number(d.views || 0), likes: Number(d.likes || 0), reposts: Number(d.reposts || 0), comments: Number(d.comments || 0), mission_profile_id: mp?.id || null, mission_name: mp?.name || null, special_reward: Number(mp?.reward || 0), network: 'X', author_handle: d.author_handle || settings.x_handle || null, image_urls: Array.isArray(d.image_urls) ? d.image_urls : [], video_url: d.video_url || null, metrics_source: d.source || 'auto', metrics_updated_at: new Date().toISOString() }; })); const today=postDateParts(new Date())?.key||'',periodRows=rows.filter(row=>publicationIsWithinPeriod(row,activePeriod.start_date,today)),outside=rows.length-periodRows.length; if(!periodRows.length){setBusy(false);setBulkMsg('Nenhuma publicação pertence ao período aberto.');return} const { error } = await supabase.from('posts').insert(periodRows); setBusy(false); if (error) {
         setBulkMsg(isMonthlyLimitError(error) ? `Meta mensal de ${monthlyPostGoal.toLocaleString('pt-BR')} publicações atingida.` : 'Não foi possível adicionar os links.');
         return;
-    } setBulkMsg(`${periodRows.length} publicação(ões) adicionada(s).${outside ? ` ${outside} link(s) ficaram fora do período aberto.` : ''}${omitted ? ` ${omitted} link(s) não foram adicionados porque a meta mensal foi alcançada.` : ''}`); setBulkText(''); await load(true); }
+    } setBulkText(''); setBusy(true); const warning=await syncMissionSelectionsAfterSave(supabase); setBusy(false); setBulkMsg(`${periodRows.length} publicação(ões) adicionada(s).${outside ? ` ${outside} link(s) ficaram fora do período aberto.` : ''}${omitted ? ` ${omitted} link(s) não foram adicionados porque a meta mensal foi alcançada.` : ''}${warning ? ` ${warning}` : ''}`); await load(true); }
     const openBulk = () => { if (!requireOpenPeriod()) return; setBulkMission(firstNormalMissionId(profiles)); setBulkOpen(true); };
     const searchX = () => { if (!requireOpenPeriod()) return; window.dispatchEvent(new CustomEvent('aoh:x-import-request')); };
     async function signOut() { await supabase.auth.signOut(); }

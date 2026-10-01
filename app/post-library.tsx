@@ -4,6 +4,7 @@ import {useEffect,useMemo,useRef,useState,type CSSProperties} from 'react';
 import Image from 'next/image';
 import {cardPhotoUrl} from '@/lib/card-photo';
 import {supabase} from '@/lib/supabase';
+import {syncMissionSelectionsAfterSave} from '@/lib/sync-mission-selections';
 import {useEscapeClose} from '@/lib/use-escape-close';
 import {minimumPostProgress,monthlyReward,postContribution,viewGoalProgress} from '@/lib/reward';
 import {formatPostDate,postDateKey,postPublishedDate,postPublishedValue} from '@/lib/post-date';
@@ -103,6 +104,8 @@ export default function PostLibrary({userId,posts,reload,view,profiles=[],crysta
   const{error}=await supabase.from('posts').update(payload).eq('id',edit.id).eq('user_id',userId);
   if(error){alert('Não foi possível atualizar a publicação.');return}
   setEdit(null);
+  const warning=await syncMissionSelectionsAfterSave(supabase);
+  if(warning)alert(warning);
   await reload();
  }
 
