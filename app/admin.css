@@ -27,6 +27,18 @@
 .admin-counter{color:#ffb45f}
 .admin-control-row{min-height:91px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:17px 19px;border-bottom:1px solid #262626}
 .admin-control-row:last-child{border-bottom:0}
+.admin-account-backups .admin-control-row{flex-wrap:wrap}
+.admin-account-backups strong{overflow-wrap:anywhere}
+.admin-backup-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.admin-backup-actions button{min-height:40px}
+.admin-backup-actions button.admin-backup-danger{border-color:#713131;background:#321414;color:#ff9393}
+.admin-backup-actions button:disabled{opacity:.5;cursor:not-allowed}
+.admin-backup-confirm{margin:16px;padding:16px;border:1px solid #713131;border-radius:8px;background:#241919;font-size:13px;line-height:1.5}
+.admin-backup-confirm h3{margin:0 0 10px;font-size:15px}
+.admin-backup-confirm label{display:block;margin-top:14px}
+.admin-backup-confirm input{display:block;box-sizing:border-box;width:100%;max-width:320px;margin:8px 0 14px;padding:10px;background:#111;color:#eee;border:1px solid #777;border-radius:6px;min-height:44px}
+.admin-backup-confirm input:focus-visible{outline:2px solid #f6ad55;outline-offset:2px}
+@media(max-width:600px){.admin-account-backups .admin-backup-actions{width:100%;display:grid;grid-template-columns:1fr}.admin-backup-actions button{min-height:44px;width:100%}}
 .admin-control-row strong{font-size:12px}
 .admin-control-row p,.admin-panel-copy{margin:5px 0 0;color:#aeb3bd;font-size:10px;line-height:1.45}
 .admin-toggle,.admin-outline,.admin-primary,.admin-link{border:1px solid #353535;border-radius:7px;background:#1d1d1d;color:#bfc3ca;padding:9px 12px;font-size:9px;font-weight:900;white-space:nowrap}

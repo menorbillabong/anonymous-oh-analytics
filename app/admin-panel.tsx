@@ -1025,7 +1025,7 @@ function actionLabel(action:string) {
     disable_global_ranking_control:'Controle global desativado', disqualify_post:'Publicação desqualificada',
     requalify_post:'Publicação requalificada', configure_account_cleanup:'Limpeza de contas configurada',
     schedule_account_deletion:'Exclusão agendada', cancel_account_deletion:'Exclusão cancelada',
-    delete_inactive_account:'Conta inativa excluída', configure_google_sheets:'Google Sheets configurado',
+    delete_inactive_account:'Conta inativa excluída', delete_account_backup:'Cópia de conta excluída', configure_google_sheets:'Google Sheets configurado',
     configure_closed_period_post_cleanup:'Prazo padrão de publicações configurado',
     schedule_closed_period_post_cleanup:'Exclusão de período agendada',
     cancel_closed_period_post_cleanup:'Exclusão de período cancelada',

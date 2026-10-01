@@ -83,6 +83,11 @@ export function AdminAccountBackups() {
   const [backups, setBackups] = useState<Backup[]>([]);
   const [notice, setNotice] = useState('Carregando cópias...');
   const [working, setWorking] = useState('');
+  const [deleting, setDeleting] = useState<Backup | null>(null);
+  const [confirmation, setConfirmation] = useState('');
+  const lock = useRef(false);
+  const confirmationInput = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (deleting) confirmationInput.current?.focus(); }, [deleting]);
   useEffect(() => {
     let active = true;
     void (async () => {
@@ -95,7 +100,8 @@ export function AdminAccountBackups() {
     return () => { active = false; };
   }, []);
   async function download(id: string) {
-    if (working) return;
+    if (lock.current || deleting) return;
+    lock.current = true;
     setWorking(id); setNotice('');
     try {
       const {data, error} = await supabase.rpc('admin_account_backups', {p_backup_id: id});
@@ -106,14 +112,42 @@ export function AdminAccountBackups() {
       link.href = url; link.download = `account-backup-${id}.json`; link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { setNotice(messageOf(error)); }
-    finally { setWorking(''); }
+    finally { lock.current = false; setWorking(''); }
   }
-  return <div className="admin-panel">
+  async function deleteBackup() {
+    if (lock.current || !deleting || confirmation.trim() !== 'EXCLUIR') return;
+    const target = deleting;
+    lock.current = true; setWorking(`delete:${target.id}`); setNotice('');
+    try {
+      const {data, error} = await supabase.rpc('admin_delete_account_backup', {
+        p_backup_id: target.id, p_confirmation: confirmation.trim(),
+      });
+      if (error) throw error;
+      if (!data?.deleted || data.backup_id !== target.id) throw new Error('Exclusão não confirmada. Atualize a página para conferir a lista.');
+      setBackups(current => current.filter(backup => backup.id !== target.id));
+      setDeleting(null); setConfirmation('');
+      setNotice('Cópia excluída do site. Nenhuma conta ou publicação atual foi alterada. Arquivos já baixados não foram removidos.');
+    } catch (error) { setNotice(messageOf(error)); }
+    finally { lock.current = false; setWorking(''); }
+  }
+  return <div className="admin-panel admin-account-backups">
     <div className="admin-panel-head"><div><small>SEGURANÇA DE CONTAS</small><h2>Cópias de exclusões manuais</h2></div></div>
     <p className="admin-panel-copy">Apenas administradores têm acesso. Guarde os arquivos em local seguro; eles contêm dados pessoais. Cópias anteriores a esta proteção não são criadas retroativamente.</p>
     {notice && <p role="status">{notice}</p>}
-    {!notice && !backups.length && <p>Nenhuma conta foi excluída pelo novo fluxo.</p>}
+    {!notice && !backups.length && <p>Nenhuma cópia disponível.</p>}
+    {deleting && <div className="admin-backup-confirm" role="group" aria-labelledby="backup-delete-title">
+      <h3 id="backup-delete-title">Excluir esta cópia de segurança?</h3>
+      <p><strong>{deleting.email}</strong> — {new Date(deleting.created_at).toLocaleString('pt-BR')}</p>
+      <p>Esta ação é definitiva no site. Você perderá a possibilidade de recuperar os dados por esta cópia. Nenhuma conta ou publicação atual será apagada. Arquivos já baixados continuarão no seu computador.</p>
+      <label htmlFor="backup-delete-confirmation">Digite EXCLUIR para confirmar</label>
+      <input ref={confirmationInput} id="backup-delete-confirmation" value={confirmation} autoComplete="off" disabled={Boolean(working)} onChange={event => setConfirmation(event.target.value)}/>
+      <div className="admin-backup-actions">
+        <button type="button" className="admin-outline" disabled={Boolean(working)} onClick={() => { setDeleting(null); setConfirmation(''); }}>CANCELAR</button>
+        <button type="button" className="admin-outline admin-backup-danger" disabled={Boolean(working) || confirmation.trim() !== 'EXCLUIR'} onClick={() => void deleteBackup()}>{working ? 'EXCLUINDO...' : 'EXCLUIR DEFINITIVAMENTE'}</button>
+      </div>
+    </div>}
     {backups.map(backup => <div key={backup.id} className="admin-control-row"><div><strong>{backup.email}</strong><p>{new Date(backup.created_at).toLocaleString('pt-BR')}</p></div>
-      <button className="admin-outline" disabled={Boolean(working)} onClick={() => void download(backup.id)}>{working === backup.id ? 'BAIXANDO...' : 'BAIXAR CÓPIA'}</button></div>)}
+      <div className="admin-backup-actions"><button type="button" className="admin-outline" disabled={Boolean(working) || Boolean(deleting)} onClick={() => void download(backup.id)}>{working === backup.id ? 'BAIXANDO...' : 'BAIXAR CÓPIA'}</button>
+      <button type="button" className="admin-outline admin-backup-danger" disabled={Boolean(working) || Boolean(deleting)} aria-label={`Excluir cópia de ${backup.email}`} onClick={() => { setDeleting(backup); setConfirmation(''); setNotice(''); }}>EXCLUIR CÓPIA</button></div></div>)}
   </div>;
 }
