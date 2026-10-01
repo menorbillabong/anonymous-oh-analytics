@@ -17,6 +17,7 @@ export function eligibleForMissionPeriod(post:{id:string|number;counting_exclude
 
 export function missionSelectionError(error:{message?:string}){
  const message=error.message||'';
+ if(message.includes('MISSION_PERIOD_BULK_INVALID'))return 'Selecione de 1 a 1.000 períodos válidos para excluir.';
  if(message.includes('MISSION_PERIOD_LINKED_OUTSIDE_DATES'))return 'As novas datas deixariam publicações vinculadas fora do período. Corrija as seleções antes de reduzir as datas.';
  if(message.includes('MISSION_PERIOD_ADMIN_REQUIRED'))return 'Somente o administrador pode gerenciar períodos de missão.';
  if(message.includes('MISSION_PERIOD_INVALID'))return 'Informe datas válidas e uma quantidade inteira igual ou maior que zero.';

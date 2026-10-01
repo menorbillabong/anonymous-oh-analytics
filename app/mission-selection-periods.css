@@ -13,3 +13,35 @@ body:has(.mission-selection-page) [data-pix-donation]{display:none!important}
 .mission-period-definition{padding:16px;border:1px solid #444;border-radius:8px;flex:1;min-width:240px}
 .mission-period-admin-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
 .mission-period-delete-confirm{padding:18px;border:1px solid #b76b5b;border-radius:10px;background:#291d19;margin:16px 0}
+/* Admin layout only: the user-facing mission selection toolbar is unchanged. */
+.mission-period-admin-layout{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:24px;align-items:start}
+.mission-period-editor,.mission-period-list-panel{min-width:0}
+.mission-period-admin-layout h3{font-size:15px;margin:0}
+.mission-period-editor{padding:16px;border:1px solid #333;border-radius:10px;background:#141414}
+.mission-period-editor .mission-period-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0}
+.mission-period-editor .mission-period-fields label{min-width:0;font-size:12px;gap:6px}
+.mission-period-editor .mission-period-fill-field{grid-column:1/-1}
+.mission-period-editor .mission-period-fill-field input{max-width:150px}
+.mission-period-editor .mission-period-fields input{padding:8px;min-height:40px;font-size:13px;box-sizing:border-box;color-scheme:dark}
+.mission-period-editor p{font-size:12px;color:#aaa;margin:14px 0 0}
+.mission-period-list-panel{padding:16px;border:1px solid #444;border-radius:10px;background:#121212}
+.mission-period-list-heading,.mission-period-list-tools{display:flex;align-items:center;flex-wrap:wrap;gap:12px;justify-content:space-between}
+.mission-period-list-heading h3 span{display:inline-block;margin-left:6px;padding:3px 8px;background:#292929;border-radius:6px;color:#f6ad55;font-size:12px}
+.mission-period-list-tools{padding:14px 0;margin-top:10px;border-top:1px solid #333;border-bottom:1px solid #333;font-size:12px}
+.mission-period-list-tools>span{color:#aaa;margin-left:auto}
+.mission-period-admin .mission-period-check{display:flex;align-items:center;gap:10px;min-width:0;cursor:pointer}
+.mission-period-admin .mission-period-check input{appearance:auto;flex:0 0 18px;width:18px;height:18px;min-height:18px;margin:0;padding:0;accent-color:#f6ad55;cursor:pointer}
+.mission-period-admin .mission-period-existing{display:grid;gap:8px;margin:12px 0 0;padding:0;list-style:none}
+.mission-period-admin .mission-period-definition{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;padding:12px;background:#1b1b1b}
+.mission-period-admin .mission-period-definition.is-selected{border-color:#f6ad55;background:#292117}
+.mission-period-admin .mission-period-definition.is-editing{outline:1px solid #f6ad55;outline-offset:2px}
+.mission-period-row-info{min-width:0;overflow-wrap:anywhere;font-size:13px;line-height:1.4}
+.mission-period-row-info small{font-size:11px}
+.mission-period-definition .mission-period-admin-actions{margin:0;flex-shrink:0;gap:6px}
+.mission-period-admin-layout button{font-size:12px;padding:8px 12px;min-height:40px}
+.mission-period-admin button.mission-period-secondary{background:#252525;color:#ddd;border-color:#555}
+.mission-period-list-empty{font-size:13px;color:#aaa;padding:20px 0}
+.mission-period-delete-confirm ul{max-height:160px;overflow:auto;padding-left:20px;font-size:13px;line-height:1.7}
+.mission-period-admin .mission-period-message:empty{display:none}
+@media(max-width:1000px){.mission-period-admin-layout{grid-template-columns:1fr}.mission-period-editor{max-width:none}.mission-period-editor .mission-period-fields{grid-template-columns:repeat(3,minmax(0,1fr))}.mission-period-editor .mission-period-fill-field{grid-column:auto}}
+@media(max-width:560px){.mission-period-admin{padding:14px}.mission-period-admin-layout{gap:14px}.mission-period-editor,.mission-period-list-panel{padding:12px}.mission-period-editor .mission-period-fields{grid-template-columns:repeat(2,minmax(0,1fr))}.mission-period-editor .mission-period-fill-field{grid-column:1/-1}.mission-period-admin .mission-period-definition{align-items:flex-start;flex-direction:column}.mission-period-definition .mission-period-admin-actions{align-self:flex-end}.mission-period-list-tools>button{width:100%}.mission-period-admin-layout button{min-height:44px}}

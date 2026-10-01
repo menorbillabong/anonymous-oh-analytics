@@ -105,5 +105,48 @@ assert.deepEqual(await rows('select * from public.posts order by id'),preserved)
 await login('');
 await assert.rejects(db.exec("select public.create_mission_selection_period('2091-01-01','2091-01-10',2)"),/MISSION_PERIOD_ADMIN_REQUIRED/);
 await assert.rejects(db.exec('select public.sync_my_mission_period_selections()'),/MISSION_PERIOD_AUTH_REQUIRED/);
+// Bulk deletion: authorization, stale screens, atomic rollback and preservation.
+await db.exec(await read('20261001070518_bulk_delete_mission_selection_periods'));
+await login(admin);
+const batchPeriods=await rows('select id,revision from public.mission_selection_periods order by id limit 2');
+const batchSql=items=>`select public.delete_mission_selection_periods('${JSON.stringify(items)}'::jsonb)`;
+const snapshot=async()=>({
+ periods:await rows('select * from public.mission_selection_periods order by id'),
+ links:await rows('select * from public.mission_period_selections order by post_id'),
+ posts:await rows('select * from public.posts order by id'),
+ profiles:await rows('select * from public.mission_profiles order by id'),
+ closures:await rows('select * from public.mission_periods order by user_id'),
+ audit:await rows('select * from private.mission_selection_period_audit order by id'),
+});
+const beforeBulk=await snapshot();
+await assert.rejects(db.exec(batchSql([batchPeriods[0],{...batchPeriods[1],revision:999}])),/MISSION_PERIOD_STALE/);
+await assert.rejects(db.exec(batchSql([batchPeriods[0],{id:'ffffffff-ffff-ffff-ffff-ffffffffffff',revision:1}])),/MISSION_PERIOD_STALE/);
+for(const invalid of [[],[batchPeriods[0],batchPeriods[0]],[{id:batchPeriods[0].id}],{},null]){
+ await assert.rejects(db.exec(batchSql(invalid)),/MISSION_PERIOD_BULK_INVALID/);
+}
+await login(alice);await db.exec('set role authenticated');
+await assert.rejects(db.exec(batchSql(batchPeriods)),/MISSION_PERIOD_ADMIN_REQUIRED/);
+await db.exec('reset role');await login('');
+await assert.rejects(db.exec(batchSql(batchPeriods)),/MISSION_PERIOD_ADMIN_REQUIRED/);
+await db.exec('set role anon');
+await assert.rejects(db.exec(batchSql(batchPeriods)),/permission denied/);
+await db.exec('reset role');await login(admin);
+assert.deepEqual(await snapshot(),beforeBulk,'rejected batches leave every row untouched');
+// Force the second delete to fail after the first one would have run.
+await db.exec(`create function private.fail_second_test_delete() returns trigger language plpgsql as $$begin
+ if old.id='${batchPeriods[1].id}'::uuid then raise exception 'TEST_DELETE_FAILURE';end if;return old;end$$;
+ create trigger test_delete_failure before delete on public.mission_selection_periods for each row execute function private.fail_second_test_delete();`);
+await assert.rejects(db.exec(batchSql(batchPeriods)),/TEST_DELETE_FAILURE/);
+assert.deepEqual(await snapshot(),beforeBulk,'partial failure rolls back all deletions and audit writes');
+await db.exec('drop trigger test_delete_failure on public.mission_selection_periods;drop function private.fail_second_test_delete()');
+await db.exec('set role authenticated');
+assert.equal(await scalar(batchSql(batchPeriods)),2);
+await db.exec('reset role');
+const afterBulk=await snapshot();
+const deletedIds=new Set(batchPeriods.map(period=>period.id));
+assert.deepEqual(afterBulk.periods,beforeBulk.periods.filter(period=>!deletedIds.has(period.id)));
+assert.deepEqual(afterBulk.links,beforeBulk.links.filter(link=>!deletedIds.has(link.period_id)));
+for(const key of ['posts','profiles','closures'])assert.deepEqual(afterBulk[key],beforeBulk[key],`${key} must be preserved`);
+assert.equal(afterBulk.audit.length,beforeBulk.audit.length+2,'one recovery audit per deleted period');
 await db.close();
 console.log('PASS: period creation/edit, post classification reconciliation, overlaps, per-user limits, zero/null, manual excess/removal, existing links, snapshot preservation, timezone, admin/owner/anonymous permissions and period deletion.');
