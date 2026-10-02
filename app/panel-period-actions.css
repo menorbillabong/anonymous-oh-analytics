@@ -10,6 +10,14 @@
 .organized-actions .action-group>small{display:block;margin:0 0 8px;color:#686d76;font-size:7px;font-weight:900;letter-spacing:.08em}
 .organized-actions .action-group>div{display:flex;gap:7px;align-items:stretch;flex-wrap:wrap}
 .organized-actions .action-group>div>button,.organized-actions .action-group>div>.sheets-sync-button,.organized-actions .action-group>div>.split-btn{flex:1 1 auto;min-width:0}
+/* Bulk lookup adds a fourth item: keep missions/report together, not a stretched orphan. */
+.hero-actions.organized-actions .action-group>div:has(>button[data-appearance-button="x"]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"exports lookup" "missions report"}
+.hero-actions.organized-actions .action-group>div:has(>button[data-appearance-button="x"])>.split-btn{grid-area:exports}
+.hero-actions.organized-actions .action-group>div:has(>button[data-appearance-button="x"])>button[data-appearance-button="x"]{grid-area:lookup}
+.hero-actions.organized-actions .action-group>div:has(>button[data-appearance-button="x"])>button[data-appearance-button="missions"]{grid-area:missions}
+.hero-actions.organized-actions .action-group>div:has(>button[data-appearance-button="x"])>button[data-appearance-button="report"]{grid-area:report}
+.hero-actions.organized-actions .action-group>div:has(>button[data-appearance-button="x"])>button{height:auto;min-height:40px;padding:9px 12px;white-space:normal;line-height:1.25}
+@media(max-width:360px){.hero-actions.organized-actions .action-group>div:has(>button[data-appearance-button="x"]){grid-template-columns:minmax(0,1fr);grid-template-areas:"exports" "lookup" "missions" "report"}}
 /* Include the gear in the Sheets half; labels and loading states keep equal space. */
 .organized-actions .update-action-group>div{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
 .hero-actions:not(.organized-actions)>.metrics-sync-control,.hero-actions:not(.organized-actions)>.sheets-sync-control{flex:0 1 210px;min-width:0}
