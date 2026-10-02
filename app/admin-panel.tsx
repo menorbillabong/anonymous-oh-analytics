@@ -37,6 +37,7 @@ type AdminUser = {
   period_close_reset_at?: string;
   period_close_release_source?: 'individual' | 'global';
   x_import_enabled?: boolean;
+  x_lookup_enabled?: boolean;
   manual_adjustment_enabled?: boolean;
 };
 
@@ -123,13 +124,14 @@ export default function AdminPanel() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data, error }, { data: sheetsData }, { data: countingData }, { data: cooldownData }, { data: xImportData }, adjustmentAccess] = await Promise.all([
+    const [{ data, error }, { data: sheetsData }, { data: countingData }, { data: cooldownData }, { data: xImportData }, adjustmentAccess, lookupAccess] = await Promise.all([
       supabase.rpc('admin_dashboard'),
       supabase.rpc('admin_google_sheets_users'),
       supabase.rpc('admin_closed_period_counting_status'),
       supabase.functions.invoke('username-auth', { body: { action: 'admin-period-close-status' } }),
       supabase.rpc('admin_x_import_users'),
       supabase.rpc('admin_manual_adjustment_users'),
+      supabase.rpc('admin_x_lookup_access'),
     ]);
     if (error) {
       setMessage('Não foi possível carregar o painel administrativo.');
@@ -143,6 +145,7 @@ export default function AdminPanel() {
     const adjustmentByUser = new Map((Array.isArray(adjustmentAccess.data) ? adjustmentAccess.data : []).map((access:any) => [String(access.user_id), access.enabled === true]));
     setAdjustmentAccessLoaded(!adjustmentAccess.error && Array.isArray(adjustmentAccess.data));
     next.users = (next.users || []).map(user => {
+      user.x_lookup_enabled = !lookupAccess.error && Array.isArray(lookupAccess.data) ? lookupAccess.data.some((entry: {user_id: string; enabled: boolean}) => entry.user_id === user.id && entry.enabled) : undefined;
       const config:any = sheetsByUser.get(user.id) || {};
       const cooldown:any = cooldownByUser.get(user.id) || {};
       return {...user, sheets_sync_enabled:Boolean(config.enabled), sheets_tab_name:String(config.sheet_tab_name || ''), sheets_last_sync_at:config.last_sync_completed_at, sheets_last_sync_status:config.last_sync_status, period_close_last_closed_at:cooldown.last_closed_at, period_close_next_allowed_at:cooldown.next_allowed_at, period_close_blocked:Boolean(cooldown.blocked), period_close_reset_at:cooldown.reset_at, period_close_release_source:cooldown.release_source, x_import_enabled:Boolean(xImportByUser.get(user.id)), manual_adjustment_enabled:adjustmentByUser.get(user.id) === true};
@@ -299,6 +302,16 @@ export default function AdminPanel() {
       p_enabled: enabled,
       p_reason: reason,
     }), enabled ? 'Busca do X liberada somente para este usuário.' : 'Busca do X bloqueada para este usuário.');
+  }
+
+  async function toggleXLookup(user: AdminUser) {
+    if (busy) return;
+    if (typeof user.x_lookup_enabled !== 'boolean') { setMessage('Não foi possível conferir esta permissão. Atualize a lista e tente novamente.'); return; }
+    const enabled = !user.x_lookup_enabled;
+    if (!window.confirm(`${enabled ? 'Liberar' : 'Bloquear'} a busca de @ em massa para ${user.profile_name || user.username || 'este usuário'}? Essa função consulta links e não adiciona publicações ao site.`)) return;
+    const reason = reasonFor('alterar a permissão de busca de @ em massa');
+    if (!reason) return;
+    await run(`x-lookup-${user.id}`, () => supabase.rpc('admin_x_lookup_access', { p_target: user.id, p_enabled: enabled, p_reason: reason }), enabled ? 'Busca de @ em massa liberada.' : 'Busca de @ em massa bloqueada.');
   }
 
   async function toggleManualAdjustment(user: AdminUser) {
@@ -520,7 +533,7 @@ export default function AdminPanel() {
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_blocked ? 'unblock_ranking' : 'block_ranking', user.ranking_blocked ? 'liberar esta conta no ranking' : 'bloquear esta conta no ranking')}>{user.ranking_blocked ? 'LIBERAR RANKING' : 'BLOQUEAR RANKING'}</button>
               <button disabled={busy === `user-${user.id}`} onClick={() => manageUser(user, user.ranking_control_unlocked ? 'lock_ranking_control' : 'unlock_ranking_control', user.ranking_control_unlocked ? 'bloquear o controle individual do ranking' : 'liberar o controle individual do ranking')}>{user.ranking_control_unlocked ? 'TRAVAR CONTROLE' : 'LIBERAR CONTROLE'}</button>
             </div></div>
-            <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button><button className={user.x_import_enabled ? 'safe' : 'access'} disabled={busy === `x-import-${user.id}`} onClick={() => toggleXImport(user)}>{busy === `x-import-${user.id}` ? 'SALVANDO...' : user.x_import_enabled ? 'BUSCA DO X LIBERADA' : 'LIBERAR BUSCA DO X'}</button></div></div>
+            <div className="admin-action-group admin-action-posts"><small>PUBLICAÇÕES</small><div><button className="warning" onClick={() => setDateDeleteUser(user)}>EXCLUIR POR INTERVALO DE DATAS</button><button className={user.x_import_enabled ? 'safe' : 'access'} disabled={busy === `x-import-${user.id}`} onClick={() => toggleXImport(user)}>{busy === `x-import-${user.id}` ? 'SALVANDO...' : user.x_import_enabled ? 'BUSCA DO X LIBERADA' : 'LIBERAR BUSCA DO X'}</button><button className={user.x_lookup_enabled ? 'safe' : 'access'} disabled={Boolean(busy)} onClick={() => void toggleXLookup(user)}>{busy === `x-lookup-${user.id}` ? 'SALVANDO...' : user.x_lookup_enabled ? 'BUSCA DE @ EM MASSA LIBERADA' : 'LIBERAR BUSCA DE @ EM MASSA'}</button></div></div>
             <div className="admin-action-group"><small>FECHAMENTO</small><div><button className={user.period_close_blocked ? 'warning' : 'safe'} disabled={!user.period_close_blocked || busy === `period-close-${user.id}`} onClick={() => resetPeriodCloseCooldown(user)}>{busy === `period-close-${user.id}` ? 'LIBERANDO...' : user.period_close_blocked ? 'LIBERAR FECHAMENTO' : user.period_close_release_source ? 'FECHAMENTO LIBERADO' : 'SEM BLOQUEIO ATIVO'}</button></div>{user.period_close_blocked && <small className="admin-reason">Liberação normal em {formatDate(user.period_close_next_allowed_at, true)}</small>}{user.period_close_release_source&&<small className="admin-reason">Liberação {user.period_close_release_source==='global'?'geral':'individual'} disponível uma vez</small>}</div>
           </div>
           </div>

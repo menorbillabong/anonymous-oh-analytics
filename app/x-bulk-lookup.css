@@ -1,0 +1,13 @@
+.x-lookup-dialog{box-sizing:border-box;width:min(820px,calc(100vw - 28px));max-height:calc(100dvh - 32px);margin:auto;padding:24px;border:1px solid #4b4b4b;border-radius:16px;background:var(--aoh-surface,#171717);color:#eee;overflow:auto;box-shadow:0 18px 60px #0008}
+.x-lookup-dialog::backdrop{background:#000b}
+.x-lookup-dialog header{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.x-lookup-dialog h2{margin:5px 0;font-size:24px}.x-lookup-dialog small{color:var(--aoh-accent,#f6ad55);font-size:11px;letter-spacing:.08em}
+.x-lookup-dialog p{font-size:13px;line-height:1.6}.x-lookup-dialog label{display:block;margin:16px 0 10px;font-size:14px;font-weight:700}
+.x-lookup-dialog textarea{box-sizing:border-box;display:block;width:100%;min-height:150px;resize:vertical;border:1px solid #555;border-radius:9px;background:#101010;color:#eee;padding:12px;font:inherit}
+.x-lookup-dialog button{border:1px solid #555;border-radius:8px;padding:11px 16px;background:#292929;color:#eee;cursor:pointer;font:inherit;font-size:13px;min-height:42px}
+.x-lookup-dialog button:disabled{opacity:.5;cursor:not-allowed}.x-lookup-dialog .x-lookup-primary{background:var(--aoh-accent,#f6ad55);color:#111;border-color:transparent;font-weight:800}
+.x-lookup-dialog .x-lookup-switch{display:flex;align-items:center;gap:12px}.x-lookup-switch input{width:36px;height:21px;accent-color:var(--aoh-accent,#f6ad55)}
+.x-lookup-help{color:#aaa}.x-lookup-summary{border:1px solid #5a4427;border-radius:9px;padding:14px;color:#ffd08f;font-weight:700;font-size:14px}
+.x-lookup-list{list-style:none;padding:0;margin:16px 0;max-height:42dvh;overflow:auto;overscroll-behavior:contain}.x-lookup-list li{display:grid;gap:7px;padding:14px;border-bottom:1px solid #333;scroll-margin:10px}.x-lookup-list strong{font-size:14px}.x-lookup-list a{color:#83c5ff;overflow-wrap:anywhere;font-size:13px}.x-lookup-list span{font-size:12px;color:#aaa}.x-lookup-list .is-opened span{color:#75daa0}.x-lookup-list .is-opened{border-left:3px solid #59b584}
+.x-lookup-actions{display:flex;gap:10px;flex-wrap:wrap}.x-lookup-confirm{margin-top:16px;padding:14px;border:1px solid #a5753f;border-radius:9px}.x-lookup-confirm button{margin-right:8px}.x-lookup-error{color:#ffba9c}.x-lookup-dialog :focus-visible{outline:2px solid #fff;outline-offset:3px}
+@media(max-width:550px){.x-lookup-dialog{padding:16px}.x-lookup-dialog h2{font-size:20px}.x-lookup-actions button{flex:1 1 100%}}
